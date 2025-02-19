@@ -1,8 +1,8 @@
-const express = require('express');
-const { check } = require('express-validator');
-const { register, login } = require('../controllers/authController');
+import { Router } from 'express';
+import { check } from 'express-validator';
+import { register, login } from '../controllers/authController';
 
-const router = express.Router();
+const router = Router();
 
 // Kayıt rotası
 router.post(
@@ -26,4 +26,4 @@ router.post(
   login
 );
 
-module.exports = router; 
+export default router; 

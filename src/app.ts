@@ -1,10 +1,10 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const dotenv = require('dotenv');
+import express, { Request, Response } from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
 // Route'ları import et
-const authRoutes = require('./routes/authRoutes');
+import authRoutes from './routes/authRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -17,7 +17,7 @@ app.use(express.json());
 app.use(cors());
 
 // MongoDB bağlantısı
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI!)
   .then(() => console.log('MongoDB bağlantısı başarılı'))
   .catch((err) => console.log('MongoDB bağlantı hatası:', err));
 
@@ -25,7 +25,7 @@ mongoose.connect(process.env.MONGODB_URI)
 app.use('/api/auth', authRoutes);
 
 // Ana route
-app.get('/', (req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({ message: 'AIKU API çalışıyor' });
 });
 

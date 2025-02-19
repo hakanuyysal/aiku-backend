@@ -1,7 +1,20 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+import mongoose, { Document, Model, Schema } from 'mongoose';
+import bcrypt from 'bcryptjs';
 
-const userSchema = new mongoose.Schema({
+export interface IUser extends Document {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  createdAt: Date;
+  matchPassword(enteredPassword: string): Promise<boolean>;
+}
+
+interface IUserModel extends Model<IUser> {
+  // Model statik metodları buraya eklenebilir
+}
+
+const userSchema = new Schema<IUser>({
   firstName: {
     type: String,
     required: [true, 'İsim alanı zorunludur'],
@@ -33,17 +46,18 @@ const userSchema = new mongoose.Schema({
 });
 
 // Şifreyi hashleme
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function(this: IUser, next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
 });
 
 // Şifre karşılaştırma metodu
-userSchema.methods.matchPassword = async function(enteredPassword) {
+userSchema.methods.matchPassword = async function(this: IUser, enteredPassword: string): Promise<boolean> {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-module.exports = mongoose.model('User', userSchema); 
+export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 

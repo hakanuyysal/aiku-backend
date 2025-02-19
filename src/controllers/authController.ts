@@ -1,16 +1,24 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const { validationResult } = require('express-validator');
+import { Request, Response } from 'express';
+import { validationResult } from 'express-validator';
+import jwt from 'jsonwebtoken';
+import { IUser, User } from '../models/User';
+
+interface UserResponse {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
 
 // JWT Token oluşturma
-const createToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
+const createToken = (id: string): string => {
+  return jwt.sign({ id }, process.env.JWT_SECRET!, {
     expiresIn: process.env.JWT_EXPIRE
   });
 };
 
 // Kayıt işlemi
-exports.register = async (req, res) => {
+export const register = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -41,15 +49,17 @@ exports.register = async (req, res) => {
 
     const token = createToken(user._id);
 
+    const userResponse: UserResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email
+    };
+
     res.status(201).json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email
-      }
+      user: userResponse
     });
   } catch (err) {
     res.status(500).json({
@@ -60,7 +70,7 @@ exports.register = async (req, res) => {
 };
 
 // Giriş işlemi
-exports.login = async (req, res) => {
+export const login = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -92,15 +102,17 @@ exports.login = async (req, res) => {
 
     const token = createToken(user._id);
 
+    const userResponse: UserResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email
+    };
+
     res.status(200).json({
       success: true,
       token,
-      user: {
-        id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email
-      }
+      user: userResponse
     });
   } catch (err) {
     res.status(500).json({
