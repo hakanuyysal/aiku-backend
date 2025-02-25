@@ -6,6 +6,15 @@ export interface IUser extends Document {
   lastName: string;
   email: string;
   password: string;
+  phone?: string;
+  title?: string;
+  location?: string;
+  profileInfo?: string;
+  profilePhoto?: string;
+  linkedin?: string;
+  instagram?: string;
+  facebook?: string;
+  twitter?: string;
   createdAt: Date;
   matchPassword(enteredPassword: string): Promise<boolean>;
 }
@@ -39,6 +48,42 @@ const userSchema = new Schema<IUser>({
     minlength: [6, 'Şifre en az 6 karakter olmalıdır'],
     select: false
   },
+  phone: {
+    type: String,
+    trim: true
+  },
+  title: {
+    type: String,
+    trim: true
+  },
+  location: {
+    type: String,
+    trim: true
+  },
+  profileInfo: {
+    type: String,
+    trim: true
+  },
+  profilePhoto: {
+    type: String, 
+    default: "https://example.com/default-avatar.png" 
+  },
+  linkedin: {
+    type: String,
+    trim: true
+  },
+  instagram: {
+    type: String,
+    trim: true
+  },
+  facebook: {
+    type: String,
+    trim: true
+  },
+  twitter: {
+    type: String,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -46,7 +91,7 @@ const userSchema = new Schema<IUser>({
 });
 
 // Şifreyi hashleme
-userSchema.pre('save', async function(this: IUser, next) {
+userSchema.pre('save', async function (this: IUser, next) {
   if (!this.isModified('password')) {
     return next();
   }
@@ -56,8 +101,8 @@ userSchema.pre('save', async function(this: IUser, next) {
 });
 
 // Şifre karşılaştırma metodu
-userSchema.methods.matchPassword = async function(this: IUser, enteredPassword: string): Promise<boolean> {
+userSchema.methods.matchPassword = async function (this: IUser, enteredPassword: string): Promise<boolean> {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-export const User = mongoose.model<IUser, IUserModel>('User', userSchema); 
+export const User = mongoose.model<IUser, IUserModel>('User', userSchema);

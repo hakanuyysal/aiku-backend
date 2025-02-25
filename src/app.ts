@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
+import companyRoutes from './routes/companyRoutes'; 
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -14,7 +15,12 @@ const app = express();
 
 // Middleware'leri ekle
 app.use(express.json());
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost:3000", 
+    credentials: true,
+  })
+);
 
 // MongoDB bağlantısı
 mongoose.connect(process.env.MONGODB_URI!)
@@ -23,6 +29,7 @@ mongoose.connect(process.env.MONGODB_URI!)
 
 // Route'ları ekle
 app.use('/api/auth', authRoutes);
+app.use('/api/company', companyRoutes);
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {
@@ -30,7 +37,7 @@ app.get('/', (_req: Request, res: Response) => {
 });
 
 // Port ayarı
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // Sunucuyu başlat
 app.listen(PORT, () => {

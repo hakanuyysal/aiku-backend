@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { check } from 'express-validator';
-import { register, login } from '../controllers/authController';
+import { register, login, getCurrentUser, updateUser } from '../controllers/authController';
+import { protect } from '../middleware/auth';
 
 const router = Router();
 
@@ -26,4 +27,10 @@ router.post(
   login
 );
 
-export default router; 
+// Giriş yapmış kullanıcının bilgilerini alma rotası
+router.get('/currentUser', protect, getCurrentUser);
+
+// Kullanıcı bilgilerini güncelleme rotası**
+router.put('/updateUser', protect, updateUser);
+
+export default router;
