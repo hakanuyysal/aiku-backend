@@ -11,7 +11,7 @@ import { protect } from '../middleware/auth';
 
 const router = Router();
 
-// Giriş yapmış kullanıcıya ait tüm şirketleri getirme (örn: GET /api/company/my)
+// Giriş yapmış kullanıcıya ait tüm şirketleri getirme 
 router.get('/current', protect, getCompaniesForUser);
 
 // Şirket oluşturma rotası (örn: POST /api/company)
