@@ -2,11 +2,13 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
 import productRoutes from './routes/productRoutes'; // Product routes eklendi
+import uploadRoutes from './routes/uploadRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -23,6 +25,9 @@ app.use(
   })
 );
 
+// Statik dosya servisi
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // MongoDB bağlantısı
 mongoose.connect(process.env.MONGODB_URI!)
   .then(() => console.log('✅ MongoDB bağlantısı başarılı'))
@@ -32,6 +37,7 @@ mongoose.connect(process.env.MONGODB_URI!)
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/product', productRoutes); // Yeni Product Routes eklendi
+app.use('/api/upload', uploadRoutes);
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {
@@ -39,7 +45,7 @@ app.get('/', (_req: Request, res: Response) => {
 });
 
 // Port ayarı
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3004;
 
 // Sunucuyu başlat
 app.listen(PORT, () => {
