@@ -5,7 +5,8 @@ import dotenv from 'dotenv';
 
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
-import companyRoutes from './routes/companyRoutes'; 
+import companyRoutes from './routes/companyRoutes';
+import productRoutes from './routes/productRoutes'; // Product routes eklendi
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -17,23 +18,24 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000", 
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true,
   })
 );
 
 // MongoDB bağlantısı
 mongoose.connect(process.env.MONGODB_URI!)
-  .then(() => console.log('MongoDB bağlantısı başarılı'))
-  .catch((err) => console.log('MongoDB bağlantı hatası:', err));
+  .then(() => console.log('✅ MongoDB bağlantısı başarılı'))
+  .catch((err) => console.log('❌ MongoDB bağlantı hatası:', err));
 
 // Route'ları ekle
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
+app.use('/api/product', productRoutes); // Yeni Product Routes eklendi
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {
-  res.json({ message: 'AIKU API çalışıyor' });
+  res.json({ message: '🚀 AIKU API çalışıyor' });
 });
 
 // Port ayarı
@@ -41,5 +43,5 @@ const PORT = process.env.PORT || 5000;
 
 // Sunucuyu başlat
 app.listen(PORT, () => {
-  console.log(`Sunucu ${PORT} portunda çalışıyor`);
-}); 
+  console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
+});
