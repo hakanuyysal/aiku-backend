@@ -16,6 +16,8 @@ export interface ICompany extends Document {
   companyAddress: string;
   companyLinkedIn?: string;
   companyTwitter?: string;
+  companyInstagram?: string;  
+  interestedSectors?: string[];
   user: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   slug: string;
@@ -110,6 +112,18 @@ const companySchema = new Schema<ICompany>(
         /^(https?:\/\/)?(www\.)?x\.com\/[A-Za-z0-9_]+\/?$/,
         'Please enter a valid Twitter URL',
       ],
+    },
+    companyInstagram: {
+      type: String,
+      trim: true,
+      match: [
+        /^(https?:\/\/)?(www\.)?instagram\.com\/[A-Za-z0-9_.]+\/?$/,
+        'Please enter a valid Instagram URL',
+      ],
+    },
+    interestedSectors: {
+      type: [String],
+      default: [],
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,

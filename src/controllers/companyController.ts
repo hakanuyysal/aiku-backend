@@ -21,10 +21,11 @@ interface CompanyResponse {
   companyAddress: string;
   companyLinkedIn?: string;
   companyTwitter?: string;
+  companyInstagram?: string;    
+  interestedSectors?: string[]; 
   user: string;
   createdAt: Date;
 }
-
 
 // Şirket oluşturma
 export const createCompany = async (req: Request, res: Response) => {
@@ -61,6 +62,8 @@ export const createCompany = async (req: Request, res: Response) => {
       companyAddress,
       companyLinkedIn,
       companyTwitter,
+      companyInstagram,   
+      interestedSectors,  
     } = req.body;
 
     const company = await Company.create({
@@ -79,6 +82,8 @@ export const createCompany = async (req: Request, res: Response) => {
       companyAddress,
       companyLinkedIn,
       companyTwitter,
+      companyInstagram,   
+      interestedSectors,  
       user: userId,
     });
 
@@ -99,6 +104,8 @@ export const createCompany = async (req: Request, res: Response) => {
       companyAddress: company.companyAddress,
       companyLinkedIn: company.companyLinkedIn,
       companyTwitter: company.companyTwitter,
+      companyInstagram: company.companyInstagram,      
+      interestedSectors: company.interestedSectors, 
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -108,7 +115,6 @@ export const createCompany = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
   }
 };
-
 
 // Belirtilen ID'ye sahip şirketi getirme
 export const getCompany = async (req: Request, res: Response) => {
@@ -148,6 +154,8 @@ export const getCompany = async (req: Request, res: Response) => {
       companyAddress: company.companyAddress,
       companyLinkedIn: company.companyLinkedIn,
       companyTwitter: company.companyTwitter,
+      companyInstagram: company.companyInstagram,   
+      interestedSectors: company.interestedSectors,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -157,7 +165,6 @@ export const getCompany = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
   }
 };
-
 
 // Kullanıcıya ait tüm şirketleri getirme
 export const getCompaniesForUser = async (req: Request, res: Response) => {
@@ -170,15 +177,12 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     const userId = decoded.id;
 
-    // 🛠 **Eğer `userId` bir ObjectId değilse, ObjectId'ye çevir**
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Geçersiz Kullanıcı ID'si" });
     }
 
-    // Kullanıcıya ait tüm şirketleri bulma
     const companies = await Company.find({ user: new mongoose.Types.ObjectId(userId) });
 
-    // Şirket listesini response için düzenleme
     const companiesResponse = companies.map(company => ({
       id: company._id,
       companyName: company.companyName,
@@ -196,6 +200,8 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
       companyAddress: company.companyAddress,
       companyLinkedIn: company.companyLinkedIn,
       companyTwitter: company.companyTwitter,
+      companyInstagram: company.companyInstagram,
+      interestedSectors: company.interestedSectors,
       user: company.user.toString(),
       createdAt: company.createdAt,
     }));
@@ -205,7 +211,6 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
   }
 };
-
 
 // Şirket bilgilerini güncelleme
 export const updateCompany = async (req: Request, res: Response) => {
@@ -243,6 +248,8 @@ export const updateCompany = async (req: Request, res: Response) => {
       companyAddress,
       companyLinkedIn,
       companyTwitter,
+      companyInstagram,
+      interestedSectors,
     } = req.body;
 
     if (companyName) company.companyName = companyName;
@@ -260,6 +267,8 @@ export const updateCompany = async (req: Request, res: Response) => {
     if (companyAddress) company.companyAddress = companyAddress;
     if (companyLinkedIn) company.companyLinkedIn = companyLinkedIn;
     if (companyTwitter) company.companyTwitter = companyTwitter;
+    if (companyInstagram) company.companyInstagram = companyInstagram;
+    if (interestedSectors) company.interestedSectors = interestedSectors;
 
     await company.save();
 
@@ -280,6 +289,8 @@ export const updateCompany = async (req: Request, res: Response) => {
       companyAddress: company.companyAddress,
       companyLinkedIn: company.companyLinkedIn,
       companyTwitter: company.companyTwitter,
+      companyInstagram: company.companyInstagram,
+      interestedSectors: company.interestedSectors,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -289,7 +300,6 @@ export const updateCompany = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
   }
 };
-
 
 // Şirket silme
 export const deleteCompany = async (req: Request, res: Response) => {
