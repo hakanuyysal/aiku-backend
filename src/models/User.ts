@@ -66,7 +66,7 @@ const userSchema = new Schema<IUser>({
   },
   profilePhoto: {
     type: String, 
-    default: "https://example.com/default-avatar.png" 
+    default: null 
   },
   linkedin: {
     type: String,

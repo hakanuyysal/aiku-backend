@@ -236,3 +236,37 @@ export const updateUser = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
   }
 };
+
+// Kullanıcı bilgilerini id ile getirme
+export const getUserById = async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
+    }
+
+    res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        title: user.title,
+        location: user.location,
+        profileInfo: user.profileInfo,
+        profilePhoto: user.profilePhoto,
+        linkedin: user.linkedin,
+        instagram: user.instagram,
+        facebook: user.facebook,
+        twitter: user.twitter,
+        createdAt: user.createdAt
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: "Sunucu hatası", error: err.message });
+  }
+};

@@ -36,7 +36,7 @@ mongoose.connect(process.env.MONGODB_URI!)
 // Route'ları ekle
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
-app.use('/api/product', productRoutes); // Yeni Product Routes eklendi
+app.use('/api/product', productRoutes); 
 app.use('/api/upload', uploadRoutes);
 
 // Ana route

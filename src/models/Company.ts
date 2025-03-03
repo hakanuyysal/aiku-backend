@@ -107,7 +107,7 @@ const companySchema = new Schema<ICompany>(
       type: String,
       trim: true,
       match: [
-        /^(https?:\/\/)?(www\.)?twitter\.com\/[A-Za-z0-9_]+\/?$/,
+        /^(https?:\/\/)?(www\.)?x\.com\/[A-Za-z0-9_]+\/?$/,
         'Please enter a valid Twitter URL',
       ],
     },
