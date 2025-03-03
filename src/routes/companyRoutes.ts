@@ -4,12 +4,16 @@ import {
   createCompany,
   getCompany,
   getCompaniesForUser,
+  getAllCompanies,
   updateCompany,
   deleteCompany
 } from '../controllers/companyController';
 import { protect } from '../middleware/auth';
 
 const router = Router();
+
+// Tüm şirketleri getirme rotası (örn: GET /api/company/all)
+router.get('/all', protect, getAllCompanies);
 
 // Giriş yapmış kullanıcıya ait tüm şirketleri getirme 
 router.get('/current', protect, getCompaniesForUser);

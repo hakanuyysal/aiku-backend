@@ -14,7 +14,7 @@ import { protect } from '../middleware/auth';
 const router = Router();
 
 // **Tüm Ürünleri Getirme (örn: GET /api/products)**
-router.get('/', getAllProducts);
+router.get('/all', getAllProducts);
 
 // **Kullanıcının Ürünlerini Getirme (örn: GET /api/products/user)**
 router.get('/user', protect, getProductsByUser);

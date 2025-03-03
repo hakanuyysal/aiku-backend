@@ -27,6 +27,47 @@ interface CompanyResponse {
   createdAt: Date;
 }
 
+// Tüm şirketleri getirme
+export const getAllCompanies = async (req: Request, res: Response) => {
+  try {
+    // Eğer token ile erişim zorunlu ise aşağıdaki satırları aktif edebilirsiniz:
+    // const token = req.header('Authorization')?.replace('Bearer ', '');
+    // if (!token) {
+    //   return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+    // }
+    // const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+
+    const companies = await Company.find();
+    const companiesResponse: CompanyResponse[] = companies.map((company) => ({
+      id: company._id,
+      companyName: company.companyName,
+      companyLogo: company.companyLogo,
+      companyType: company.companyType,
+      openForInvestments: company.openForInvestments,
+      businessModel: company.businessModel,
+      companySector: company.companySector,
+      companySize: company.companySize,
+      companyEmail: company.companyEmail,
+      companyPhone: company.companyPhone,
+      companyInfo: company.companyInfo,
+      detailedDescription: company.detailedDescription,
+      companyWebsite: company.companyWebsite,
+      companyAddress: company.companyAddress,
+      companyLinkedIn: company.companyLinkedIn,
+      companyTwitter: company.companyTwitter,
+      companyInstagram: company.companyInstagram,
+      interestedSectors: company.interestedSectors,
+      user: company.user.toString(),
+      createdAt: company.createdAt,
+    }));
+
+    res.status(200).json({ success: true, companies: companiesResponse });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+
 // Şirket oluşturma
 export const createCompany = async (req: Request, res: Response) => {
   try {
@@ -119,22 +160,10 @@ export const createCompany = async (req: Request, res: Response) => {
 // Belirtilen ID'ye sahip şirketi getirme
 export const getCompany = async (req: Request, res: Response) => {
   try {
-    // Token doğrulama
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
-    }
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    const userId = decoded.id;
-
     const { id } = req.params;
     const company = await Company.findById(id);
     if (!company) {
       return res.status(404).json({ success: false, message: 'Şirket bulunamadı' });
-    }
-
-    if (company.user.toString() !== userId) {
-      return res.status(403).json({ success: false, message: 'Bu şirketi görüntüleme yetkiniz yok' });
     }
 
     const companyResponse: CompanyResponse = {
@@ -154,7 +183,7 @@ export const getCompany = async (req: Request, res: Response) => {
       companyAddress: company.companyAddress,
       companyLinkedIn: company.companyLinkedIn,
       companyTwitter: company.companyTwitter,
-      companyInstagram: company.companyInstagram,   
+      companyInstagram: company.companyInstagram,
       interestedSectors: company.interestedSectors,
       user: company.user.toString(),
       createdAt: company.createdAt,
@@ -166,21 +195,16 @@ export const getCompany = async (req: Request, res: Response) => {
   }
 };
 
+
 // Kullanıcıya ait tüm şirketleri getirme
 export const getCompaniesForUser = async (req: Request, res: Response) => {
   try {
-    // Token doğrulaması
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
-    }
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    const userId = decoded.id;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    const { userId } = req.query;
+    if (!userId || typeof userId !== "string" || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ success: false, message: "Geçersiz Kullanıcı ID'si" });
     }
 
+    // Belirtilen kullanıcı ID'sine sahip şirketleri bulma
     const companies = await Company.find({ user: new mongoose.Types.ObjectId(userId) });
 
     const companiesResponse = companies.map(company => ({
