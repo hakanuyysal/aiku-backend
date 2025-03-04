@@ -166,7 +166,7 @@ export const getProductsByCompany = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Geçersiz Şirket ID'si" });
     }
 
-    const products = await Product.find({ company: companyId }).populate('companyId', 'companyName companyLogo');
+    const products = await Product.find({ companyId: companyId }).populate('companyId', 'companyName companyLogo');
     res.status(200).json({ success: true, products });
   } catch (err: any) {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
