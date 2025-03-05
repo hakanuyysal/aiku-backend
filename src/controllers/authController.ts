@@ -270,3 +270,130 @@ export const getUserById = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
+
+// Favorilere öğe ekleme fonksiyonu
+export const addFavorite = async (req: Request, res: Response) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+    }
+
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+    let user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    const { type, itemId } = req.body;
+    if (!type || !itemId) {
+      return res.status(400).json({ success: false, message: 'type ve itemId alanları gereklidir' });
+    }
+
+    // Favori ekleme işlemi: type değerine göre ilgili favorites alanı güncelleniyor
+    if (type === 'user') {
+      // Aynı öğenin tekrar eklenmemesi için kontrol
+      if (user.favoriteUsers && user.favoriteUsers.includes(itemId)) {
+        return res.status(400).json({ success: false, message: 'Kullanıcı zaten favorilerde' });
+      }
+      user.favoriteUsers = user.favoriteUsers || [];
+      user.favoriteUsers.push(itemId);
+    } else if (type === 'company') {
+      if (user.favoriteCompanies && user.favoriteCompanies.includes(itemId)) {
+        return res.status(400).json({ success: false, message: 'Şirket zaten favorilerde' });
+      }
+      user.favoriteCompanies = user.favoriteCompanies || [];
+      user.favoriteCompanies.push(itemId);
+    } else if (type === 'product') {
+      if (user.favoriteProducts && user.favoriteProducts.includes(itemId)) {
+        return res.status(400).json({ success: false, message: 'Ürün zaten favorilerde' });
+      }
+      user.favoriteProducts = user.favoriteProducts || [];
+      user.favoriteProducts.push(itemId);
+    } else {
+      return res.status(400).json({ success: false, message: 'Geçersiz favori türü' });
+    }
+
+    await user.save();
+    res.status(200).json({ success: true, message: 'Favorilere eklendi' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+// Favoriden öğe kaldırma fonksiyonu
+export const removeFavorite = async (req: Request, res: Response) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+    }
+
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+    let user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    const { type, itemId } = req.body;
+    if (!type || !itemId) {
+      return res.status(400).json({ success: false, message: 'type ve itemId alanları gereklidir' });
+    }
+
+    if (type === 'user') {
+      user.favoriteUsers = user.favoriteUsers.filter(
+        (fav) => fav.toString() !== itemId
+      );
+    } else if (type === 'company') {
+      user.favoriteCompanies = user.favoriteCompanies.filter(
+        (fav) => fav.toString() !== itemId
+      );
+    } else if (type === 'product') {
+      user.favoriteProducts = user.favoriteProducts.filter(
+        (fav) => fav.toString() !== itemId
+      );
+    } else {
+      return res.status(400).json({ success: false, message: 'Geçersiz favori türü' });
+    }
+
+    await user.save();
+    res.status(200).json({ success: true, message: 'Favoriden kaldırıldı' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+
+// Favorilere eklenmiş öğeleri çekme fonksiyonu
+export const getFavorites = async (req: Request, res: Response) => {
+  try {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+    }
+
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+    const user = await User.findById(decoded.id)
+      .populate('favoriteUsers', 'firstName lastName email')
+      .populate('favoriteCompanies', 'name description')
+      .populate('favoriteProducts', 'name price')
+      .lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    user.favoriteUsers = (user.favoriteUsers || []).filter(fav => fav);
+
+    res.status(200).json({
+      success: true,
+      favorites: {
+        favoriteUsers: user.favoriteUsers,
+        favoriteCompanies: user.favoriteCompanies,
+        favoriteProducts: user.favoriteProducts,
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+  }
+};
+

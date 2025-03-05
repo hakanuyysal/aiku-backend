@@ -16,6 +16,9 @@ export interface IUser extends Document {
   facebook?: string;
   twitter?: string;
   createdAt: Date;
+  favoriteUsers?: mongoose.Types.ObjectId[];
+  favoriteCompanies?: mongoose.Types.ObjectId[];
+  favoriteProducts?: mongoose.Types.ObjectId[];
   matchPassword(enteredPassword: string): Promise<boolean>;
 }
 
@@ -65,8 +68,8 @@ const userSchema = new Schema<IUser>({
     trim: true
   },
   profilePhoto: {
-    type: String, 
-    default: null 
+    type: String,
+    default: null
   },
   linkedin: {
     type: String,
@@ -87,7 +90,22 @@ const userSchema = new Schema<IUser>({
   createdAt: {
     type: Date,
     default: Date.now
-  }
+  },
+  favoriteUsers: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    default: []
+  }],
+  favoriteCompanies: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Company',
+    default: []
+  }],
+  favoriteProducts: [{
+    type: Schema.Types.ObjectId,
+    ref: 'Product',
+    default: []
+  }]
 });
 
 // Şifreyi hashleme
