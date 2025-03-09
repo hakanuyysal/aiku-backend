@@ -18,6 +18,7 @@
     "@types/multer": "^1.4.12",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
+    "docx": "^9.2.0",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
@@ -27,7 +28,9 @@
     "multer": "^1.4.5-lts.1",
     "pdf-parse": "^1.1.1",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "textract": "^2.5.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
