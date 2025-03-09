@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import { Server } from 'socket.io';
+import http from 'http';
 
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
@@ -15,6 +17,29 @@ dotenv.config();
 
 // Express uygulamasını oluştur
 const app = express();
+const server = http.createServer(app);
+
+// Socket.IO kurulumu
+const io = new Server(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  },
+});
+
+// Socket.IO olaylarını dinle
+io.on('connection', (socket) => {
+  console.log('👤 Yeni kullanıcı bağlandı');
+
+  socket.on('send_message', (message) => {
+    console.log('📨 Mesaj alındı:', message);
+    io.emit('receive_message', message);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('👋 Kullanıcı ayrıldı');
+  });
+});
 
 // Middleware'leri ekle
 app.use(express.json());
@@ -48,6 +73,7 @@ app.get('/', (_req: Request, res: Response) => {
 const PORT = process.env.PORT || 3004;
 
 // Sunucuyu başlat
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
+  console.log('✅ Socket.IO sistemi aktif');
 });
