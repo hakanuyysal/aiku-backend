@@ -39,6 +39,11 @@ interface ContactInfo {
   phones: string[];
 }
 
+interface ScrapeResult {
+  content: string;
+  foundUrls: string[];
+}
+
 export class GeminiService {
   private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
@@ -85,16 +90,59 @@ export class GeminiService {
     }
   }
 
-  private async scrapeWebsite(url: string): Promise<string> {
+  private async findSubPages(page: Page): Promise<string[]> {
+    return await page.evaluate(() => {
+      const subPages: string[] = [];
+      const relevantKeywords = [
+        "about",
+        "contact",
+        "hakkinda",
+        "hakkımızda",
+        "iletisim",
+        "iletişim",
+        "biz-kimiz",
+        "kurumsal",
+        "corporate",
+        "company",
+      ];
+
+      document.querySelectorAll("a").forEach((link) => {
+        const href = link.getAttribute("href");
+        const text = link.textContent?.toLowerCase() || "";
+
+        if (
+          href &&
+          !href.startsWith("#") &&
+          !href.startsWith("tel:") &&
+          !href.startsWith("mailto:")
+        ) {
+          if (
+            relevantKeywords.some(
+              (keyword) =>
+                href.toLowerCase().includes(keyword) || text.includes(keyword)
+            )
+          ) {
+            subPages.push(href);
+          }
+        }
+      });
+
+      return [...new Set(subPages)];
+    });
+  }
+
+  private async scrapeWebsite(url: string): Promise<ScrapeResult> {
     try {
       url = this.validateUrl(url);
+      const baseUrl = new URL(url).origin;
+      let allContent = "";
+      const visitedUrls = new Set<string>();
+      const foundUrls: string[] = [];
 
       const isAllowed = await this.checkRobotsRules(url);
       if (!isAllowed) {
         throw new Error("Bu site robots.txt tarafından engellenmiş");
       }
-
-      await this.delay(2000);
 
       const browser = await puppeteer.launch({
         headless: true,
@@ -108,231 +156,262 @@ export class GeminiService {
 
       console.log("Browser launched");
 
-      const page = await browser.newPage();
-      await page.setUserAgent(
-        "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
+      try {
+        const page = await browser.newPage();
+        await page.setUserAgent(
+          "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
+        );
+
+        // Ana sayfayı tara
+        await this.scrapePage(page, url, visitedUrls);
+        allContent += await this.extractPageContent(page);
+
+        // Alt sayfaları bul
+        const subPages = await this.findSubPages(page);
+
+        // Her alt sayfayı tara
+        for (const subPath of subPages) {
+          try {
+            const fullUrl = subPath.startsWith("http")
+              ? subPath
+              : new URL(subPath, baseUrl).href;
+
+            // Aynı domain'de olduğundan emin ol
+            if (!fullUrl.startsWith(baseUrl)) continue;
+
+            // Daha önce ziyaret edilmediyse tara
+            if (!visitedUrls.has(fullUrl)) {
+              await this.delay(2000); // Rate limiting
+              await this.scrapePage(page, fullUrl, visitedUrls);
+              allContent += "\n\n--- " + fullUrl + " ---\n";
+              allContent += await this.extractPageContent(page);
+              foundUrls.push(fullUrl);
+            }
+          } catch (error) {
+            console.warn("Sub-page scraping error:", error);
+            continue;
+          }
+        }
+
+        await page.close();
+      } finally {
+        await browser.close();
+      }
+
+      return {
+        content: this.sanitizeText(allContent),
+        foundUrls,
+      };
+    } catch (error) {
+      console.error("Web scraping error:", error);
+      throw new Error(
+        "Web sitesi içeriği alınamadı: " + (error as Error).message
+      );
+    }
+  }
+  private async scrapePage(
+    page: Page,
+    url: string,
+    visitedUrls: Set<string>
+  ): Promise<void> {
+    if (visitedUrls.has(url)) return;
+
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        await page.goto(url, {
+          waitUntil: "networkidle0",
+          timeout: 30000,
+        });
+        visitedUrls.add(url);
+        break;
+      } catch (error) {
+        retryCount++;
+        if (retryCount === maxRetries) throw error;
+        await this.delay(2000 * retryCount);
+      }
+    }
+
+    const hasCaptcha = await page.evaluate(() => {
+      return (
+        document.body.textContent?.toLowerCase().includes("captcha") ||
+        document.body.innerHTML.toLowerCase().includes("recaptcha")
+      );
+    });
+
+    if (hasCaptcha) {
+      throw new Error("Captcha tespit edildi, scraping yapılamıyor");
+    }
+  }
+
+  private async extractPageContent(page: Page): Promise<string> {
+    const metadata = await page.evaluate(() => {
+      const getMetaContent = (selector: string): string =>
+        document.querySelector(selector)?.getAttribute("content") || "";
+
+      const filterSensitiveData = (text: string): string => {
+        return text.replace(/[^\w\s@.-]/g, "").trim();
+      };
+
+      return {
+        title: filterSensitiveData(document.title),
+        metaDescription: filterSensitiveData(
+          getMetaContent('meta[name="description"]')
+        ),
+        metaKeywords: filterSensitiveData(
+          getMetaContent('meta[name="keywords"]')
+        ),
+        ogTitle: filterSensitiveData(
+          getMetaContent('meta[property="og:title"]')
+        ),
+        ogDescription: filterSensitiveData(
+          getMetaContent('meta[property="og:description"]')
+        ),
+      } as PageMetadata;
+    });
+
+    const logoUrl = await page.evaluate(() => {
+      const logoImg = document.querySelector(
+        'img[alt*="logo" i], img[src*="logo" i], a img'
+      ) as HTMLImageElement;
+      return logoImg?.src || "";
+    });
+
+    const contactInfo = await page.evaluate(() => {
+      const text = document.body.innerText;
+      const emailPattern =
+        /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+      const phonePattern =
+        /(?:(?:\+|00)?[0-9]{1,3}[-. ]?)?\(?[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{2,4}/g;
+
+      const emails = [...new Set(text.match(emailPattern) || [])];
+      const phones = [...new Set(text.match(phonePattern) || [])];
+
+      document.querySelectorAll('a[href^="mailto:"]').forEach((el: Element) => {
+        const email = el.getAttribute("href")?.replace("mailto:", "");
+        if (email) emails.push(email);
+      });
+
+      document.querySelectorAll('a[href^="tel:"]').forEach((el: Element) => {
+        const phone = el.getAttribute("href")?.replace("tel:", "");
+        if (phone) phones.push(phone);
+      });
+
+      return {
+        emails: [...new Set(emails)],
+        phones: [...new Set(phones)],
+      } as ContactInfo;
+    });
+
+    const socialLinks = await page.evaluate(() => {
+      const links: string[] = [];
+      document
+        .querySelectorAll(
+          'a[href*="facebook.com"], a[href*="twitter.com"], a[href*="instagram.com"], a[href*="linkedin.com"], a[href*="youtube.com"]'
+        )
+        .forEach((el: Element) => {
+          const href = el.getAttribute("href");
+          if (href) links.push(href);
+        });
+      return [...new Set(links)];
+    });
+
+    const addressInfo = await page.evaluate(() => {
+      const addresses: string[] = [];
+
+      const mapsElements = document.querySelectorAll(
+        'iframe[src*="google.com/maps"], iframe[src*="maps.google.com"], a[href*="maps.google.com"], a[href*="google.com/maps"]'
       );
 
-      await page.setCookie({
-        name: "cookie_consent",
-        value: "accepted",
-        domain: new URL(url).hostname,
-      });
+      mapsElements.forEach((el: Element) => {
+        const src = el.getAttribute("src") || el.getAttribute("href") || "";
 
-      let retryCount = 0;
-      const maxRetries = 3;
+        const placeMatch = src.match(/(?:place|q|query)=([^&]+)/);
+        const coordsMatch = src.match(/(?:@|ll=)([-\d.]+),([-\d.]+)/);
 
-      while (retryCount < maxRetries) {
-        try {
-          await page.goto(url, {
-            waitUntil: "networkidle0",
-            timeout: 30000,
-          });
-          break;
-        } catch (error) {
-          retryCount++;
-          if (retryCount === maxRetries) throw error;
-          await this.delay(2000 * retryCount);
+        if (placeMatch) {
+          const place = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+          addresses.push(place);
         }
-      }
 
-      console.log("Page loaded");
-
-      const hasCaptcha = await page.evaluate(() => {
-        return (
-          document.body.textContent?.toLowerCase().includes("captcha") ||
-          document.body.innerHTML.toLowerCase().includes("recaptcha")
-        );
-      });
-
-      if (hasCaptcha) {
-        throw new Error("Captcha tespit edildi, scraping yapılamıyor");
-      }
-
-      const metadata = await page.evaluate(() => {
-        const getMetaContent = (selector: string): string =>
-          document.querySelector(selector)?.getAttribute("content") || "";
-
-        const filterSensitiveData = (text: string): string => {
-          return text.replace(/[^\w\s@.-]/g, "").trim();
-        };
-
-        return {
-          title: filterSensitiveData(document.title),
-          metaDescription: filterSensitiveData(
-            getMetaContent('meta[name="description"]')
-          ),
-          metaKeywords: filterSensitiveData(
-            getMetaContent('meta[name="keywords"]')
-          ),
-          ogTitle: filterSensitiveData(
-            getMetaContent('meta[property="og:title"]')
-          ),
-          ogDescription: filterSensitiveData(
-            getMetaContent('meta[property="og:description"]')
-          ),
-        } as PageMetadata;
-      });
-
-      const logoUrl = await page.evaluate(() => {
-        const logoImg = document.querySelector(
-          'img[alt*="logo" i], img[src*="logo" i], a img'
-        ) as HTMLImageElement;
-        return logoImg?.src || "";
-      });
-
-      const contactInfo = await page.evaluate(() => {
-        const text = document.body.innerText;
-        const emailPattern =
-          /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-        const phonePattern =
-          /(?:(?:\+|00)?[0-9]{1,3}[-. ]?)?\(?[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{2,4}/g;
-
-        const emails = [...new Set(text.match(emailPattern) || [])];
-        const phones = [...new Set(text.match(phonePattern) || [])];
-
-        document
-          .querySelectorAll('a[href^="mailto:"]')
-          .forEach((el: Element) => {
-            const email = el.getAttribute("href")?.replace("mailto:", "");
-            if (email) emails.push(email);
-          });
-
-        document.querySelectorAll('a[href^="tel:"]').forEach((el: Element) => {
-          const phone = el.getAttribute("href")?.replace("tel:", "");
-          if (phone) phones.push(phone);
-        });
-
-        return {
-          emails: [...new Set(emails)],
-          phones: [...new Set(phones)],
-        } as ContactInfo;
-      });
-
-      const socialLinks = await page.evaluate(() => {
-        const links: string[] = [];
-        document
-          .querySelectorAll(
-            'a[href*="facebook.com"], a[href*="twitter.com"], a[href*="instagram.com"], a[href*="linkedin.com"], a[href*="youtube.com"]'
-          )
-          .forEach((el: Element) => {
-            const href = el.getAttribute("href");
-            if (href) links.push(href);
-          });
-        return [...new Set(links)];
-      });
-
-      const addressInfo = await page.evaluate(() => {
-        const addresses: string[] = [];
-
-        const mapsElements = document.querySelectorAll(
-          'iframe[src*="google.com/maps"], iframe[src*="maps.google.com"], a[href*="maps.google.com"], a[href*="google.com/maps"]'
-        );
-
-        mapsElements.forEach((el: Element) => {
-          const src = el.getAttribute("src") || el.getAttribute("href") || "";
-
-          const placeMatch = src.match(/(?:place|q|query)=([^&]+)/);
-          const coordsMatch = src.match(/(?:@|ll=)([-\d.]+),([-\d.]+)/);
-
-          if (placeMatch) {
-            const place = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
-            addresses.push(place);
+        let parent = el.parentElement;
+        for (let i = 0; i < 5 && parent; i++) {
+          const text = parent.textContent?.trim();
+          if (text && text.length > 10 && text.length < 200) {
+            addresses.push(text);
           }
+          parent = parent.parentElement;
+        }
+      });
 
-          let parent = el.parentElement;
-          for (let i = 0; i < 5 && parent; i++) {
-            const text = parent.textContent?.trim();
-            if (text && text.length > 10 && text.length < 200) {
-              addresses.push(text);
-            }
-            parent = parent.parentElement;
-          }
-        });
+      const contactSelectors = [
+        ".contact-info",
+        ".contact-details",
+        ".address",
+        ".location",
+        "#contact-address",
+        "[data-address]",
+        ".footer-address",
+        ".office-address",
+        "address",
+        ".contact-section address",
+        ".contact-section .address",
+        ".contact-box",
+        ".contact-info-box",
+      ];
 
-        const contactSelectors = [
-          ".contact-info",
-          ".contact-details",
-          ".address",
-          ".location",
-          "#contact-address",
-          "[data-address]",
-          ".footer-address",
-          ".office-address",
-          "address",
-          ".contact-section address",
-          ".contact-section .address",
-          ".contact-box",
-          ".contact-info-box",
-        ];
-
-        contactSelectors.forEach((selector) => {
-          const elements = document.querySelectorAll(selector);
-          elements.forEach((el) => {
-            const text = el.textContent?.trim();
-            if (text && text.length > 10 && text.length < 200) {
-              addresses.push(text);
-            }
-          });
-        });
-
-        const addressKeywords = [
-          "adres",
-          "address",
-          "location",
-          "konum",
-          "ofis",
-          "office",
-          "merkez",
-          "headquarters",
-        ];
-        document.querySelectorAll("p, div, span").forEach((el: Element) => {
-          const text = el.textContent?.trim() || "";
-          if (
-            text.length > 10 &&
-            text.length < 200 &&
-            addressKeywords.some((keyword) =>
-              text.toLowerCase().includes(keyword)
-            )
-          ) {
+      contactSelectors.forEach((selector) => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((el) => {
+          const text = el.textContent?.trim();
+          if (text && text.length > 10 && text.length < 200) {
             addresses.push(text);
           }
         });
-
-        document
-          .querySelectorAll(
-            "[data-address], [data-location], [data-venue], [data-office]"
-          )
-          .forEach((el: Element) => {
-            const addr =
-              el.getAttribute("data-address") ||
-              el.getAttribute("data-location") ||
-              el.getAttribute("data-venue") ||
-              el.getAttribute("data-office");
-            if (addr) addresses.push(addr);
-          });
-
-        return [...new Set(addresses)];
       });
 
-      await page.close();
-      await browser.close();
+      const addressKeywords = [
+        "adres",
+        "address",
+        "location",
+        "konum",
+        "ofis",
+        "office",
+        "merkez",
+        "headquarters",
+      ];
+      document.querySelectorAll("p, div, span").forEach((el: Element) => {
+        const text = el.textContent?.trim() || "";
+        if (
+          text.length > 10 &&
+          text.length < 200 &&
+          addressKeywords.some((keyword) =>
+            text.toLowerCase().includes(keyword)
+          )
+        ) {
+          addresses.push(text);
+        }
+      });
 
-      const sanitizeText = (text: string): string => {
-        text = text.replace(
-          /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
-          "[FILTERED]"
-        );
-        text = text.replace(/\b\d{11}\b/g, "[FILTERED]");
-        text = text.replace(
-          /\b(password|şifre|tc|tckn)\b[:=]\s*\S+/gi,
-          "[FILTERED]"
-        );
-        return text;
-      };
+      document
+        .querySelectorAll(
+          "[data-address], [data-location], [data-venue], [data-office]"
+        )
+        .forEach((el: Element) => {
+          const addr =
+            el.getAttribute("data-address") ||
+            el.getAttribute("data-location") ||
+            el.getAttribute("data-venue") ||
+            el.getAttribute("data-office");
+          if (addr) addresses.push(addr);
+        });
 
-      return sanitizeText(
-        `
+      return [...new Set(addresses)];
+    });
+
+    return `
 Page Title: ${metadata.title}
 OG Title: ${metadata.ogTitle}
 Meta Description: ${metadata.metaDescription}
@@ -349,16 +428,20 @@ ${socialLinks.join("\n")}
 
 Found Addresses:
 ${addressInfo.join("\n")}
+    `.trim();
+  }
 
-URL: ${url}
-      `.trim()
-      );
-    } catch (error) {
-      console.error("Web scraping error:", error);
-      throw new Error(
-        "Web sitesi içeriği alınamadı: " + (error as Error).message
-      );
-    }
+  private sanitizeText(text: string): string {
+    text = text.replace(
+      /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
+      "[FILTERED]"
+    );
+    text = text.replace(/\b\d{11}\b/g, "[FILTERED]");
+    text = text.replace(
+      /\b(password|şifre|tc|tckn)\b[:=]\s*\S+/gi,
+      "[FILTERED]"
+    );
+    return text;
   }
 
   private calculateAddressScore(text: string): number {
@@ -383,7 +466,9 @@ URL: ${url}
 
   async analyzeWebsite(url: string): Promise<FormData> {
     try {
-      const websiteContent = await this.scrapeWebsite(url);
+      const { content: websiteContent, foundUrls } = await this.scrapeWebsite(
+        url
+      );
       let socialLinks: string[] = [];
 
       try {
