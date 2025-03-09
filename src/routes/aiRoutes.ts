@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
 
 const router = express.Router();
 const geminiService = new GeminiService();
@@ -29,6 +30,11 @@ async function readFileContent(file: Express.Multer.File): Promise<string> {
       // DOCX dosyasını text'e çevir
       const result = await mammoth.extractRawText({ path: file.path });
       return result.value;
+    } else if (ext === '.pdf') {
+      // PDF dosyasını text'e çevir
+      const dataBuffer = fs.readFileSync(file.path);
+      const data = await pdfParse(dataBuffer);
+      return data.text;
     } else {
       // Normal text dosyası olarak oku
       return fs.readFileSync(file.path, 'utf-8');
@@ -38,7 +44,7 @@ async function readFileContent(file: Express.Multer.File): Promise<string> {
     try {
       fs.unlinkSync(file.path);
     } catch (error) {
-      console.error('Dosya silinirken hata:', error);
+      console.error('File deletion error:', error);
     }
   }
 }
@@ -47,19 +53,19 @@ async function readFileContent(file: Express.Multer.File): Promise<string> {
 router.post('/analyze-document', upload.single('document'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'Dosya yüklenmedi' });
+      return res.status(400).json({ error: 'No file uploaded' });
     }
 
     // Dosya içeriğini oku
     const documentText = await readFileContent(req.file);
-    console.log('Dosya içeriği:', documentText); // Debug için
+    console.log('File content:', documentText); // Debug için
     
     // Analiz et
     const formData = await geminiService.analyzeDocument(documentText);
     res.json(formData);
   } catch (error) {
-    console.error('Döküman analizi hatası:', error);
-    res.status(500).json({ error: 'Döküman analizi sırasında bir hata oluştu' });
+    console.error('Document analysis error:', error);
+    res.status(500).json({ error: 'Error during document analysis' });
   }
 });
 

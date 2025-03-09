@@ -31,15 +31,21 @@ export class GeminiService {
 
   async analyzeDocument(documentText: string): Promise<FormData> {
     try {
-      const prompt = `You are an AI assistant specialized in analyzing company information. Analyze the given text and extract company details.
+      const prompt = `You are an AI assistant specialized in extracting company information from documents. Your task is to thoroughly analyze the given text and extract all relevant company details.
 
-Your task:
-1. Carefully read the text
-2. Find company information (company name, email, phone, website, address, description)
-3. Return the found information in JSON format
-4. If any information is not found, leave that field as an empty string ("")
-5. ONLY return JSON, do not write anything else
-6. Do not use markdown
+Instructions:
+1. Carefully examine the entire text for any company-related information
+2. Look for both explicit and implicit information
+3. Search for:
+   - Company name (look for business names, brands, letterhead information)
+   - Email addresses (any business or contact email)
+   - Phone numbers (any business or contact phone numbers)
+   - Website URLs (company websites, social media)
+   - Physical address (office location, headquarters, branches)
+   - Company description (what they do, services, products, industry)
+4. Return ONLY a JSON object with the found information
+5. If information is not found, use empty string ("")
+6. Do not include any explanatory text or markdown
 
 Expected JSON format:
 {
@@ -51,7 +57,7 @@ Expected JSON format:
   "description": "Company description"
 }
 
-Here's the text to analyze:
+Text to analyze:
 ${documentText}`;
 
       const result = await this.model.generateContent(prompt);
