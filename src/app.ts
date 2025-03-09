@@ -11,6 +11,7 @@ import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
 import productRoutes from './routes/productRoutes'; // Product routes eklendi
 import uploadRoutes from './routes/uploadRoutes';
+import aiRoutes from './routes/aiRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -63,6 +64,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/product', productRoutes); 
 app.use('/api/upload', uploadRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {
