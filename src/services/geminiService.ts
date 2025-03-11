@@ -579,21 +579,36 @@ ${websiteContent}`;
       const prompt = `You are an AI assistant specialized in extracting company information from documents. Your task is to thoroughly analyze the given text and extract all relevant company details according to these specific fields:
 
 Instructions:
-1. Carefully examine the entire text
-2. Extract the following details:
-   - companyName: Company name (required)
-   - companyEmail: Business email address (required)
-   - companyPhone: Contact phone number (required)
-   - companyWebsite: Website URL
-   - companyAddress: Physical address (required)
-   - companyInfo: Brief company information
-   - detailedDescription: Detailed company description
-   - companyType: Try to determine if it's 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup'
-   - businessModel: Try to determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
-   - companySector: Main industry or sector
-   - companySize: Try to determine company size ('1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+')
-3. Return ONLY a JSON object with these exact field names
-4. If information is not found, use empty string ("")
+1. Carefully examine the entire text, including contact sections and social media references
+2. Extract and format the following details:
+   - companyName: Company name without any suffixes
+   - companyEmail: IMPORTANT - Extract ALL email addresses found in the text, separate them with commas
+   - companyPhone: Extract ALL phone numbers if present
+   - companyWebsite: Extract website URL if mentioned, or construct from email domain (e.g., if email is @alohalive.online, use alohalive.online)
+   - companyAddress: Extract physical address if present
+   - companyInfo: Write a PROFESSIONAL and FORMAL 2-3 sentence company description focusing on their core business, main offerings, and market position. Write in third person, present tense. Example: "[Company] is a leading provider of [services/products] specializing in [focus area]. The company delivers [key offerings] to [target market]."
+   - detailedDescription: Write a COMPREHENSIVE and FORMAL 4-5 paragraph company description that includes:
+     * Paragraph 1: Company overview and core business
+     * Paragraph 2: Products and services in detail
+     * Paragraph 3: Market focus and target audience
+     * Paragraph 4: Company strengths and unique value propositions
+     Write in third person, present tense, using professional business language.
+   - companyType: MUST be one of: 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup' - Look for explicit mentions or infer from context
+   - businessModel: MUST be one of: 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C' - Look for explicit mentions or infer from target audience
+   - companySector: Main industry sector(s)
+   - companySize: MUST be one of: '1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+' - Infer from context if not explicitly stated
+
+3. IMPORTANT RULES:
+   - For emails: Include ALL email addresses found in the text
+   - For website: If not explicitly mentioned, construct from email domain
+   - For social media: Look for mentions of LinkedIn, Twitter, Instagram, etc.
+   - Write descriptions in a professional, authoritative tone
+   - NEVER use uncertain language like "appears to be" or "seems to"
+   - If a field is mentioned in the text (even briefly), it MUST be captured
+   - For companySize, if team is mentioned as "dynamic" or "startup", default to '1-10' unless stated otherwise
+
+4. Return ONLY a JSON object with these exact field names
+5. If information is truly not found, use empty string ("")
 
 Text to analyze:
 ${documentText}`;
@@ -604,11 +619,26 @@ ${documentText}`;
 
       try {
         const parsed = JSON.parse(text);
+        
+        // Extract domain from email if website is empty
+        let website = parsed.companyWebsite?.trim() || "";
+        if (!website && parsed.companyEmail) {
+          const emailDomain = parsed.companyEmail.split('@')[1]?.split(',')[0];
+          if (emailDomain) {
+            website = `https://${emailDomain}`;
+          }
+        }
+
+        // Extract social media URLs from text
+        const linkedInMatch = documentText.match(/linkedin\.com\/[^\s,\n]+/);
+        const twitterMatch = documentText.match(/twitter\.com\/[^\s,\n]+/);
+        const instagramMatch = documentText.match(/instagram\.com\/[^\s,\n]+/);
+
         return {
           companyName: parsed.companyName?.trim() || "",
           companyEmail: parsed.companyEmail?.trim() || "",
           companyPhone: parsed.companyPhone?.trim() || "",
-          companyWebsite: parsed.companyWebsite?.trim() || "",
+          companyWebsite: website,
           companyAddress: parsed.companyAddress?.trim() || "",
           companyInfo: parsed.companyInfo?.trim() || "",
           detailedDescription: parsed.detailedDescription?.trim() || "",
@@ -616,9 +646,9 @@ ${documentText}`;
           businessModel: parsed.businessModel || "",
           companySector: parsed.companySector || "",
           companySize: parsed.companySize || "",
-          companyLinkedIn: parsed.companyLinkedIn?.trim() || "",
-          companyTwitter: parsed.companyTwitter?.trim() || "",
-          companyInstagram: parsed.companyInstagram?.trim() || "",
+          companyLinkedIn: linkedInMatch ? `https://www.${linkedInMatch[0]}` : "",
+          companyTwitter: twitterMatch ? `https://www.${twitterMatch[0]}` : "",
+          companyInstagram: instagramMatch ? `https://www.${instagramMatch[0]}` : "",
         };
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
