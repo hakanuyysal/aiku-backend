@@ -248,15 +248,13 @@ router.post("/analyze-website", async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) {
-      return res.status(400).json({ error: "URL gerekli" });
+      return res.status(400).json({ error: "URL is required" });
     }
-
     const formData = await geminiService.analyzeWebsite(url);
     res.json(formData);
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Website analizi sırasında bir hata oluştu" });
+    console.error("Website analysis error:", error);
+    res.status(500).json({ error: "Error during website analysis" });
   }
 });
 
@@ -265,15 +263,13 @@ router.post("/analyze-linkedin", async (req, res) => {
   try {
     const { linkedInData } = req.body;
     if (!linkedInData) {
-      return res.status(400).json({ error: "LinkedIn verisi gerekli" });
+      return res.status(400).json({ error: "LinkedIn data is required" });
     }
-
     const formData = await geminiService.analyzeLinkedIn(linkedInData);
     res.json(formData);
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "LinkedIn analizi sırasında bir hata oluştu" });
+    console.error("LinkedIn analysis error:", error);
+    res.status(500).json({ error: "Error during LinkedIn analysis" });
   }
 });
 
