@@ -9,7 +9,7 @@ import http from 'http';
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
-import productRoutes from './routes/productRoutes'; // Product routes eklendi
+import productRoutes from './routes/productRoutes'; 
 import uploadRoutes from './routes/uploadRoutes';
 import aiRoutes from './routes/aiRoutes';
 import linkedInRoutes from './routes/linkedInRoutes';
