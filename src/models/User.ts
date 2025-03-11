@@ -99,8 +99,8 @@ const userSchema = new Schema<IUser>({
   },
   authProvider: {
     type: String,
-    enum: ['local', 'linkedin'],
-    default: 'local'
+    enum: ['email', 'linkedin'],
+    default: 'email'
   },
   emailVerified: {
     type: Boolean,

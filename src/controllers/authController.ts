@@ -1,8 +1,8 @@
-import { Request, Response } from 'express';
-import { validationResult } from 'express-validator';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import { IUser, User } from '../models/User';
+import { Request, Response } from "express";
+import { validationResult } from "express-validator";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { IUser, User } from "../models/User";
 
 interface UserResponse {
   id: string;
@@ -20,41 +20,38 @@ interface UserResponse {
   twitter?: string;
 }
 
-// JWT Token oluşturma
 const createToken = (id: string): string => {
   return jwt.sign({ id }, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRE
+    expiresIn: process.env.JWT_EXPIRE,
   });
 };
 
-// Kayıt işlemi
 export const register = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
     const { firstName, lastName, email, password } = req.body;
 
-    // Email kontrolü
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({
         success: false,
-        message: 'Bu email adresi zaten kayıtlı'
+        message: "Bu email adresi zaten kayıtlı",
       });
     }
 
-    // Yeni kullanıcı oluşturma
     user = await User.create({
       firstName,
       lastName,
       email,
-      password
+      password,
+      authProvider: "email",
     });
 
     const token = createToken(user._id);
@@ -63,52 +60,52 @@ export const register = async (req: Request, res: Response) => {
       id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email
+      email: user.email,
     };
 
     res.status(201).json({
       success: true,
       token,
-      user: userResponse
+      user: userResponse,
     });
   } catch (err) {
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: "Sunucu hatası",
     });
   }
 };
 
-// Giriş işlemi
 export const login = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        errors: errors.array()
+        errors: errors.array(),
       });
     }
 
     const { email, password } = req.body;
 
-    // Email ve şifre kontrolü
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select("+password");
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Geçersiz email veya şifre'
+        message: "Geçersiz email veya şifre",
       });
     }
 
-    // Şifre kontrolü
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Geçersiz email veya şifre'
+        message: "Geçersiz email veya şifre",
       });
     }
+
+    user.authProvider = "email";
+    await user.save();
 
     const token = createToken(user._id);
 
@@ -116,37 +113,41 @@ export const login = async (req: Request, res: Response) => {
       id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email
+      email: user.email,
     };
 
     res.status(200).json({
       success: true,
       token,
-      user: userResponse
+      user: userResponse,
     });
   } catch (err) {
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: "Sunucu hatası",
     });
   }
 };
 
-// Kullanıcı bilgileri getirme
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
 
     if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+      return res.status(401).json({
+        success: false,
+        message: "Yetkilendirme başarısız, token bulunamadı",
+      });
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
 
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
 
     res.status(200).json({
@@ -165,32 +166,49 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         instagram: user.instagram,
         facebook: user.facebook,
         twitter: user.twitter,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
       },
     });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
 
-
-//Kullanıcı bilgileri güncelleme
 export const updateUser = async (req: Request, res: Response) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+      return res.status(401).json({
+        success: false,
+        message: "Yetkilendirme başarısız, token bulunamadı",
+      });
     }
 
-    // Kullanıcıyı doğrula
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     let user = await User.findById(decoded.id);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
 
-    // Güncellenmek istenen alanları al
-    const { firstName, lastName, email, phone, title, location, profileInfo, profilePhoto, linkedin, instagram, facebook, twitter, password } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      title,
+      location,
+      profileInfo,
+      profilePhoto,
+      linkedin,
+      instagram,
+      facebook,
+      twitter,
+      password,
+    } = req.body;
 
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
@@ -211,10 +229,8 @@ export const updateUser = async (req: Request, res: Response) => {
       user.password = await bcrypt.hash(password, salt);
     }
 
-    // Güncellenmiş kullanıcıyı kaydet
     await user.save();
 
-    // Kullanıcı bilgilerini döndür
     const updatedUserResponse: UserResponse = {
       id: user._id,
       firstName: user.firstName,
@@ -233,18 +249,21 @@ export const updateUser = async (req: Request, res: Response) => {
 
     res.status(200).json({ success: true, user: updatedUserResponse });
   } catch (err) {
-    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
 
-// Kullanıcı bilgilerini id ile getirme
 export const getUserById = async (req: Request, res: Response) => {
   try {
     const userId = req.params.id;
-    const user = await User.findById(userId).select('-password');
+    const user = await User.findById(userId).select("-password");
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
 
     res.status(200).json({
@@ -263,126 +282,159 @@ export const getUserById = async (req: Request, res: Response) => {
         instagram: user.instagram,
         facebook: user.facebook,
         twitter: user.twitter,
-        createdAt: user.createdAt
-      }
+        createdAt: user.createdAt,
+      },
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: "Sunucu hatası", error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
 
-// Favorilere öğe ekleme fonksiyonu
 export const addFavorite = async (req: Request, res: Response) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+      return res.status(401).json({
+        success: false,
+        message: "Yetkilendirme başarısız, token bulunamadı",
+      });
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     let user = await User.findById(decoded.id);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
 
     const { type, itemId } = req.body;
     if (!type || !itemId) {
-      return res.status(400).json({ success: false, message: 'type ve itemId alanları gereklidir' });
+      return res.status(400).json({
+        success: false,
+        message: "type ve itemId alanları gereklidir",
+      });
     }
 
-    // Favori ekleme işlemi: type değerine göre ilgili favorites alanı güncelleniyor
-    if (type === 'user') {
-      // Aynı öğenin tekrar eklenmemesi için kontrol
+    if (type === "user") {
       if (user.favoriteUsers && user.favoriteUsers.includes(itemId)) {
-        return res.status(400).json({ success: false, message: 'Kullanıcı zaten favorilerde' });
+        return res
+          .status(400)
+          .json({ success: false, message: "Kullanıcı zaten favorilerde" });
       }
       user.favoriteUsers = user.favoriteUsers || [];
       user.favoriteUsers.push(itemId);
-    } else if (type === 'company') {
+    } else if (type === "company") {
       if (user.favoriteCompanies && user.favoriteCompanies.includes(itemId)) {
-        return res.status(400).json({ success: false, message: 'Şirket zaten favorilerde' });
+        return res
+          .status(400)
+          .json({ success: false, message: "Şirket zaten favorilerde" });
       }
       user.favoriteCompanies = user.favoriteCompanies || [];
       user.favoriteCompanies.push(itemId);
-    } else if (type === 'product') {
+    } else if (type === "product") {
       if (user.favoriteProducts && user.favoriteProducts.includes(itemId)) {
-        return res.status(400).json({ success: false, message: 'Ürün zaten favorilerde' });
+        return res
+          .status(400)
+          .json({ success: false, message: "Ürün zaten favorilerde" });
       }
       user.favoriteProducts = user.favoriteProducts || [];
       user.favoriteProducts.push(itemId);
     } else {
-      return res.status(400).json({ success: false, message: 'Geçersiz favori türü' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Geçersiz favori türü" });
     }
 
     await user.save();
-    res.status(200).json({ success: true, message: 'Favorilere eklendi' });
+    res.status(200).json({ success: true, message: "Favorilere eklendi" });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
 
-// Favoriden öğe kaldırma fonksiyonu
 export const removeFavorite = async (req: Request, res: Response) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+      return res.status(401).json({
+        success: false,
+        message: "Yetkilendirme başarısız, token bulunamadı",
+      });
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     let user = await User.findById(decoded.id);
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
 
     const { type, itemId } = req.body;
     if (!type || !itemId) {
-      return res.status(400).json({ success: false, message: 'type ve itemId alanları gereklidir' });
+      return res.status(400).json({
+        success: false,
+        message: "type ve itemId alanları gereklidir",
+      });
     }
-
-    if (type === 'user') {
+    if (type === "user") {
+      user.favoriteUsers = user.favoriteUsers || [];
       user.favoriteUsers = user.favoriteUsers.filter(
         (fav) => fav.toString() !== itemId
       );
-    } else if (type === 'company') {
+    } else if (type === "company") {
+      user.favoriteCompanies = user.favoriteCompanies || [];
       user.favoriteCompanies = user.favoriteCompanies.filter(
         (fav) => fav.toString() !== itemId
       );
-    } else if (type === 'product') {
+    } else if (type === "product") {
+      user.favoriteProducts = user.favoriteProducts || [];
       user.favoriteProducts = user.favoriteProducts.filter(
         (fav) => fav.toString() !== itemId
       );
     } else {
-      return res.status(400).json({ success: false, message: 'Geçersiz favori türü' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Geçersiz favori türü" });
     }
 
     await user.save();
-    res.status(200).json({ success: true, message: 'Favoriden kaldırıldı' });
+    res.status(200).json({ success: true, message: "Favoriden kaldırıldı" });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
 
-
-// Favorilere eklenmiş öğeleri çekme fonksiyonu
 export const getFavorites = async (req: Request, res: Response) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header("Authorization")?.replace("Bearer ", "");
     if (!token) {
-      return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+      return res.status(401).json({
+        success: false,
+        message: "Yetkilendirme başarısız, token bulunamadı",
+      });
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     const user = await User.findById(decoded.id)
-      .populate('favoriteUsers', 'firstName lastName email')
-      .populate('favoriteCompanies', 'name description')
-      .populate('favoriteProducts', 'name price')
+      .populate("favoriteUsers", "firstName lastName email")
+      .populate("favoriteCompanies", "name description")
+      .populate("favoriteProducts", "name price")
       .lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
 
-    user.favoriteUsers = (user.favoriteUsers || []).filter(fav => fav);
+    user.favoriteUsers = (user.favoriteUsers || []).filter((fav) => fav);
 
     res.status(200).json({
       success: true,
@@ -390,10 +442,11 @@ export const getFavorites = async (req: Request, res: Response) => {
         favoriteUsers: user.favoriteUsers,
         favoriteCompanies: user.favoriteCompanies,
         favoriteProducts: user.favoriteProducts,
-      }
+      },
     });
   } catch (err: any) {
-    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: "Sunucu hatası", error: err.message });
   }
 };
-
