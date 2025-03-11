@@ -11,19 +11,23 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 interface FormData {
-  companyName?: string;
-  email?: string;
-  phone?: string;
-  website?: string;
-  address?: string;
-  description?: string;
-  socialMedia?: {
-    facebook?: string;
-    twitter?: string;
-    instagram?: string;
-    linkedin?: string;
-    youtube?: string;
-  };
+  companyName: string;
+  companyLogo?: string;
+  companyType?: 'Enterprise' | 'Entrepreneur' | 'Investor' | 'Startup';
+  openForInvestments?: boolean;
+  businessModel?: 'B2B' | 'B2C' | 'B2G' | 'C2C' | 'C2B' | 'D2C' | 'B2B2C';
+  companySector?: string;
+  companySize?: '1-10' | '11-50' | '51-200' | '201-500' | '501-1000' | '1001-5000' | '5001-10000' | '10001+';
+  companyEmail: string;
+  companyPhone: string;
+  companyInfo?: string;
+  detailedDescription?: string;
+  companyWebsite?: string;
+  companyAddress: string;
+  companyLinkedIn?: string;
+  companyTwitter?: string;
+  companyInstagram?: string;
+  interestedSectors?: string[];
 }
 
 interface PageMetadata {
@@ -500,20 +504,37 @@ ${addressInfo.join("\n")}
       const prompt = `You are an AI assistant specialized in analyzing website content. Analyze the following website content and extract company information.
 
 Instructions:
-1. Carefully examine the provided website content, especially the 'Found Addresses' section
-2. Look for company information in all sections
-3. Extract the following details:
+1. Carefully examine the provided website content, especially the 'Found Addresses' section and contact information
+2. Look for company information in all sections including meta data, page content, and contact sections
+3. Extract and format the following details:
    - companyName: Extract from title, OG title, or about section. Remove common suffixes like "Inc.", "Ltd." unless they're integral to the name
-   - email: Look for valid email addresses in contact section or footer
-   - phone: Look for phone numbers, clean and format them properly (if multiple numbers found, include all with commas)
-   - website: Use the provided URL (base domain without path)
-   - address: IMPORTANT - Look in 'Found Addresses' section first, then contact section and footer. If multiple addresses found, use the one with highest relevance
-   - description: Create a concise description from meta description, about section, or main content. Include key features and services.
-4. Return ONLY a JSON object with the exact field names specified above
-5. If information is not found, use empty string ("")
-6. Make sure the information is accurate and relevant to the company
-7. Do not include placeholder text or example values
-8. If multiple values found (like phones or emails), include all with comma separation
+   - companyEmail: IMPORTANT - Look for ALL email addresses in contact section, footer, and throughout the content. Include ALL found emails separated by commas
+   - companyPhone: IMPORTANT - Look for ALL phone numbers in contact section, footer, and throughout the content. Format them properly and include ALL found numbers separated by commas
+   - companyWebsite: Use the provided URL (base domain without path)
+   - companyAddress: CRITICAL - Look in 'Found Addresses' section first, then contact section and footer. If multiple addresses found, use the most complete and relevant one
+   - companyInfo: Write a PROFESSIONAL and FORMAL 2-3 sentence company description focusing on their core business, main offerings, and market position. Write in third person, present tense, and avoid phrases like "appears to be" or "seems to". Example: "[Company] is a leading provider of [services/products] specializing in [focus area]. The company delivers [key offerings] to [target market]."
+   - detailedDescription: Write a COMPREHENSIVE and FORMAL 4-5 paragraph company description that includes:
+     * Paragraph 1: Company overview and core business
+     * Paragraph 2: Products and services in detail
+     * Paragraph 3: Market focus and target audience
+     * Paragraph 4: Company strengths and unique value propositions
+     Write in third person, present tense, using professional business language. DO NOT use uncertain language like "appears to be" or "seems to". DO NOT mention the source of information or make observations about missing information.
+   - companyType: Based on the content, determine if it's 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup'
+   - businessModel: Based on their customer focus, determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
+   - companySector: Determine their main industry sector
+   - companySize: Based on any employee information, determine size ('1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+')
+
+4. IMPORTANT NOTES:
+   - DO NOT leave fields empty if information can be found or reasonably inferred from the content
+   - Write descriptions in a professional, authoritative tone without speculative language
+   - If multiple contact details found (emails, phones), include ALL of them
+   - Make educated guesses for companyType, businessModel, and companySector based on the content
+   - Use proper formatting and separate multiple items with commas
+   - NEVER include phrases like "based on the content", "appears to be", "seems to", or any other uncertain language
+   - Write as if you are creating official company documentation
+
+5. Return ONLY a JSON object with these exact field names
+6. If information is truly not found, use empty string ("")
 
 Website Content:
 ${websiteContent}`;
@@ -526,33 +547,21 @@ ${websiteContent}`;
         const parsed = JSON.parse(text);
         const websiteUrl = new URL(url).origin;
 
-        const socialMedia = {
-          facebook:
-            socialLinks.find((link: string) => link.includes("facebook.com")) ||
-            "",
-          twitter:
-            socialLinks.find((link: string) => link.includes("twitter.com")) ||
-            "",
-          instagram:
-            socialLinks.find((link: string) =>
-              link.includes("instagram.com")
-            ) || "",
-          linkedin:
-            socialLinks.find((link: string) => link.includes("linkedin.com")) ||
-            "",
-          youtube:
-            socialLinks.find((link: string) => link.includes("youtube.com")) ||
-            "",
-        };
-
         return {
           companyName: parsed.companyName?.trim() || "",
-          email: parsed.email?.trim() || "",
-          phone: parsed.phone?.trim() || "",
-          website: parsed.website || websiteUrl,
-          address: parsed.address?.trim() || "",
-          description: parsed.description?.trim() || "",
-          socialMedia,
+          companyEmail: parsed.companyEmail?.trim() || "",
+          companyPhone: parsed.companyPhone?.trim() || "",
+          companyWebsite: parsed.companyWebsite || websiteUrl,
+          companyAddress: parsed.companyAddress?.trim() || "",
+          companyInfo: parsed.companyInfo?.trim() || "",
+          detailedDescription: parsed.detailedDescription?.trim() || "",
+          companyType: parsed.companyType || "",
+          businessModel: parsed.businessModel || "",
+          companySector: parsed.companySector || "",
+          companySize: parsed.companySize || "",
+          companyLinkedIn: socialLinks.find((link: string) => link.includes("linkedin.com")) || "",
+          companyTwitter: socialLinks.find((link: string) => link.includes("twitter.com")) || "",
+          companyInstagram: socialLinks.find((link: string) => link.includes("instagram.com")) || "",
         };
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
@@ -567,31 +576,24 @@ ${websiteContent}`;
 
   async analyzeDocument(documentText: string): Promise<FormData> {
     try {
-      const prompt = `You are an AI assistant specialized in extracting company information from documents. Your task is to thoroughly analyze the given text and extract all relevant company details.
+      const prompt = `You are an AI assistant specialized in extracting company information from documents. Your task is to thoroughly analyze the given text and extract all relevant company details according to these specific fields:
 
 Instructions:
-1. Carefully examine the entire text for any company-related information
-2. Look for both explicit and implicit information
-3. Search for:
-   - Company name (look for business names, brands, letterhead information)
-   - Email addresses (any business or contact email)
-   - Phone numbers (any business or contact phone numbers)
-   - Website URLs (company websites, social media)
-   - Physical address (office location, headquarters, branches)
-   - Company description (what they do, services, products, industry)
-4. Return ONLY a JSON object with the found information
-5. If information is not found, use empty string ("")
-6. Do not include any explanatory text or markdown
-
-Expected JSON format:
-{
-  "companyName": "Company name",
-  "email": "Email address",
-  "phone": "Phone number",
-  "website": "Website address",
-  "address": "Address",
-  "description": "Company description"
-}
+1. Carefully examine the entire text
+2. Extract the following details:
+   - companyName: Company name (required)
+   - companyEmail: Business email address (required)
+   - companyPhone: Contact phone number (required)
+   - companyWebsite: Website URL
+   - companyAddress: Physical address (required)
+   - companyInfo: Brief company information
+   - detailedDescription: Detailed company description
+   - companyType: Try to determine if it's 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup'
+   - businessModel: Try to determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
+   - companySector: Main industry or sector
+   - companySize: Try to determine company size ('1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+')
+3. Return ONLY a JSON object with these exact field names
+4. If information is not found, use empty string ("")
 
 Text to analyze:
 ${documentText}`;
@@ -601,7 +603,23 @@ ${documentText}`;
       const text = this.cleanJsonString(response.text());
 
       try {
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        return {
+          companyName: parsed.companyName?.trim() || "",
+          companyEmail: parsed.companyEmail?.trim() || "",
+          companyPhone: parsed.companyPhone?.trim() || "",
+          companyWebsite: parsed.companyWebsite?.trim() || "",
+          companyAddress: parsed.companyAddress?.trim() || "",
+          companyInfo: parsed.companyInfo?.trim() || "",
+          detailedDescription: parsed.detailedDescription?.trim() || "",
+          companyType: parsed.companyType || "",
+          businessModel: parsed.businessModel || "",
+          companySector: parsed.companySector || "",
+          companySize: parsed.companySize || "",
+          companyLinkedIn: parsed.companyLinkedIn?.trim() || "",
+          companyTwitter: parsed.companyTwitter?.trim() || "",
+          companyInstagram: parsed.companyInstagram?.trim() || "",
+        };
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
         console.error("Received text:", text);
@@ -615,16 +633,24 @@ ${documentText}`;
 
   async analyzeLinkedIn(linkedInData: string): Promise<FormData> {
     try {
-      const prompt = `Analyze this LinkedIn profile and return information in JSON format. ONLY return JSON, do not write anything else. Do not use markdown. If any information is not found, leave that field as an empty string:
+      const prompt = `Analyze this LinkedIn profile and extract company information according to these specific fields:
 
-{
-  "companyName": "Company name",
-  "email": "Email address",
-  "phone": "Phone number",
-  "website": "Website address",
-  "address": "Address",
-  "description": "Company description"
-}
+Instructions:
+1. Carefully examine the LinkedIn profile content
+2. Extract the following details:
+   - companyName: Company name (required)
+   - companyEmail: Business email address (required)
+   - companyPhone: Contact phone number (required)
+   - companyWebsite: Website URL
+   - companyAddress: Physical address (required)
+   - companyInfo: Brief company information
+   - detailedDescription: Detailed company description
+   - companyType: Try to determine if it's 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup'
+   - businessModel: Try to determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
+   - companySector: Main industry or sector
+   - companySize: Try to determine company size ('1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+')
+3. Return ONLY a JSON object with these exact field names
+4. If information is not found, use empty string ("")
 
 Profile: ${linkedInData}`;
 
@@ -633,7 +659,23 @@ Profile: ${linkedInData}`;
       const text = this.cleanJsonString(response.text());
 
       try {
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        return {
+          companyName: parsed.companyName?.trim() || "",
+          companyEmail: parsed.companyEmail?.trim() || "",
+          companyPhone: parsed.companyPhone?.trim() || "",
+          companyWebsite: parsed.companyWebsite?.trim() || "",
+          companyAddress: parsed.companyAddress?.trim() || "",
+          companyInfo: parsed.companyInfo?.trim() || "",
+          detailedDescription: parsed.detailedDescription?.trim() || "",
+          companyType: parsed.companyType || "",
+          businessModel: parsed.businessModel || "",
+          companySector: parsed.companySector || "",
+          companySize: parsed.companySize || "",
+          companyLinkedIn: parsed.companyLinkedIn?.trim() || "",
+          companyTwitter: parsed.companyTwitter?.trim() || "",
+          companyInstagram: parsed.companyInstagram?.trim() || "",
+        };
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
         console.error("Received text:", text);
