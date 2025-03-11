@@ -661,28 +661,41 @@ ${documentText}`;
     }
   }
 
-  async analyzeLinkedIn(linkedInData: string): Promise<FormData> {
+  async analyzeLinkedIn(linkedInData: any): Promise<FormData> {
     try {
-      const prompt = `Analyze this LinkedIn profile and extract company information according to these specific fields:
+      // LinkedIn verilerini daha okunabilir bir formata dönüştürme
+      const userData = linkedInData?.data?.user;
+      if (!userData) {
+        throw new Error("LinkedIn kullanıcı verisi bulunamadı");
+      }
+
+      const prompt = `Analyze this LinkedIn user data and create a professional company profile:
+
+User Information:
+- Full Name: ${userData.firstName} ${userData.lastName}
+- Email: ${userData.email}
+- LinkedIn Profile: ${userData.linkedin}
+- Location: ${userData.locale?.country || 'Not specified'}
 
 Instructions:
-1. Carefully examine the LinkedIn profile content
-2. Extract the following details:
-   - companyName: Company name (required)
-   - companyEmail: Business email address (required)
-   - companyPhone: Contact phone number (required)
-   - companyWebsite: Website URL
-   - companyAddress: Physical address (required)
-   - companyInfo: Brief company information
-   - detailedDescription: Detailed company description
-   - companyType: Try to determine if it's 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup'
-   - businessModel: Try to determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
-   - companySector: Main industry or sector
-   - companySize: Try to determine company size ('1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+')
-3. Return ONLY a JSON object with these exact field names
-4. If information is not found, use empty string ("")
+1. Create a professional company profile based on this individual's information
+2. Assume this person is an entrepreneur or business professional
+3. Format the response as a company profile with these fields:
+   - companyName: Create a professional company name using the person's name (e.g., "[Last Name] Consulting" or "[Full Name] Ventures")
+   - companyEmail: Use the provided email
+   - companyPhone: Leave empty if not provided
+   - companyWebsite: Leave empty if not provided
+   - companyAddress: Use the country information if available
+   - companyInfo: Write a brief, professional description focusing on individual expertise
+   - detailedDescription: Create a detailed professional profile
+   - companyType: Most likely 'Entrepreneur' unless other information suggests otherwise
+   - businessModel: Determine based on the profile context
+   - companySector: Determine based on the profile context
+   - companySize: Most likely '1-10' unless other information suggests otherwise
+   - companyLinkedIn: Use the provided LinkedIn profile URL
 
-Profile: ${linkedInData}`;
+4. Return ONLY a JSON object with these exact field names
+5. If information is not found, use empty string ("")`;
 
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
@@ -691,28 +704,29 @@ Profile: ${linkedInData}`;
       try {
         const parsed = JSON.parse(text);
         return {
-          companyName: parsed.companyName?.trim() || "",
-          companyEmail: parsed.companyEmail?.trim() || "",
+          ...parsed,
+          companyLinkedIn: userData.linkedin || "",
+          companyEmail: userData.email || "",
+          companyName: parsed.companyName?.trim() || `${userData.firstName} ${userData.lastName}`,
           companyPhone: parsed.companyPhone?.trim() || "",
           companyWebsite: parsed.companyWebsite?.trim() || "",
-          companyAddress: parsed.companyAddress?.trim() || "",
+          companyAddress: parsed.companyAddress?.trim() || userData.locale?.country || "",
           companyInfo: parsed.companyInfo?.trim() || "",
           detailedDescription: parsed.detailedDescription?.trim() || "",
-          companyType: parsed.companyType || "",
+          companyType: parsed.companyType || "Entrepreneur",
           businessModel: parsed.businessModel || "",
           companySector: parsed.companySector || "",
-          companySize: parsed.companySize || "",
-          companyLinkedIn: parsed.companyLinkedIn?.trim() || "",
+          companySize: parsed.companySize || "1-10",
           companyTwitter: parsed.companyTwitter?.trim() || "",
           companyInstagram: parsed.companyInstagram?.trim() || "",
         };
       } catch (parseError) {
-        console.error("JSON parse error:", parseError);
-        console.error("Received text:", text);
-        throw new Error("AI response is not in JSON format");
+        console.error("JSON ayrıştırma hatası:", parseError);
+        console.error("Alınan metin:", text);
+        throw new Error("AI yanıtı JSON formatında değil");
       }
     } catch (error) {
-      console.error("Gemini API error:", error);
+      console.error("Gemini API hatası:", error);
       throw error;
     }
   }
