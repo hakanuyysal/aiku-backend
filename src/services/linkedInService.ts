@@ -96,7 +96,8 @@ export class LinkedInService {
       email: userInfo.email,
       picture: userInfo.picture,
       locale: userInfo.locale,
-      emailVerified: userInfo.email_verified
+      emailVerified: userInfo.email_verified,
+      linkedinUrl: `https://www.linkedin.com/in/${userInfo.sub}/`
     };
   }
 
@@ -113,6 +114,7 @@ export class LinkedInService {
         profilePhoto: linkedInData.picture,
         locale: linkedInData.locale,
         emailVerified: linkedInData.emailVerified,
+        linkedin: linkedInData.linkedinUrl,
         authProvider: 'linkedin',
         lastLogin: new Date()
       };
@@ -141,6 +143,7 @@ export class LinkedInService {
           lastName: user.lastName,
           email: user.email,
           profilePhoto: user.profilePhoto,
+          linkedin: user.linkedin,
           locale: user.locale,
           emailVerified: user.emailVerified
         },
