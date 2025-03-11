@@ -1,10 +1,9 @@
-import axios from 'axios';
-import { GeminiService } from './geminiService';
-import dotenv from 'dotenv';
-import jwt from 'jsonwebtoken';
-import { User } from '../models/User'; // User modelini import et
+import axios from "axios";
+import { GeminiService } from "./geminiService";
+import dotenv from "dotenv";
+import jwt from "jsonwebtoken";
+import { User } from "../models/User";
 
-// Env değişkenlerini yükle
 dotenv.config();
 
 export class LinkedInService {
@@ -14,8 +13,14 @@ export class LinkedInService {
   private geminiService: GeminiService;
 
   constructor() {
-    if (!process.env.LINKEDIN_CLIENT_ID || !process.env.LINKEDIN_CLIENT_SECRET || !process.env.LINKEDIN_REDIRECT_URI) {
-      throw new Error('LinkedIn API bilgileri eksik. Lütfen .env dosyasını kontrol edin.');
+    if (
+      !process.env.LINKEDIN_CLIENT_ID ||
+      !process.env.LINKEDIN_CLIENT_SECRET ||
+      !process.env.LINKEDIN_REDIRECT_URI
+    ) {
+      throw new Error(
+        "LinkedIn API bilgileri eksik. Lütfen .env dosyasını kontrol edin."
+      );
     }
 
     this.clientId = process.env.LINKEDIN_CLIENT_ID;
@@ -23,70 +28,81 @@ export class LinkedInService {
     this.redirectUri = process.env.LINKEDIN_REDIRECT_URI;
     this.geminiService = new GeminiService();
 
-    console.log('LinkedIn Service initialized with:', {
+    console.log("LinkedIn Service initialized with:", {
       clientId: this.clientId,
-      redirectUri: this.redirectUri
+      redirectUri: this.redirectUri,
     });
   }
 
-  // LinkedIn OAuth URL oluşturma - Sadece OpenID scope'ları
   getAuthUrl(): string {
-    const scopes = [
-      'openid',
-      'profile',
-      'email'
-    ];
-    
-    // Scope'ları virgülle ayır
-    const scope = scopes.join(',');
+    const scopes = ["openid", "profile", "email"];
+
+    const scope = scopes.join(",");
     const authUrl = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${this.clientId}&redirect_uri=${this.redirectUri}&scope=${scope}&state=random123`;
-    
-    console.log('Generated LinkedIn Auth URL:', authUrl);
+
+    console.log("Generated LinkedIn Auth URL:", authUrl);
     return authUrl;
   }
 
-  // Access token alma
   async getAccessToken(code: string): Promise<string> {
     try {
-      console.log('Getting access token with code:', code);
-      console.log('Using client ID:', this.clientId);
-      console.log('Using redirect URI:', this.redirectUri);
+      console.log("Getting access token with code:", code);
+      console.log("Using client ID:", this.clientId);
+      console.log("Using redirect URI:", this.redirectUri);
 
-      const response = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
-        params: {
-          grant_type: 'authorization_code',
-          code,
-          client_id: this.clientId,
-          client_secret: this.clientSecret,
-          redirect_uri: this.redirectUri
+      const response = await axios.post(
+        "https://www.linkedin.com/oauth/v2/accessToken",
+        null,
+        {
+          params: {
+            grant_type: "authorization_code",
+            code,
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            redirect_uri: this.redirectUri,
+          },
         }
-      });
+      );
 
-      console.log('Access token response:', response.data);
+      console.log("Access token response:", response.data);
       return response.data.access_token;
     } catch (error: any) {
-      console.error('LinkedIn access token error:', error.response?.data || error.message);
-      throw new Error(`LinkedIn access token alınamadı: ${error.response?.data?.error_description || error.message}`);
+      console.error(
+        "LinkedIn access token error:",
+        error.response?.data || error.message
+      );
+      throw new Error(
+        `LinkedIn access token alınamadı: ${
+          error.response?.data?.error_description || error.message
+        }`
+      );
     }
   }
 
-  // Kullanıcı profilini çekme - Sadece OpenID bilgileri
   async getProfile(accessToken: string) {
     try {
-      console.log('Getting user profile with access token');
+      console.log("Getting user profile with access token");
 
-      // OpenID ile kullanıcı bilgilerini al
-      const userInfoResponse = await axios.get('https://api.linkedin.com/v2/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
+      const userInfoResponse = await axios.get(
+        "https://api.linkedin.com/v2/userinfo",
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
 
-      console.log('User info response:', userInfoResponse.data);
+      console.log("User info response:", userInfoResponse.data);
 
-      // OpenID verilerini formatlama
       return this.formatLinkedInData(userInfoResponse.data);
     } catch (error: any) {
-      console.error('LinkedIn profile error:', error.response?.data || error.message);
-      throw new Error(`LinkedIn profil bilgileri alınamadı: ${error.response?.data?.error_description || error.message}`);
+      console.error(
+        "LinkedIn profile error:",
+        error.response?.data || error.message
+      );
+      throw new Error(
+        `LinkedIn profil bilgileri alınamadı: ${
+          error.response?.data?.error_description || error.message
+        }`
+      );
     }
   }
 
@@ -97,43 +113,38 @@ export class LinkedInService {
       picture: userInfo.picture,
       locale: userInfo.locale,
       emailVerified: userInfo.email_verified,
-      linkedinUrl: `https://www.linkedin.com/in/${userInfo.sub}/`
+      linkedinUrl: `https://www.linkedin.com/in/${userInfo.sub}/`,
     };
   }
 
-  // LinkedIn ile giriş/kayıt işlemi
   async handleAuth(linkedInData: any) {
     try {
-      // Email ile kullanıcı ara
       let user = await User.findOne({ email: linkedInData.email });
 
       const userData = {
-        firstName: linkedInData.name.split(' ')[0],
-        lastName: linkedInData.name.split(' ').slice(1).join(' '),
+        firstName: linkedInData.name.split(" ")[0],
+        lastName: linkedInData.name.split(" ").slice(1).join(" "),
         email: linkedInData.email,
         profilePhoto: linkedInData.picture,
         locale: linkedInData.locale,
         emailVerified: linkedInData.emailVerified,
         linkedin: linkedInData.linkedinUrl,
-        authProvider: 'linkedin',
-        lastLogin: new Date()
+        authProvider: "linkedin",
+        lastLogin: new Date(),
       };
 
       if (!user) {
-        // Kullanıcı yoksa yeni kullanıcı oluştur
         user = new User(userData);
         await user.save();
       } else {
-        // Kullanıcı varsa bilgilerini güncelle
         user.set(userData);
         await user.save();
       }
 
-      // JWT token oluştur
       const token = jwt.sign(
         { userId: user._id.toString() },
-        process.env.JWT_SECRET || 'your-super-secret-jwt-key',
-        { expiresIn: process.env.JWT_EXPIRE || '24h' }
+        process.env.JWT_SECRET || "your-super-secret-jwt-key",
+        { expiresIn: process.env.JWT_EXPIRE || "24h" }
       );
 
       return {
@@ -145,13 +156,13 @@ export class LinkedInService {
           profilePhoto: user.profilePhoto,
           linkedin: user.linkedin,
           locale: user.locale,
-          emailVerified: user.emailVerified
+          emailVerified: user.emailVerified,
         },
-        token
+        token,
       };
     } catch (error: any) {
-      console.error('LinkedIn auth error:', error);
-      throw new Error('LinkedIn ile giriş işlemi başarısız: ' + error.message);
+      console.error("LinkedIn auth error:", error);
+      throw new Error("LinkedIn ile giriş işlemi başarısız: " + error.message);
     }
   }
-} 
+}
