@@ -106,28 +106,24 @@ export class LinkedInService {
       // Email ile kullanıcı ara
       let user = await User.findOne({ email: linkedInData.email });
 
+      const userData = {
+        firstName: linkedInData.name.split(' ')[0],
+        lastName: linkedInData.name.split(' ').slice(1).join(' '),
+        email: linkedInData.email,
+        profilePhoto: linkedInData.picture,
+        locale: linkedInData.locale,
+        emailVerified: linkedInData.emailVerified,
+        authProvider: 'linkedin',
+        lastLogin: new Date()
+      };
+
       if (!user) {
         // Kullanıcı yoksa yeni kullanıcı oluştur
-        user = new User({
-          name: linkedInData.name,
-          email: linkedInData.email,
-          profilePicture: linkedInData.picture,
-          locale: linkedInData.locale,
-          emailVerified: linkedInData.emailVerified,
-          authProvider: 'linkedin'
-        });
-
+        user = new User(userData);
         await user.save();
       } else {
         // Kullanıcı varsa bilgilerini güncelle
-        user.set({
-          name: linkedInData.name,
-          profilePicture: linkedInData.picture,
-          locale: linkedInData.locale,
-          emailVerified: linkedInData.emailVerified,
-          lastLogin: new Date()
-        });
-
+        user.set(userData);
         await user.save();
       }
 
@@ -141,9 +137,10 @@ export class LinkedInService {
       return {
         user: {
           id: user._id.toString(),
-          name: user.name,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
-          profilePicture: user.profilePicture,
+          profilePhoto: user.profilePhoto,
           locale: user.locale,
           emailVerified: user.emailVerified
         },
