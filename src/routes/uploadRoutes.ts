@@ -4,9 +4,84 @@ import { protect } from '../middleware/auth';
 import { Request, Response } from 'express';
 import { Company } from '../models/Company';
 import { Product } from '../models/Product';
+import { TeamMember } from '../models/TeamMember';
 import { deleteFile } from '../utils/fileUtils';
 
 const router = Router();
+
+// Takım Üyesi Profil Fotoğrafı Yükleme / Güncelleme
+router.post('/team-member-profile-photo/:teamMemberId', protect, upload.single('photo'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen bir dosya yükleyin'
+      });
+    }
+
+    const teamMember = await TeamMember.findById(req.params.teamMemberId);
+    if (!teamMember) {
+      return res.status(404).json({
+        success: false,
+        message: 'Takım üyesi bulunamadı'
+      });
+    }
+
+    // Eski fotoğrafı sil
+    if (teamMember.profilePhoto) {
+      deleteFile(teamMember.profilePhoto);
+    }
+
+    // Dosya yolunu oluştur
+    const fileUrl = `/uploads/images/${req.file.filename}`;
+
+    // Takım üyesinin profil fotoğrafını güncelle
+    teamMember.profilePhoto = fileUrl;
+    await teamMember.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Takım üyesi profil fotoğrafı başarıyla yüklendi',
+      data: { url: fileUrl }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Dosya yükleme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+  }
+});
+
+// Takım Üyesi Profil Fotoğrafı Silme
+router.delete('/team-member-profile-photo/:teamMemberId', protect, async (req: Request, res: Response) => {
+  try {
+    const teamMember = await TeamMember.findById(req.params.teamMemberId);
+    if (!teamMember) {
+      return res.status(404).json({
+        success: false,
+        message: 'Takım üyesi bulunamadı'
+      });
+    }
+
+    if (teamMember.profilePhoto) {
+      deleteFile(teamMember.profilePhoto);
+      teamMember.profilePhoto = undefined;
+      await teamMember.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Takım üyesi profil fotoğrafı başarıyla silindi'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Dosya silme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+  }
+});
 
 // Profil fotoğrafı yükleme
 router.post('/profile-photo', protect, upload.single('photo'), async (req: Request, res: Response) => {

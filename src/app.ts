@@ -9,7 +9,8 @@ import http from 'http';
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
-import productRoutes from './routes/productRoutes'; 
+import productRoutes from './routes/productRoutes';
+import teamMemberRoutes from './routes/teamMemberRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import aiRoutes from './routes/aiRoutes';
 import linkedInRoutes from './routes/linkedInRoutes';
@@ -63,7 +64,8 @@ mongoose.connect(process.env.MONGODB_URI!)
 // Route'ları ekle
 app.use('/api/auth', authRoutes);
 app.use('/api/company', companyRoutes);
-app.use('/api/product', productRoutes); 
+app.use('/api/product', productRoutes);
+app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api', linkedInRoutes);
