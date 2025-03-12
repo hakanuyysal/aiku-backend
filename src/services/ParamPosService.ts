@@ -15,7 +15,7 @@ class ParamPosService {
     this.clientUsername = process.env.PARAM_CLIENT_USERNAME || '';
     this.clientPassword = process.env.PARAM_CLIENT_PASSWORD || '';
     this.guid = process.env.PARAM_GUID || '';
-    this.baseUrl = process.env.PARAM_BASE_URL || 'https://test-dmz.param.com.tr:4443/';
+    this.baseUrl = process.env.PARAM_BASE_URL || 'https://dev.param.com.tr/';
 
     // Başlangıçta credentials'ları kontrol et
     console.log('ParamPosService başlatılıyor:', {
@@ -29,18 +29,34 @@ class ParamPosService {
 
   private async getToken(): Promise<string> {
     try {
+      const url = this.baseUrl;
+      
       console.log('Token isteği gönderiliyor...', {
         clientCode: this.clientCode,
         clientUsername: this.clientUsername,
         guid: this.guid,
-        url: `${this.baseUrl}corporate/test/v1/token`
+        url
       });
 
-      const response = await axios.post(`${this.baseUrl}corporate/test/v1/token`, {
-        clientCode: this.clientCode,
-        clientUsername: this.clientUsername,
-        clientPassword: this.clientPassword,
-        guid: this.guid
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Body>
+            <TP_WMD_UCD xmlns="https://turkpos.com.tr/">
+              <G>
+                <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
+                <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
+                <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
+              </G>
+              <GUID>${this.guid}</GUID>
+            </TP_WMD_UCD>
+          </soap:Body>
+        </soap:Envelope>`;
+
+      const response = await axios.post(url, soapEnvelope, {
+        headers: {
+          'Content-Type': 'text/xml;charset=UTF-8',
+          'SOAPAction': 'https://turkpos.com.tr/TP_WMD_UCD'
+        }
       });
 
       console.log('Token yanıtı:', {
@@ -49,12 +65,13 @@ class ParamPosService {
         data: response.data
       });
 
-      if (!response.data.result?.token) {
-        console.error('Token yanıtında token bulunamadı:', response.data);
-        throw new Error('Token alınamadı: ' + JSON.stringify(response.data));
+      // SOAP yanıtını parse et
+      const result = response.data;
+      if (!result) {
+        throw new Error('Token alınamadı: Yanıt boş');
       }
 
-      return response.data.result.token;
+      return result;
     } catch (error) {
       if (error instanceof AxiosError) {
         console.error('Token alma hatası:', {
@@ -87,36 +104,40 @@ class ParamPosService {
         cvcLength: cvc?.length
       });
 
-      const token = await this.getToken();
+      const url = this.baseUrl;
       
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Body>
+            <TP_KK_Sakli_Liste xmlns="https://turkpos.com.tr/">
+              <G>
+                <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
+                <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
+                <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
+              </G>
+              <GUID>${this.guid}</GUID>
+              <KK_Sahibi>${cardHolderName}</KK_Sahibi>
+              <KK_No>${cardNumber}</KK_No>
+              <KK_SK_Ay>${expireMonth}</KK_SK_Ay>
+              <KK_SK_Yil>${expireYear}</KK_SK_Yil>
+              <KK_CVC>${cvc}</KK_CVC>
+              <Data1>${userId}</Data1>
+              <Data2>${process.env.CLIENT_URL}/payment/callback</Data2>
+            </TP_KK_Sakli_Liste>
+          </soap:Body>
+        </soap:Envelope>`;
+
       console.log('Kart kaydetme isteği gönderiliyor...', {
-        userId,
-        cardHolderName,
-        expireMonth,
-        expireYear,
-        url: `${this.baseUrl}corporate/test/v1/card/register`,
-        returnUrl: process.env.CLIENT_URL + '/payment/callback'
+        url,
+        soapAction: 'https://turkpos.com.tr/TP_KK_Sakli_Liste'
       });
 
-      const response = await axios.post(
-        `${this.baseUrl}corporate/test/v1/card/register`,
-        {
-          cardNumber,
-          cardHolderName,
-          expireMonth,
-          expireYear,
-          cvc,
-          userId,
-          returnUrl: process.env.CLIENT_URL + '/payment/callback'
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+      const response = await axios.post(url, soapEnvelope, {
+        headers: {
+          'Content-Type': 'text/xml;charset=UTF-8',
+          'SOAPAction': 'https://turkpos.com.tr/TP_KK_Sakli_Liste'
         }
-      );
+      });
 
       console.log('Kart kaydetme yanıtı:', {
         status: response.status,
@@ -124,12 +145,13 @@ class ParamPosService {
         data: response.data
       });
 
-      if (!response.data.result) {
-        console.error('Kart kaydetme yanıtında result bulunamadı:', response.data);
-        throw new Error('Kart kaydetme başarısız: ' + JSON.stringify(response.data));
+      // SOAP yanıtını parse et
+      const result = response.data;
+      if (!result) {
+        throw new Error('Kart kaydetme yanıtı boş');
       }
 
-      return response.data;
+      return result;
     } catch (error) {
       if (error instanceof AxiosError) {
         console.error('Kart kaydetme hatası:', {
@@ -141,7 +163,7 @@ class ParamPosService {
             url: error.config?.url,
             method: error.config?.method,
             headers: error.config?.headers,
-            data: JSON.stringify(error.config?.data)
+            data: error.config?.data
           }
         });
         throw new Error(`Kart kaydetme işlemi başarısız: ${error.response?.data?.message || error.message}`);
@@ -160,9 +182,10 @@ class ParamPosService {
       });
 
       const token = await this.getToken();
+      const url = new URL('corporate/v1/payment', this.baseUrl).toString();
       
       const response = await axios.post(
-        `${this.baseUrl}corporate/test/v1/payment`,
+        url,
         {
           amount,
           cardToken,
@@ -212,9 +235,10 @@ class ParamPosService {
       console.log('Kart silme işlemi başlatılıyor...', { cardToken });
 
       const token = await this.getToken();
+      const url = new URL('corporate/v1/card/delete', this.baseUrl).toString();
       
       const response = await axios.post(
-        `${this.baseUrl}corporate/test/v1/card/delete`,
+        url,
         {
           cardToken
         },
