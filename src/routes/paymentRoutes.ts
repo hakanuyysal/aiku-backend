@@ -15,9 +15,9 @@ router.post('/process-payment',
     body('cardNumber').isString().isLength({ min: 16, max: 16 }).withMessage('Geçerli bir kart numarası giriniz'),
     body('cardHolderName').isString().notEmpty().withMessage('Kart sahibi adı gereklidir'),
     body('expireMonth').isString().isLength({ min: 2, max: 2 }).withMessage('Geçerli bir son kullanma ayı giriniz'),
-    body('expireYear').isString().isLength({ min: 2, max: 2 }).withMessage('Geçerli bir son kullanma yılı giriniz'),
+    body('expireYear').isString().isLength({ min: 4, max: 4 }).withMessage('Geçerli bir son kullanma yılı giriniz (YYYY)'),
     body('cvc').isString().isLength({ min: 3, max: 3 }).withMessage('Geçerli bir CVC giriniz'),
-    body('amount').isNumeric().withMessage('Geçerli bir tutar giriniz'),
+    body('amount').isFloat({ min: 0.01 }).withMessage('Geçerli bir tutar giriniz'),
     body('installment').optional().isInt({ min: 1 }).withMessage('Geçerli bir taksit sayısı giriniz'),
     validateRequest
   ],
@@ -25,15 +25,21 @@ router.post('/process-payment',
     try {
       const { cardNumber, cardHolderName, expireMonth, expireYear, cvc, amount, installment = 1 } = req.body;
 
-      const result = await ParamPosService.payment(
-        amount,
+      // amount string'den number'a çevir
+      const numericAmount = parseFloat(amount);
+
+      const result = await ParamPosService.payment({
+        amount: numericAmount,
         cardNumber,
         cardHolderName,
         expireMonth,
         expireYear,
         cvc,
-        installment
-      );
+        installment,
+        is3D: true,
+        userId: req.user?._id.toString(),
+        ipAddress: req.ip
+      });
 
       res.status(200).json({
         success: true,
