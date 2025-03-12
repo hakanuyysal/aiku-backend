@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import dotenv from 'dotenv';
+import { v4 as uuidv4 } from 'uuid';
 
 dotenv.config();
 
@@ -109,7 +110,7 @@ class ParamPosService {
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap:Body>
-            <TP_KK_Sakli_Liste xmlns="https://turkpos.com.tr/">
+            <KK_Sakli_Liste xmlns="https://turkpos.com.tr/">
               <G>
                 <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
@@ -123,19 +124,19 @@ class ParamPosService {
               <KK_CVC>${cvc}</KK_CVC>
               <Data1>${userId}</Data1>
               <Data2>${process.env.CLIENT_URL}/payment/callback</Data2>
-            </TP_KK_Sakli_Liste>
+            </KK_Sakli_Liste>
           </soap:Body>
         </soap:Envelope>`;
 
       console.log('Kart kaydetme isteği gönderiliyor...', {
         url,
-        soapAction: 'https://turkpos.com.tr/TP_KK_Sakli_Liste'
+        soapAction: 'https://turkpos.com.tr/KK_Sakli_Liste'
       });
 
       const response = await axios.post(url, soapEnvelope, {
         headers: {
           'Content-Type': 'text/xml;charset=UTF-8',
-          'SOAPAction': 'https://turkpos.com.tr/TP_KK_Sakli_Liste'
+          'SOAPAction': 'https://turkpos.com.tr/KK_Sakli_Liste'
         }
       });
 
@@ -173,34 +174,62 @@ class ParamPosService {
     }
   }
 
-  async payment(amount: number, cardToken: string, installment: number = 1) {
+  async payment(amount: number, cardNumber: string, cardHolderName: string, expireMonth: string, expireYear: string, cvc: string, installment: number = 1) {
     try {
       console.log('Ödeme işlemi başlatılıyor...', {
         amount,
-        cardToken,
+        cardHolderName,
+        expireMonth,
+        expireYear,
         installment
       });
 
-      const token = await this.getToken();
-      const url = new URL('corporate/v1/payment', this.baseUrl).toString();
+      const url = this.baseUrl;
+      const islemGuid = uuidv4(); // 36 haneli benzersiz ID oluştur
       
-      const response = await axios.post(
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Body>
+            <TP_WMD_Pay xmlns="https://turkpos.com.tr/">
+              <G>
+                <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
+                <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
+                <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
+              </G>
+              <GUID>${this.guid}</GUID>
+              <KK_Sahibi>${cardHolderName}</KK_Sahibi>
+              <KK_No>${cardNumber}</KK_No>
+              <KK_SK_Ay>${expireMonth}</KK_SK_Ay>
+              <KK_SK_Yil>${expireYear}</KK_SK_Yil>
+              <KK_CVC>${cvc}</KK_CVC>
+              <Taksit>${installment}</Taksit>
+              <Islem_Tutar>${amount}</Islem_Tutar>
+              <Toplam_Tutar>${amount}</Toplam_Tutar>
+              <Islem_Hash>hash</Islem_Hash>
+              <Islem_ID>${Date.now()}</Islem_ID>
+              <Islem_GUID>${islemGuid}</Islem_GUID>
+              <IPAdr>127.0.0.1</IPAdr>
+              <Ref_URL>${process.env.CLIENT_URL}</Ref_URL>
+              <Data1></Data1>
+              <Data2></Data2>
+              <Data3></Data3>
+              <Data4></Data4>
+              <Data5></Data5>
+            </TP_WMD_Pay>
+          </soap:Body>
+        </soap:Envelope>`;
+
+      console.log('Ödeme isteği gönderiliyor...', {
         url,
-        {
-          amount,
-          cardToken,
-          installment,
-          currency: 'TRY',
-          returnUrl: process.env.CLIENT_URL + '/payment/callback'
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+        soapAction: 'https://turkpos.com.tr/TP_WMD_Pay'
+      });
+
+      const response = await axios.post(url, soapEnvelope, {
+        headers: {
+          'Content-Type': 'text/xml;charset=UTF-8',
+          'SOAPAction': 'https://turkpos.com.tr/TP_WMD_Pay'
         }
-      );
+      });
 
       console.log('Ödeme yanıtı:', {
         status: response.status,
@@ -208,7 +237,13 @@ class ParamPosService {
         data: response.data
       });
 
-      return response.data;
+      // SOAP yanıtını parse et
+      const result = response.data;
+      if (!result) {
+        throw new Error('Ödeme yanıtı boş');
+      }
+
+      return result;
     } catch (error) {
       if (error instanceof AxiosError) {
         console.error('Ödeme hatası:', {
