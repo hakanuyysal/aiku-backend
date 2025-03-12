@@ -18,6 +18,7 @@ export interface ICompany extends Document {
   companyTwitter?: string;
   companyInstagram?: string;  
   interestedSectors?: string[];
+  isIncorporated?: boolean;
   user: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   slug: string;
@@ -124,6 +125,10 @@ const companySchema = new Schema<ICompany>(
     interestedSectors: {
       type: [String],
       default: [],
+    },
+    isIncorporated: {
+      type: Boolean,
+      default: false,
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
