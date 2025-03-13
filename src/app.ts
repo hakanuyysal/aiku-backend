@@ -13,7 +13,8 @@ import productRoutes from './routes/productRoutes';
 import teamMemberRoutes from './routes/teamMemberRoutes';
 import uploadRoutes from './routes/uploadRoutes';
 import aiRoutes from './routes/aiRoutes';
-import linkedInRoutes from './routes/linkedInRoutes';
+import cardRoutes from './routes/cardRoutes';
+import paymentRoutes from './routes/paymentRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -69,6 +70,8 @@ app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api', linkedInRoutes);
+app.use('/api/cards', cardRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {

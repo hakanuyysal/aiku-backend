@@ -16,6 +16,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "@types/multer": "^1.4.12",
+    "@types/uuid": "^10.0.0",
     "axios": "^1.8.2",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.0.0",
@@ -23,7 +24,7 @@
     "docx": "^9.2.0",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "express-validator": "^7.0.1",
+    "express-validator": "^7.2.1",
     "jsonwebtoken": "^9.0.0",
     "mammoth": "^1.9.0",
     "mongoose": "^7.0.3",
@@ -33,9 +34,11 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "textract": "^2.5.0",
+    "uuid": "^11.1.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/axios": "^0.14.4",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
