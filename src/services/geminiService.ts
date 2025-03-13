@@ -277,10 +277,58 @@ export class GeminiService {
     });
 
     const logoUrl = await page.evaluate(() => {
-      const logoImg = document.querySelector(
-        'img[alt*="logo" i], img[src*="logo" i], a img'
-      ) as HTMLImageElement;
-      return logoImg?.src || "";
+      // Logo bulmak için tüm olası seçicileri kontrol et
+      const logoSelectors = [
+        // Alt veya src içinde "logo" geçen resimler
+        'img[alt*="logo" i]',
+        'img[src*="logo" i]',
+        // Header, navbar veya footer içindeki resimler (genelde logo olur)
+        'header img',
+        'nav img',
+        '.navbar img',
+        '.header img',
+        '.logo img',
+        '.site-logo img',
+        '.brand img',
+        '.brand-logo img',
+        'a.logo img',
+        'a.brand img',
+        '.footer .logo img',
+        // Logo sınıfı olan elemanlar
+        '.logo img',
+        '.site-logo',
+        '.company-logo',
+        '.brand-logo',
+        // Link içindeki logoları da bul
+        'a[href="/"] img',
+        'a[href="./"] img',
+        'a[href="../"] img',
+        // Ana sayfaya link veren logoyu bul
+        'a[href="#home"] img',
+        // SVG logoları
+        'svg.logo',
+        // Genel olarak ilk img tag'i
+        'header a img',
+        // Son çare olarak sayfadaki ilk resim
+        'a img'
+      ];
+      
+      // Tüm seçicileri dene
+      for (const selector of logoSelectors) {
+        const element = document.querySelector(selector) as HTMLImageElement | SVGElement;
+        if (element) {
+          // Eğer HTMLImageElement ise src değerini al
+          if ('src' in element && element.src) {
+            return element.src;
+          }
+          // SVG olabilir, o zaman outerHTML'i dön
+          else if (element instanceof SVGElement) {
+            return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
+          }
+        }
+      }
+      
+      return "";
     });
 
     const contactInfo = await page.evaluate(() => {
@@ -474,6 +522,7 @@ ${addressInfo.join("\n")}
         url
       );
       let socialLinks: string[] = [];
+      let logoUrl = ""; // Logo URL'sini saklamak için değişken
 
       try {
         const browser = await puppeteer.launch({
@@ -482,6 +531,50 @@ ${addressInfo.join("\n")}
         });
         const page = await browser.newPage();
         await page.goto(url, { waitUntil: "networkidle0" });
+
+        // Logo URL'sini çek
+        logoUrl = await page.evaluate(() => {
+          // Logo bulmak için tüm olası seçicileri kontrol et
+          const logoSelectors = [
+            'img[alt*="logo" i]',
+            'img[src*="logo" i]',
+            'header img',
+            'nav img',
+            '.navbar img',
+            '.header img',
+            '.logo img',
+            '.site-logo img',
+            '.brand img',
+            '.brand-logo img',
+            'a.logo img',
+            'a.brand img',
+            '.footer .logo img',
+            '.logo img',
+            '.site-logo',
+            '.company-logo',
+            '.brand-logo',
+            'a[href="/"] img',
+            'a[href="./"] img',
+            'a[href="../"] img',
+            'a[href="#home"] img',
+            'svg.logo',
+            'header a img',
+            'a img'
+          ];
+          
+          for (const selector of logoSelectors) {
+            const element = document.querySelector(selector) as HTMLImageElement | SVGElement;
+            if (element) {
+              if ('src' in element && element.src) {
+                return element.src;
+              } else if (element instanceof SVGElement) {
+                return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
+              }
+            }
+          }
+          
+          return "";
+        });
 
         socialLinks = await page.evaluate(() => {
           const links: string[] = [];
@@ -549,6 +642,7 @@ ${websiteContent}`;
 
         return {
           companyName: parsed.companyName?.trim() || "",
+          companyLogo: logoUrl, // Çekilen logo URL'sini ekle
           companyEmail: parsed.companyEmail?.trim() || "",
           companyPhone: parsed.companyPhone?.trim() || "",
           companyWebsite: parsed.companyWebsite || websiteUrl,
@@ -646,6 +740,7 @@ ${documentText}`;
           businessModel: parsed.businessModel || "",
           companySector: parsed.companySector || "",
           companySize: parsed.companySize || "",
+          companyLogo: "", // Dokümandan logo çekilemeyeceği için boş
           companyLinkedIn: linkedInMatch ? `https://www.${linkedInMatch[0]}` : "",
           companyTwitter: twitterMatch ? `https://www.${twitterMatch[0]}` : "",
           companyInstagram: instagramMatch ? `https://www.${instagramMatch[0]}` : "",
@@ -705,6 +800,7 @@ Instructions:
         const parsed = JSON.parse(text);
         return {
           ...parsed,
+          companyLogo: userData.profilePictureUrl || "", // Kullanıcı profil resmini logo olarak kullan
           companyLinkedIn: userData.linkedin || "",
           companyEmail: userData.email || "",
           companyName: parsed.companyName?.trim() || `${userData.firstName} ${userData.lastName}`,
