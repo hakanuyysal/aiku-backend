@@ -6,9 +6,11 @@ import {
   getCompaniesForUser,
   getAllCompanies,
   updateCompany,
-  deleteCompany
+  deleteCompany,
+  uploadCompanyVideo
 } from '../controllers/companyController';
 import { protect } from '../middleware/auth';
+import videoUpload from '../middleware/videoUpload';
 
 const router = Router();
 
@@ -47,5 +49,7 @@ router.put('/:id', protect, updateCompany);
 
 // Şirket silme (örn: DELETE /api/company/:id)
 router.delete('/:id', protect, deleteCompany);
+
+router.post('/:id/upload-video', protect, videoUpload.single('video'), uploadCompanyVideo);
 
 export default router;

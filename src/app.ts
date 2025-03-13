@@ -15,6 +15,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import aiRoutes from './routes/aiRoutes';
 import cardRoutes from './routes/cardRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import linkedInRoutes from './routes/linkedInRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();

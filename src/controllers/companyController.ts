@@ -3,6 +3,7 @@ import { validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import { Company, ICompany } from '../models/Company';
 import mongoose from "mongoose";
+import videoUpload from '../middleware/videoUpload';
 
 interface CompanyResponse {
   id: string;
@@ -357,5 +358,43 @@ export const deleteCompany = async (req: Request, res: Response) => {
     res.status(200).json({ success: true, message: 'Şirket başarıyla silindi' });
   } catch (err: any) {
     res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+// Video yükleme endpoint'i
+export const uploadCompanyVideo = async (req: Request, res: Response) => {
+  try {
+    const companyId = req.params.id;
+    const company = await Company.findById(companyId);
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Şirket bulunamadı',
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen bir video dosyası yükleyin',
+      });
+    }
+
+    // Video dosya yolunu güncelle
+    company.companyVideo = `/uploads/videos/${req.file.filename}`;
+    await company.save();
+
+    res.status(200).json({
+      success: true,
+      data: company,
+      message: 'Video başarıyla yüklendi',
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Video yükleme başarısız',
+      error: error.message,
+    });
   }
 };

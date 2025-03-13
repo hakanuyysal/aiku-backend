@@ -3,6 +3,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 export interface ICompany extends Document {
   companyName: string;
   companyLogo?: string;
+  companyVideo?: string;
   companyType: 'Enterprise' | 'Entrepreneur' | 'Investor' | 'Startup';
   openForInvestments?: boolean;
   businessModel: 'B2B' | 'B2C' | 'B2G' | 'C2C' | 'C2B' | 'D2C' | 'B2B2C';
@@ -37,6 +38,10 @@ const companySchema = new Schema<ICompany>(
     companyLogo: {
       type: String,
       trim: true, 
+    },
+    companyVideo: {
+      type: String,
+      trim: true,
     },
     companyType: {
       type: String,
