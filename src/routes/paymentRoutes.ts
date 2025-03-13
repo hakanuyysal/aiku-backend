@@ -36,9 +36,9 @@ router.post('/process-payment',
         expireYear,
         cvc,
         installment,
-        is3D: true,
+        is3D: false,
         userId: req.user?._id.toString(),
-        ipAddress: req.ip
+        ipAddress: req.headers['x-forwarded-for']?.toString() || req.ip
       });
 
       res.status(200).json({

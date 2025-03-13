@@ -160,6 +160,7 @@ class ParamPosService {
 
       const orderId = Date.now().toString();
       const totalAmount = await this.calculateCommission(amount, installment);
+      const transactionGuid = uuidv4();
       const hash = this.calculateHash({
         installment,
         amount,
@@ -174,6 +175,7 @@ class ParamPosService {
           CLIENT_PASSWORD: this.clientPassword
         },
         GUID: this.guid,
+        Islem_GUID: transactionGuid,
         KK_Sahibi: cardHolderName,
         KK_No: cardNumber,
         KK_SK_Ay: expireMonth,
@@ -185,7 +187,7 @@ class ParamPosService {
         Islem_Hash: hash,
         Islem_ID: orderId,
         IPAdr: ipAddress,
-        Ref_URL: process.env.CLIENT_URL || '',
+        Ref_URL: process.env.PRODUCTION_URL || 'https://aiku.com.tr',
         Data1: userId || '',
         Data2: '',
         Data3: '',
