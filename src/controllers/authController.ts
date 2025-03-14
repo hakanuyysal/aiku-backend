@@ -19,6 +19,26 @@ interface UserResponse {
   instagram?: string;
   facebook?: string;
   twitter?: string;
+  emailVerified?: boolean;
+  locale?: {
+    country: string;
+    language: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
+  subscriptionStatus?: 'active' | 'pending' | 'trial' | 'cancelled' | 'expired';
+  subscriptionStartDate?: Date;
+  trialEndsAt?: Date;
+  subscriptionPlan?: 'startup' | 'business' | 'investor';
+  subscriptionPeriod?: 'monthly' | 'yearly';
+  subscriptionAmount?: number;
+  autoRenewal?: boolean;
+  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
+  savedCardId?: string;
+  lastPaymentDate?: Date;
+  nextPaymentDate?: Date;
+  billingAddress?: string;
+  vatNumber?: string;
 }
 
 const createToken = (id: string): string => {
@@ -37,7 +57,21 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    const { firstName, lastName, email, password } = req.body;
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      title,
+      location,
+      profileInfo,
+      profilePhoto,
+      linkedin,
+      instagram,
+      facebook,
+      twitter,
+    } = req.body;
 
     let user = await User.findOne({ email });
     if (user) {
@@ -52,6 +86,15 @@ export const register = async (req: Request, res: Response) => {
       lastName,
       email,
       password,
+      phone,
+      title,
+      location,
+      profileInfo,
+      profilePhoto,
+      linkedin,
+      instagram,
+      facebook,
+      twitter,
       authProvider: "email",
     });
 
@@ -62,6 +105,32 @@ export const register = async (req: Request, res: Response) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      phone: user.phone,
+      title: user.title,
+      location: user.location,
+      profileInfo: user.profileInfo,
+      profilePhoto: user.profilePhoto,
+      linkedin: user.linkedin,
+      instagram: user.instagram,
+      facebook: user.facebook,
+      twitter: user.twitter,
+      emailVerified: user.emailVerified,
+      locale: user.locale,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionStartDate: user.subscriptionStartDate,
+      trialEndsAt: user.trialEndsAt,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionPeriod: user.subscriptionPeriod,
+      subscriptionAmount: user.subscriptionAmount,
+      autoRenewal: user.autoRenewal,
+      paymentMethod: user.paymentMethod,
+      savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+      lastPaymentDate: user.lastPaymentDate,
+      nextPaymentDate: user.nextPaymentDate,
+      billingAddress: user.billingAddress,
+      vatNumber: user.vatNumber,
     };
 
     res.status(201).json({
@@ -115,6 +184,32 @@ export const login = async (req: Request, res: Response) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      phone: user.phone,
+      title: user.title,
+      location: user.location,
+      profileInfo: user.profileInfo,
+      profilePhoto: user.profilePhoto,
+      linkedin: user.linkedin,
+      instagram: user.instagram,
+      facebook: user.facebook,
+      twitter: user.twitter,
+      emailVerified: user.emailVerified,
+      locale: user.locale,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionStartDate: user.subscriptionStartDate,
+      trialEndsAt: user.trialEndsAt,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionPeriod: user.subscriptionPeriod,
+      subscriptionAmount: user.subscriptionAmount,
+      autoRenewal: user.autoRenewal,
+      paymentMethod: user.paymentMethod,
+      savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+      lastPaymentDate: user.lastPaymentDate,
+      nextPaymentDate: user.nextPaymentDate,
+      billingAddress: user.billingAddress,
+      vatNumber: user.vatNumber,
     };
 
     res.status(200).json({
@@ -167,10 +262,26 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         instagram: user.instagram,
         facebook: user.facebook,
         twitter: user.twitter,
+        emailVerified: user.emailVerified,
+        locale: user.locale,
         createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionStartDate: user.subscriptionStartDate,
+        trialEndsAt: user.trialEndsAt,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionPeriod: user.subscriptionPeriod,
+        subscriptionAmount: user.subscriptionAmount,
+        autoRenewal: user.autoRenewal,
+        paymentMethod: user.paymentMethod,
+        savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+        lastPaymentDate: user.lastPaymentDate,
+        nextPaymentDate: user.nextPaymentDate,
+        billingAddress: user.billingAddress,
+        vatNumber: user.vatNumber,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     res
       .status(500)
       .json({ success: false, message: "Sunucu hatası", error: err.message });
@@ -224,7 +335,7 @@ export const updateUser = async (req: Request, res: Response) => {
     if (facebook) user.facebook = facebook;
     if (twitter) user.twitter = twitter;
 
-    // **Şifre güncelleniyorsa hashle**
+    // Şifre güncelleniyorsa hashle
     if (password) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
@@ -246,10 +357,27 @@ export const updateUser = async (req: Request, res: Response) => {
       instagram: user.instagram,
       facebook: user.facebook,
       twitter: user.twitter,
+      emailVerified: user.emailVerified,
+      locale: user.locale,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionStartDate: user.subscriptionStartDate,
+      trialEndsAt: user.trialEndsAt,
+      subscriptionPlan: user.subscriptionPlan,
+      subscriptionPeriod: user.subscriptionPeriod,
+      subscriptionAmount: user.subscriptionAmount,
+      autoRenewal: user.autoRenewal,
+      paymentMethod: user.paymentMethod,
+      savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+      lastPaymentDate: user.lastPaymentDate,
+      nextPaymentDate: user.nextPaymentDate,
+      billingAddress: user.billingAddress,
+      vatNumber: user.vatNumber,
     };
 
     res.status(200).json({ success: true, user: updatedUserResponse });
-  } catch (err) {
+  } catch (err: any) {
     res
       .status(500)
       .json({ success: false, message: "Sunucu hatası", error: err.message });
@@ -283,7 +411,23 @@ export const getUserById = async (req: Request, res: Response) => {
         instagram: user.instagram,
         facebook: user.facebook,
         twitter: user.twitter,
+        emailVerified: user.emailVerified,
+        locale: user.locale,
         createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionStartDate: user.subscriptionStartDate,
+        trialEndsAt: user.trialEndsAt,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionPeriod: user.subscriptionPeriod,
+        subscriptionAmount: user.subscriptionAmount,
+        autoRenewal: user.autoRenewal,
+        paymentMethod: user.paymentMethod,
+        savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+        lastPaymentDate: user.lastPaymentDate,
+        nextPaymentDate: user.nextPaymentDate,
+        billingAddress: user.billingAddress,
+        vatNumber: user.vatNumber,
       },
     });
   } catch (err: any) {
