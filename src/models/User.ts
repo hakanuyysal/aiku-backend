@@ -45,10 +45,14 @@ export interface IUser extends Document {
     status: 'success' | 'failed' | 'pending';
     transactionId?: string;
     description?: string;
+    type?: string;
+    plan?: 'startup' | 'business' | 'investor';
+    period?: 'monthly' | 'yearly';
   }>;
   billingAddress?: string;
   vatNumber?: string;
   isSubscriptionActive?: boolean;
+  role?: 'user' | 'admin' | 'editor';
   
   matchPassword(enteredPassword: string): Promise<boolean>;
   checkAutoRenewal(): Promise<boolean>;
@@ -160,25 +164,21 @@ const userSchema = new Schema<IUser>({
   // Abonelik özellikleri
   subscriptionStatus: {
     type: String,
-    enum: ['active', 'pending', 'trial', 'cancelled', 'expired'],
-    default: 'active'
+    enum: ['active', 'pending', 'trial', 'cancelled', 'expired']
   },
   subscriptionStartDate: {
-    type: Date,
-    default: Date.now
+    type: Date
   },
   trialEndsAt: {
     type: Date
   },
   subscriptionPlan: {
     type: String,
-    enum: ['startup', 'business', 'investor'],
-    default: 'startup'
+    enum: ['startup', 'business', 'investor']
   },
   subscriptionPeriod: {
     type: String,
-    enum: ['monthly', 'yearly'],
-    default: 'monthly'
+    enum: ['monthly', 'yearly']
   },
   subscriptionAmount: {
     type: Number,
@@ -211,6 +211,19 @@ const userSchema = new Schema<IUser>({
         status: String,
         transactionId: String,
         description: String,
+        type: {
+          type: String,
+          enum: ['subscription', 'oneTime', 'refund'],
+          default: 'subscription'
+        },
+        plan: {
+          type: String,
+          enum: ['startup', 'business', 'investor']
+        },
+        period: {
+          type: String,
+          enum: ['monthly', 'yearly']
+        }
       }
     ],
     default: []
@@ -224,6 +237,11 @@ const userSchema = new Schema<IUser>({
   isSubscriptionActive: {
     type: Boolean,
     default: false
+  },
+  role: {
+    type: String,
+    enum: ['user', 'admin', 'editor'],
+    default: 'user'
   }
 }, {
   timestamps: true,
@@ -321,7 +339,10 @@ userSchema.methods.checkAutoRenewal = async function() {
             date: new Date(),
             status: 'success',
             transactionId: paymentResult.transactionId,
-            description: 'Otomatik abonelik yenileme'
+            description: 'Otomatik abonelik yenileme',
+            type: 'subscription',
+            plan: this.subscriptionPlan,
+            period: this.subscriptionPeriod
           });
           
           this.lastPaymentDate = new Date();

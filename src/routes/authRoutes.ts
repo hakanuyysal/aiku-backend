@@ -10,7 +10,9 @@ import {
   removeFavorite,
   getFavorites,
   googleCallback,
-  fixSubscription
+  fixSubscription,
+  createOrUpdateSubscription,
+  checkAndRenewTrialSubscriptions
 } from '../controllers/authController';
 import { protect } from '../middleware/auth';
 import passport from '../config/passport';
@@ -50,6 +52,21 @@ router.get('/user/:id', protect, getUserById);
 
 // Abonelik durumunu kontrol et ve düzelt
 router.get('/fix-subscription', protect, fixSubscription);
+
+// Yeni abonelik oluşturma veya güncelleme
+router.post(
+  '/subscription',
+  protect,
+  [
+    check('plan', 'Abonelik planı zorunludur').not().isEmpty(),
+    check('period', 'Abonelik dönemi zorunludur').not().isEmpty(),
+    check('paymentMethod', 'Ödeme yöntemi zorunludur').not().isEmpty()
+  ],
+  createOrUpdateSubscription
+);
+
+// Trial abonelikleri kontrol etme ve yenileme (sadece admin)
+router.post('/admin/check-trial-subscriptions', protect, checkAndRenewTrialSubscriptions);
 
 // Favorilere öğe ekleme rotası
 router.post(
