@@ -11,11 +11,12 @@ import {
 } from '../controllers/companyController';
 import { protect } from '../middleware/auth';
 import videoUpload from '../middleware/videoUpload';
+import { optionalAuth } from '../middleware/optionalAuth';
 
 const router = Router();
 
 // Tüm şirketleri getirme rotası (örn: GET /api/company/all)
-router.get('/all', protect, getAllCompanies);
+router.get('/all', optionalAuth, getAllCompanies);
 
 // Giriş yapmış kullanıcıya ait tüm şirketleri getirme 
 router.get('/current', protect, getCompaniesForUser);

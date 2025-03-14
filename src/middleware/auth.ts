@@ -19,15 +19,14 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
   let token: string | undefined;
 
   // Token kontrolü
-  if (req.headers.authorization?.startsWith('Bearer ')) {
-    token = req.headers.authorization.split(' ')[1];
+  if (req.headers.authorization?.startsWith("Bearer ")) {
+    token = req.headers.authorization.split(" ")[1];
   }
 
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Yetkilendirme başarısız, token bulunamadı'
-    });
+    // Eğer token yoksa, kullanıcıyı null olarak ayarla ve devam et
+    req.user = null;
+    return next();
   }
 
   try {
@@ -35,12 +34,12 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
 
     // Kullanıcıyı veritabanında ara (şifreyi hariç tut)
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'Kullanıcı bulunamadı'
+        message: "Kullanıcı bulunamadı",
       });
     }
 
@@ -50,7 +49,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
   } catch (err) {
     return res.status(401).json({
       success: false,
-      message: 'Geçersiz veya süresi dolmuş token'
+      message: "Geçersiz veya süresi dolmuş token",
     });
   }
 };

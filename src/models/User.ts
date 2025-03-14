@@ -31,7 +31,7 @@ export interface IUser extends Document {
   subscriptionStatus?: 'active' | 'pending' | 'trial' | 'cancelled' | 'expired';
   subscriptionStartDate?: Date;
   trialEndsAt?: Date;
-  subscriptionPlan?: 'startup' | 'business' | 'investor';
+  subscriptionPlan?: 'startup' | 'business' | 'investor' | null;
   subscriptionPeriod?: 'monthly' | 'yearly';
   subscriptionAmount?: number;
   autoRenewal?: boolean;
@@ -172,9 +172,9 @@ const userSchema = new Schema<IUser>({
   },
   subscriptionPlan: {
     type: String,
-    enum: ['startup', 'business', 'investor'],
-    default: 'startup'
-  },
+    enum: [null, 'startup', 'business', 'investor'],
+    default: null,
+  },   
   subscriptionPeriod: {
     type: String,
     enum: ['monthly', 'yearly'],

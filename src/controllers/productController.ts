@@ -174,11 +174,19 @@ export const getProductsByCompany = async (req: Request, res: Response) => {
 };
 
 // **Tüm Ürünleri Getirme**
-export const getAllProducts = async (_req: Request, res: Response) => {
+export const getAllProducts = async (req: Request, res: Response) => {
   try {
+    // Ürünleri getir ve ilgili şirket bilgilerini al
     const products = await Product.find().populate('companyId', 'companyName companyLogo');
-    res.status(200).json({ success: true, products });
+
+    // console.log("User from req.user:", req.user); 
+
+    // Kullanıcı giriş yapmış olsa bile artık abonelik kontrolü YOK!
+    return res.status(200).json({ success: true, products });
+
   } catch (err: any) {
-    res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+    console.error("❌ Sunucu hatası:", err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 };
+

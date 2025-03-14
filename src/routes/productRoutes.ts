@@ -10,11 +10,12 @@ import {
   getAllProducts
 } from '../controllers/productController';
 import { protect } from '../middleware/auth';
+import { optionalAuth } from '../middleware/optionalAuth';
 
 const router = Router();
 
 // **Tüm Ürünleri Getirme (örn: GET /api/products)**
-router.get('/all', getAllProducts);
+router.get('/all', optionalAuth, getAllProducts);
 
 // **Kullanıcının Ürünlerini Getirme (örn: GET /api/products/user)**
 router.get('/user', protect, getProductsByUser);
