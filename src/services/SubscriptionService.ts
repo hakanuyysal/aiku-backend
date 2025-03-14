@@ -148,14 +148,14 @@ class SubscriptionService {
       user.subscriptionPlan = plan;
       user.subscriptionPeriod = period;
       
-      // Eğer startup planı seçilmişse ve daha önce trial durumunda değilse
-      if (plan === 'startup' && user.subscriptionStatus !== 'trial') {
+      // Eğer startup planı seçilmişse, her zaman trial durumuna ayarla
+      if (plan === 'startup') {
         user.subscriptionStatus = 'trial';
         const trialEndDate = new Date();
         trialEndDate.setMonth(trialEndDate.getMonth() + 3);
         user.trialEndsAt = trialEndDate;
         user.nextPaymentDate = trialEndDate;
-      } else if (plan !== 'startup') {
+      } else {
         // Startup dışında bir plan seçilmişse
         user.subscriptionStatus = 'pending'; // Ödeme yapılana kadar pending
         user.trialEndsAt = undefined; // Trial süresini kaldır

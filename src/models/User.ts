@@ -48,6 +48,7 @@ export interface IUser extends Document {
   }>;
   billingAddress?: string;
   vatNumber?: string;
+  isSubscriptionActive?: boolean;
   
   matchPassword(enteredPassword: string): Promise<boolean>;
   checkAutoRenewal(): Promise<boolean>;
@@ -160,7 +161,7 @@ const userSchema = new Schema<IUser>({
   subscriptionStatus: {
     type: String,
     enum: ['active', 'pending', 'trial', 'cancelled', 'expired'],
-    default: 'pending'
+    default: 'active'
   },
   subscriptionStartDate: {
     type: Date,
@@ -221,7 +222,9 @@ const userSchema = new Schema<IUser>({
     type: String,
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 userSchema.pre('save', async function (this: IUser, next) {
@@ -233,10 +236,10 @@ userSchema.pre('save', async function (this: IUser, next) {
   next();
 });
 
-// Yeni kullanıcı oluşturulduğunda veya abonelik planı startup olarak değiştirildiğinde 3 aylık deneme süresi tanımlanır
+// Abonelik planı startup olarak ayarlandığında 3 aylık deneme süresi tanımlanır
 userSchema.pre('save', function(next) {
-  // Yeni kullanıcı VEYA abonelik planı startup olarak değiştirilmişse
-  if ((this.isNew || this.isModified('subscriptionPlan')) && this.subscriptionPlan === 'startup') {
+  // Abonelik planı startup olarak değiştirilmişse ve durumu trial değilse
+  if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup' && this.subscriptionStatus !== 'trial') {
     this.subscriptionStatus = 'trial';
     const trialEndDate = new Date();
     trialEndDate.setMonth(trialEndDate.getMonth() + 3);
@@ -373,5 +376,11 @@ userSchema.methods.matchPassword = async function (this: IUser, enteredPassword:
   if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Aboneliğin aktif olup olmadığını kontrol eden virtual alan
+userSchema.virtual('isSubscriptionActive').get(function (this: IUser) {
+  // Abonelik durumu 'active' veya 'trial' ise aktif kabul edilir
+  return this.subscriptionStatus === 'active' || this.subscriptionStatus === 'trial';
+});
 
 export const User = mongoose.model<IUser, IUserModel>('User', userSchema);

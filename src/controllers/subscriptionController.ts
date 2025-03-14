@@ -44,9 +44,7 @@ export const getUserSubscription = async (
       });
     }
 
-    const user = await User.findById(userId).select(
-      "subscriptionStatus subscriptionPlan subscriptionPeriod subscriptionAmount subscriptionStartDate trialEndsAt nextPaymentDate lastPaymentDate autoRenewal"
-    );
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -74,6 +72,7 @@ export const getUserSubscription = async (
         lastPaymentDate: user.lastPaymentDate,
         autoRenewal: user.autoRenewal,
         planDetails: planDetails,
+        isSubscriptionActive: user.isSubscriptionActive
       },
     });
   } catch (error: any) {
@@ -134,14 +133,14 @@ export const changeSubscriptionPlan = async (
     user.subscriptionPlan = plan as "startup" | "business" | "investor";
     user.subscriptionPeriod = period as "monthly" | "yearly";
     
-    // Eğer startup planı seçilmişse ve daha önce trial durumunda değilse
-    if (plan === "startup" && user.subscriptionStatus !== "trial") {
+    // Eğer startup planı seçilmişse, her zaman trial durumuna ayarla
+    if (plan === "startup") {
       user.subscriptionStatus = "trial";
       const trialEndDate = new Date();
       trialEndDate.setMonth(trialEndDate.getMonth() + 3);
       user.trialEndsAt = trialEndDate;
       user.nextPaymentDate = trialEndDate;
-    } else if (plan !== "startup") {
+    } else {
       // Startup dışında bir plan seçilmişse
       user.subscriptionStatus = "pending"; // Ödeme yapılana kadar pending
       user.trialEndsAt = undefined; // Trial süresini kaldır
@@ -169,7 +168,8 @@ export const changeSubscriptionPlan = async (
         subscriptionStartDate: user.subscriptionStartDate,
         trialEndsAt: user.trialEndsAt,
         nextPaymentDate: user.nextPaymentDate,
-        planDetails: planDetails
+        planDetails: planDetails,
+        isSubscriptionActive: user.isSubscriptionActive
       }
     });
   } catch (error: any) {

@@ -17,13 +17,6 @@ export const processPayment = async (req: express.Request, res: express.Response
         
         const { amount, currency, token, subscriptionPlan, subscriptionPeriod } = req.body;
 
-        // Ödeme işlemi
-        const response = await axios.post('https://api.param.com/payments', {
-            amount,
-            currency,
-            token,
-        });
-        
         // Kullanıcıyı bul ve abonelik bilgilerini güncelle
         const user = await User.findById(userId);
         
@@ -42,11 +35,40 @@ export const processPayment = async (req: express.Request, res: express.Response
         if (subscriptionPeriod) {
             user.subscriptionPeriod = subscriptionPeriod;
         }
+
+        let paymentSuccess = false;
+        let paymentResponse = null;
+        let paymentError = null;
+
+        try {
+            // Ödeme işlemi
+            const response = await axios.post('https://api.param.com/payments', {
+                amount,
+                currency,
+                token,
+            });
+            
+            paymentSuccess = response.data && response.data.success;
+            paymentResponse = response.data;
+        } catch (error: any) {
+            paymentError = error.message;
+            console.error('Ödeme işlemi sırasında hata:', error);
+        }
         
-        // Ödeme başarılıysa abonelik durumunu güncelle
-        if (response.data && response.data.success) {
-            // Eğer startup planı seçilmişse ve daha önce trial durumunda değilse
-            if (user.subscriptionPlan === 'startup' && user.subscriptionStatus !== 'trial') {
+        // Ödeme geçmişine ekle (başarılı veya başarısız)
+        if (!user.paymentHistory) user.paymentHistory = [];
+        user.paymentHistory.push({
+            amount: amount || 0,
+            date: new Date(),
+            status: paymentSuccess ? 'success' : 'failed',
+            transactionId: (paymentResponse && paymentResponse.transactionId) || Date.now().toString(),
+            description: `${user.subscriptionPlan} planı için ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} ödeme ${paymentSuccess ? 'başarılı' : 'başarısız'}`
+        });
+        
+        // Abonelik durumunu güncelle
+        if (paymentSuccess) {
+            // Eğer startup planı seçilmişse, her zaman trial durumuna ayarla
+            if (user.subscriptionPlan === 'startup') {
                 user.subscriptionStatus = 'trial';
                 const trialEndDate = new Date();
                 trialEndDate.setMonth(trialEndDate.getMonth() + 3);
@@ -63,42 +85,70 @@ export const processPayment = async (req: express.Request, res: express.Response
                     nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + 1);
                 }
                 user.nextPaymentDate = nextPaymentDate;
+                // Trial süresini kaldır
+                user.trialEndsAt = undefined;
             }
-            
-            // Ödeme geçmişine ekle
-            if (!user.paymentHistory) user.paymentHistory = [];
-            user.paymentHistory.push({
-                amount: amount,
-                date: new Date(),
-                status: 'success',
-                transactionId: response.data.transactionId || Date.now().toString(),
-                description: `${user.subscriptionPlan} planı için ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} ödeme`
-            });
             
             user.lastPaymentDate = new Date();
-            user.subscriptionStartDate = new Date();
-            
-            await user.save();
-        }
-
-        res.status(200).json({
-            success: true,
-            data: {
-                paymentResult: response.data,
-                subscription: {
-                    plan: user.subscriptionPlan,
-                    period: user.subscriptionPeriod,
-                    status: user.subscriptionStatus,
-                    startDate: user.subscriptionStartDate,
-                    trialEndsAt: user.trialEndsAt,
-                    nextPaymentDate: user.nextPaymentDate
-                }
+        } else {
+            // Ödeme başarısız olsa bile, startup planı için trial durumunu ayarla
+            if (user.subscriptionPlan === 'startup') {
+                user.subscriptionStatus = 'trial';
+                const trialEndDate = new Date();
+                trialEndDate.setMonth(trialEndDate.getMonth() + 3);
+                user.trialEndsAt = trialEndDate;
+                user.nextPaymentDate = trialEndDate;
+            } else {
+                // Diğer planlar için pending durumunda bırak
+                user.subscriptionStatus = 'pending';
             }
-        });
+        }
+        
+        // Abonelik başlangıç tarihini her durumda güncelle
+        user.subscriptionStartDate = new Date();
+        
+        // Değişiklikleri kaydet
+        await user.save();
+
+        // Yanıt döndür
+        if (paymentSuccess) {
+            res.status(200).json({
+                success: true,
+                data: {
+                    paymentResult: paymentResponse,
+                    subscription: {
+                        plan: user.subscriptionPlan,
+                        period: user.subscriptionPeriod,
+                        status: user.subscriptionStatus,
+                        startDate: user.subscriptionStartDate,
+                        trialEndsAt: user.trialEndsAt,
+                        nextPaymentDate: user.nextPaymentDate,
+                        isSubscriptionActive: user.isSubscriptionActive
+                    }
+                }
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: 'Ödeme işlemi başarısız',
+                error: paymentError,
+                data: {
+                    subscription: {
+                        plan: user.subscriptionPlan,
+                        period: user.subscriptionPeriod,
+                        status: user.subscriptionStatus,
+                        startDate: user.subscriptionStartDate,
+                        trialEndsAt: user.trialEndsAt,
+                        nextPaymentDate: user.nextPaymentDate,
+                        isSubscriptionActive: user.isSubscriptionActive
+                    }
+                }
+            });
+        }
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: 'Ödeme işlemi başarısız',
+            message: 'Ödeme işlemi sırasında bir hata oluştu',
             error: (error as Error).message,
         });
     }
