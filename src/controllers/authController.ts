@@ -227,29 +227,42 @@ export const login = async (req: Request, res: Response) => {
 
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-
-    if (!token) {
+    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
+    const userId = req.user?._id;
+    if (!userId) {
       return res.status(401).json({
         success: false,
-        message: "Yetkilendirme başarısız, token bulunamadı",
+        message: 'Oturum açmanız gerekiyor'
       });
     }
 
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-
-    const user = await User.findById(decoded.id).select("-password");
-
+    const user = await User.findById(userId);
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Kullanıcı bulunamadı" });
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanıcı bulunamadı'
+      });
     }
+
+    // Kullanıcı aktif bir aboneliğe sahip mi?
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+    
+    // Debug bilgileri
+    const subscriptionDebug = {
+      statusValue: user.subscriptionStatus,
+      statusType: typeof user.subscriptionStatus,
+      statusLength: user.subscriptionStatus ? user.subscriptionStatus.length : 0,
+      statusCharCodes: user.subscriptionStatus ? Array.from(user.subscriptionStatus).map(c => c.charCodeAt(0)) : [],
+      trimmedStatus: user.subscriptionStatus ? user.subscriptionStatus.trim() : '',
+      isEqualActive: user.subscriptionStatus === 'active',
+      isEqualTrial: user.subscriptionStatus === 'trial',
+      manualCalculation: hasActiveSubscription
+    };
 
     res.status(200).json({
       success: true,
-      user: {
-        id: user._id,
+      data: {
+        _id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
@@ -262,29 +275,14 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         instagram: user.instagram,
         facebook: user.facebook,
         twitter: user.twitter,
-        emailVerified: user.emailVerified,
-        locale: user.locale,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-        subscriptionStatus: user.subscriptionStatus,
-        subscriptionStartDate: user.subscriptionStartDate,
-        trialEndsAt: user.trialEndsAt,
-        subscriptionPlan: user.subscriptionPlan,
-        subscriptionPeriod: user.subscriptionPeriod,
-        subscriptionAmount: user.subscriptionAmount,
-        autoRenewal: user.autoRenewal,
-        paymentMethod: user.paymentMethod,
-        savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
-        lastPaymentDate: user.lastPaymentDate,
-        nextPaymentDate: user.nextPaymentDate,
-        billingAddress: user.billingAddress,
-        vatNumber: user.vatNumber,
       },
     });
   } catch (err: any) {
-    res
-      .status(500)
-      .json({ success: false, message: "Sunucu hatası", error: err.message });
+    res.status(500).json({
+      success: false,
+      message: 'Kullanıcı bilgileri alınırken bir hata oluştu'
+    });
   }
 };
 
@@ -623,5 +621,93 @@ export const googleCallback = async (req: Request, res: Response) => {
     return res.redirect(redirectUrl);
   } catch (error) {
     return res.redirect(`${process.env.CLIENT_URL}/auth/login?error=google-login-failed`);
+  }
+};
+
+export const fixSubscription = async (req: Request, res: Response) => {
+  try {
+    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Abonelik durumunu kontrol et
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+    
+    let updated = false;
+    
+    // Eğer paymentHistory içerisinde başarılı ödeme varsa ve status active değilse
+    if (user.paymentHistory && user.paymentHistory.length > 0 && 
+        user.paymentHistory.some(p => p.status === 'success')) {
+      
+      if (!hasActiveSubscription) {
+        user.subscriptionStatus = 'active';
+        updated = true;
+      }
+      
+      // isSubscriptionActive değeri false ise düzelt
+      if (!user.isSubscriptionActive) {
+        user.isSubscriptionActive = true;
+        updated = true;
+      }
+      
+      // Güncellemeler varsa kaydet
+      if (updated) {
+        await user.save();
+        console.log('Kullanıcı abonelik durumu güncellendi:', {
+          userId: user._id,
+          status: user.subscriptionStatus,
+          isActive: user.isSubscriptionActive
+        });
+      }
+    }
+    
+    // Tüm kullanıcı verilerini getirerek durumu kontrol et
+    const refreshedUser = await User.findById(userId);
+    
+    // Son başarılı ödeme tarihini ve kullanıcı bilgilerini getir
+    const lastSuccessfulPayment = refreshedUser?.paymentHistory?.find(p => p.status === 'success');
+    
+    res.status(200).json({
+      success: true,
+      updated,
+      data: {
+        userId: refreshedUser?._id,
+        subscriptionStatus: refreshedUser?.subscriptionStatus,
+        isSubscriptionActive: refreshedUser?.isSubscriptionActive,
+        manualCheck: refreshedUser?.subscriptionStatus === 'active' || refreshedUser?.subscriptionStatus === 'trial',
+        subscriptionStartDate: refreshedUser?.subscriptionStartDate,
+        lastPaymentDate: refreshedUser?.lastPaymentDate,
+        lastSuccessfulPayment,
+        debug: {
+          subscriptionStatusType: typeof refreshedUser?.subscriptionStatus,
+          subscriptionStatusLength: refreshedUser?.subscriptionStatus ? refreshedUser.subscriptionStatus.length : 0,
+          statusRaw: refreshedUser?.subscriptionStatus,
+          statusTrimmed: refreshedUser?.subscriptionStatus ? refreshedUser.subscriptionStatus.trim() : '',
+          statusCharCodes: refreshedUser?.subscriptionStatus ? 
+            Array.from(refreshedUser.subscriptionStatus).map(c => c.charCodeAt(0)) : []
+        }
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Abonelik durumu kontrol edilirken bir hata oluştu",
+      error: error.message,
+    });
   }
 };

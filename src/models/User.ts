@@ -220,6 +220,10 @@ const userSchema = new Schema<IUser>({
   },
   vatNumber: {
     type: String,
+  },
+  isSubscriptionActive: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true,
@@ -273,6 +277,17 @@ userSchema.pre('save', function(next) {
         this.subscriptionAmount = yearlyPrices[this.subscriptionPlan];
       }
     }
+  }
+  next();
+});
+
+// Abonelik durumunu güncelleyen hook
+userSchema.pre('save', function(next) {
+  // subscriptionStatus değiştiğinde isSubscriptionActive değerini güncelle
+  if (this.isModified('subscriptionStatus')) {
+    const status = this.subscriptionStatus ? this.subscriptionStatus.trim() : '';
+    this.isSubscriptionActive = (status === 'active' || status === 'trial');
+    console.log(`isSubscriptionActive updated to: ${this.isSubscriptionActive} based on status: ${status}`);
   }
   next();
 });
@@ -378,9 +393,17 @@ userSchema.methods.matchPassword = async function (this: IUser, enteredPassword:
 };
 
 // Aboneliğin aktif olup olmadığını kontrol eden virtual alan
-userSchema.virtual('isSubscriptionActive').get(function (this: IUser) {
+userSchema.virtual('isSubscriptionActiveVirtual').get(function (this: IUser) {
+  // Debug için değerleri yazdır
+  console.log('isSubscriptionActive calculation:');
+  console.log('subscriptionStatus:', this.subscriptionStatus);
+  console.log('isEqual active:', this.subscriptionStatus === 'active');
+  console.log('isEqual trial:', this.subscriptionStatus === 'trial');
+  
   // Abonelik durumu 'active' veya 'trial' ise aktif kabul edilir
-  return this.subscriptionStatus === 'active' || this.subscriptionStatus === 'trial';
+  // String değerlerini temizleyerek kontrol et
+  const status = this.subscriptionStatus ? this.subscriptionStatus.trim() : '';
+  return status === 'active' || status === 'trial';
 });
 
 export const User = mongoose.model<IUser, IUserModel>('User', userSchema);

@@ -49,6 +49,22 @@ router.post('/process-payment',
       if (user && user._id) {
         const updatedUser = await User.findById(user._id);
         if (updatedUser) {
+          // Abonelik durumunu aktif olarak güncelle
+          updatedUser.subscriptionStatus = 'active';
+          updatedUser.subscriptionStartDate = new Date();
+          updatedUser.isSubscriptionActive = true;
+          
+          // Bir sonraki ödeme tarihini belirle
+          const nextPaymentDate = new Date();
+          if (updatedUser.subscriptionPeriod === 'monthly') {
+            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+          } else {
+            nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + 1);
+          }
+          updatedUser.nextPaymentDate = nextPaymentDate;
+          updatedUser.lastPaymentDate = new Date();
+          
+          // Ödeme geçmişini güncelle
           if (!updatedUser.paymentHistory) updatedUser.paymentHistory = [];
           updatedUser.paymentHistory.push({
             amount: numericAmount,

@@ -9,7 +9,8 @@ import {
   addFavorite, 
   removeFavorite,
   getFavorites,
-  googleCallback 
+  googleCallback,
+  fixSubscription
 } from '../controllers/authController';
 import { protect } from '../middleware/auth';
 import passport from '../config/passport';
@@ -46,6 +47,9 @@ router.put('/updateUser', protect, updateUser);
 
 // Kullanıcı id'si ile bilgilerini alma rotası
 router.get('/user/:id', protect, getUserById);
+
+// Abonelik durumunu kontrol et ve düzelt
+router.get('/fix-subscription', protect, fixSubscription);
 
 // Favorilere öğe ekleme rotası
 router.post(
