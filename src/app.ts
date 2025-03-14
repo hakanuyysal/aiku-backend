@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { Server } from 'socket.io';
 import http from 'http';
+import passport from './config/passport';
 
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
@@ -16,6 +17,7 @@ import aiRoutes from './routes/aiRoutes';
 import cardRoutes from './routes/cardRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import linkedInRoutes from './routes/linkedInRoutes';
+import subscriptionRoutes from './routes/subscriptionRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -55,6 +57,9 @@ app.use(
   })
 );
 
+// Passport middleware
+app.use(passport.initialize());
+
 // Statik dosya servisi
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
@@ -73,6 +78,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api', linkedInRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {

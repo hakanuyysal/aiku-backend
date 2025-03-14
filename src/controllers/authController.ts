@@ -3,6 +3,7 @@ import { validationResult } from "express-validator";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { IUser, User } from "../models/User";
+import { UserResponse } from '../types/UserResponse';
 
 interface UserResponse {
   id: string;
@@ -448,5 +449,35 @@ export const getFavorites = async (req: Request, res: Response) => {
     res
       .status(500)
       .json({ success: false, message: "Sunucu hatası", error: err.message });
+  }
+};
+
+export const googleCallback = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Google ile giriş başarısız",
+      });
+    }
+
+    const user = req.user as any;
+    
+    // JWT token oluştur
+    const token = createToken(user._id);
+
+    // Kullanıcı bilgilerini hazırla
+    const userResponse: UserResponse = {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+    };
+
+    // Başarılı yanıt
+    const redirectUrl = `${process.env.CLIENT_URL}/auth/social-callback?token=${token}&firstName=${user.firstName}&lastName=${user.lastName}&email=${user.email}&id=${user._id}`;
+    return res.redirect(redirectUrl);
+  } catch (error) {
+    return res.redirect(`${process.env.CLIENT_URL}/auth/login?error=google-login-failed`);
   }
 };

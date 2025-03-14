@@ -8,9 +8,11 @@ import {
   getUserById, 
   addFavorite, 
   removeFavorite,
-  getFavorites 
+  getFavorites,
+  googleCallback 
 } from '../controllers/authController';
 import { protect } from '../middleware/auth';
+import passport from '../config/passport';
 
 const router = Router();
 
@@ -69,5 +71,20 @@ router.delete(
 
 // Favori öğeleri çekme rotası
 router.get('/favorites', protect, getFavorites);
+
+// Google OAuth rotaları
+router.get(
+  '/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: '/login' 
+  }),
+  googleCallback
+);
 
 export default router;

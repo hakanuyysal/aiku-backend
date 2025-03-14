@@ -27,7 +27,31 @@ export interface IUser extends Document {
   favoriteUsers?: mongoose.Types.ObjectId[];
   favoriteCompanies?: mongoose.Types.ObjectId[];
   favoriteProducts?: mongoose.Types.ObjectId[];
+  // Abonelik özellikleri
+  subscriptionStatus?: 'active' | 'pending' | 'trial' | 'cancelled' | 'expired';
+  subscriptionStartDate?: Date;
+  trialEndsAt?: Date;
+  subscriptionPlan?: 'startup' | 'business' | 'investor';
+  subscriptionPeriod?: 'monthly' | 'yearly';
+  subscriptionAmount?: number;
+  autoRenewal?: boolean;
+  paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
+  savedCardId?: mongoose.Types.ObjectId; 
+  lastPaymentDate?: Date;
+  nextPaymentDate?: Date;
+  paymentHistory?: Array<{
+    amount: number;
+    date: Date;
+    status: 'success' | 'failed' | 'pending';
+    transactionId?: string;
+    description?: string;
+  }>;
+  billingAddress?: string;
+  vatNumber?: string;
+  
   matchPassword(enteredPassword: string): Promise<boolean>;
+  checkAutoRenewal(): Promise<boolean>;
+  processPayment(): Promise<{success: boolean, transactionId?: string, error?: string}>;
 }
 
 interface IUserModel extends Model<IUser> {
@@ -99,7 +123,7 @@ const userSchema = new Schema<IUser>({
   },
   authProvider: {
     type: String,
-    enum: ['email', 'linkedin'],
+    enum: ['email', 'linkedin', 'google'],
     default: 'email'
   },
   emailVerified: {
@@ -131,7 +155,71 @@ const userSchema = new Schema<IUser>({
     type: Schema.Types.ObjectId,
     ref: 'Product',
     default: []
-  }]
+  }],
+  // Abonelik özellikleri
+  subscriptionStatus: {
+    type: String,
+    enum: ['active', 'pending', 'trial', 'cancelled', 'expired'],
+    default: 'pending'
+  },
+  subscriptionStartDate: {
+    type: Date,
+    default: Date.now
+  },
+  trialEndsAt: {
+    type: Date
+  },
+  subscriptionPlan: {
+    type: String,
+    enum: ['startup', 'business', 'investor'],
+    default: 'startup'
+  },
+  subscriptionPeriod: {
+    type: String,
+    enum: ['monthly', 'yearly'],
+    default: 'monthly'
+  },
+  subscriptionAmount: {
+    type: Number,
+    min: 0
+  },
+  autoRenewal: {
+    type: Boolean,
+    default: true
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['creditCard', 'bankTransfer', 'other'],
+    default: 'creditCard'
+  },
+  savedCardId: {
+    type: mongoose.Types.ObjectId,
+    ref: 'SavedCard',
+  },
+  lastPaymentDate: {
+    type: Date,
+  },
+  nextPaymentDate: {
+    type: Date,
+  },
+  paymentHistory: {
+    type: [
+      {
+        amount: Number,
+        date: Date,
+        status: String,
+        transactionId: String,
+        description: String,
+      }
+    ],
+    default: []
+  },
+  billingAddress: {
+    type: String,
+  },
+  vatNumber: {
+    type: String,
+  }
 }, {
   timestamps: true
 });
@@ -144,6 +232,142 @@ userSchema.pre('save', async function (this: IUser, next) {
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });
+
+// Yeni kullanıcı oluşturulduğunda veya abonelik planı startup olarak değiştirildiğinde 3 aylık deneme süresi tanımlanır
+userSchema.pre('save', function(next) {
+  // Yeni kullanıcı VEYA abonelik planı startup olarak değiştirilmişse
+  if ((this.isNew || this.isModified('subscriptionPlan')) && this.subscriptionPlan === 'startup') {
+    this.subscriptionStatus = 'trial';
+    const trialEndDate = new Date();
+    trialEndDate.setMonth(trialEndDate.getMonth() + 3);
+    this.trialEndsAt = trialEndDate;
+    this.nextPaymentDate = trialEndDate; // Deneme süresi bitiminde otomatik çekim
+  }
+  next();
+});
+
+// Abonelik planına göre fiyatı belirleyen fonksiyon
+userSchema.pre('save', function(next) {
+  if (this.isModified('subscriptionPlan') || this.isModified('subscriptionPeriod')) {
+    // Aylık fiyatlar
+    const monthlyPrices = {
+      startup: 49,
+      business: 75,
+      investor: 99
+    };
+    
+    // Yıllık fiyatlar (%10 indirimli)
+    const yearlyPrices = {
+      startup: 529,
+      business: 810,
+      investor: 1069
+    };
+    
+    if (this.subscriptionPlan && this.subscriptionPeriod) {
+      if (this.subscriptionPeriod === 'monthly') {
+        this.subscriptionAmount = monthlyPrices[this.subscriptionPlan];
+      } else {
+        this.subscriptionAmount = yearlyPrices[this.subscriptionPlan];
+      }
+    }
+  }
+  next();
+});
+
+// Deneme süresinin sonunda otomatik ödemeyi kontrol eden metod
+userSchema.methods.checkAutoRenewal = async function() {
+  // Deneme süresinin bitişi kontrol edilir
+  if (this.subscriptionStatus === 'trial' && this.trialEndsAt && new Date() >= this.trialEndsAt) {
+    // Eğer otomatik yenileme açıksa ve kayıtlı bir kart varsa
+    if (this.autoRenewal && this.savedCardId) {
+      try {
+        // Ödeme işlemini gerçekleştir
+        const paymentResult = await this.processPayment();
+        
+        if (paymentResult.success) {
+          // Ödeme başarılı ise aboneliği aktifleştir
+          this.subscriptionStatus = 'active';
+          // Bir sonraki ödeme tarihini güncelle
+          const nextBillingDate = new Date();
+          if (this.subscriptionPeriod === 'monthly') {
+            nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
+          } else {
+            nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+          }
+          this.nextPaymentDate = nextBillingDate;
+          
+          // Ödeme geçmişine ekle
+          if (!this.paymentHistory) this.paymentHistory = [];
+          this.paymentHistory.push({
+            amount: this.subscriptionAmount || 0,
+            date: new Date(),
+            status: 'success',
+            transactionId: paymentResult.transactionId,
+            description: 'Otomatik abonelik yenileme'
+          });
+          
+          this.lastPaymentDate = new Date();
+          await this.save();
+          return true;
+        } else {
+          // Ödeme başarısız ise durumu güncelle
+          this.subscriptionStatus = 'expired';
+          await this.save();
+          return false;
+        }
+      } catch (error) {
+        console.error('Otomatik ödeme işleminde hata:', error);
+        return false;
+      }
+    } else {
+      // Otomatik yenileme kapalı veya kayıtlı kart yoksa
+      this.subscriptionStatus = 'expired';
+      await this.save();
+      return false;
+    }
+  }
+  return true;
+};
+
+// Ödeme işlemini gerçekleştiren metod
+userSchema.methods.processPayment = async function() {
+  try {
+    if (!this.savedCardId) {
+      throw new Error('Kayıtlı kart bulunamadı');
+    }
+    
+    // Kart bilgisini al
+    const savedCard = await mongoose.model('SavedCard').findById(this.savedCardId);
+    if (!savedCard) {
+      throw new Error('Geçerli kart bilgisi bulunamadı');
+    }
+    
+    // Param POS API ile ödeme işlemi
+    // Not: Bu kısım gerçek entegrasyonda doldurulmalıdır
+    const ParamPosService = await import('../services/ParamPosService');
+    const paymentService = ParamPosService.default;
+    
+    const paymentResult = await paymentService.payment({
+      amount: this.subscriptionAmount || 0,
+      cardNumber: savedCard.cardMaskedNumber.replace(/X/g, '0'), // Örnek amaçlı
+      cardHolderName: savedCard.cardHolderName,
+      expireMonth: savedCard.cardExpireMonth,
+      expireYear: savedCard.cardExpireYear,
+      cvc: '000', // Örnek amaçlı
+      installment: 1,
+      is3D: false,
+      userId: this._id.toString()
+    });
+    
+    return {
+      success: true,
+      transactionId: paymentResult.TURKPOS_RETVAL_Islem_ID || Date.now().toString()
+    };
+  } catch (error: any) {
+    console.error('Ödeme işleminde hata:', error);
+    return { success: false, error: error.message };
+  }
+};
 
 userSchema.methods.matchPassword = async function (this: IUser, enteredPassword: string): Promise<boolean> {
   if (!this.password) return false;
