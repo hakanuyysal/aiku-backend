@@ -4,6 +4,7 @@ import { body } from 'express-validator';
 import { protect } from '../middleware/auth';
 import { validateRequest } from '../middleware/validateRequest';
 import ParamPosService from '../services/ParamPosService';
+import { User, IUser } from '../models/User';
 
 const router = express.Router();
 
@@ -28,6 +29,9 @@ router.post('/process-payment',
       // amount string'den number'a çevir
       const numericAmount = parseFloat(amount);
 
+      // User objesini IUser tipine çevir
+      const user = req.user as IUser | undefined;
+      
       const result = await ParamPosService.payment({
         amount: numericAmount,
         cardNumber,
@@ -37,15 +41,54 @@ router.post('/process-payment',
         cvc,
         installment,
         is3D: false,
-        userId: req.user?._id.toString(),
+        userId: user && user._id ? user._id.toString() : undefined,
         ipAddress: req.headers['x-forwarded-for']?.toString() || req.ip
       });
+
+      // Kullanıcıyı bul ve ödeme geçmişini güncelle
+      if (user && user._id) {
+        const updatedUser = await User.findById(user._id);
+        if (updatedUser) {
+          if (!updatedUser.paymentHistory) updatedUser.paymentHistory = [];
+          updatedUser.paymentHistory.push({
+            amount: numericAmount,
+            date: new Date(),
+            status: 'success',
+            transactionId: result.TURKPOS_RETVAL_Islem_ID,
+            description: `Ödeme başarılı: ${numericAmount} TL, İşlem ID: ${result.TURKPOS_RETVAL_Islem_ID}`
+          });
+          await updatedUser.save();
+        }
+      }
 
       res.status(200).json({
         success: true,
         data: result
       });
     } catch (error) {
+      // Hata durumunda da ödeme geçmişine ekle (başarısız olarak)
+      try {
+        // User objesini IUser tipine çevir
+        const user = req.user as IUser | undefined;
+        
+        if (user && user._id) {
+          const updatedUser = await User.findById(user._id);
+          if (updatedUser) {
+            const numericAmount = parseFloat(req.body.amount);
+            if (!updatedUser.paymentHistory) updatedUser.paymentHistory = [];
+            updatedUser.paymentHistory.push({
+              amount: numericAmount,
+              date: new Date(),
+              status: 'failed',
+              description: `Ödeme başarısız: ${numericAmount} TL, Hata: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+            });
+            await updatedUser.save();
+          }
+        }
+      } catch (saveError) {
+        console.error('Ödeme hatası kaydedilirken hata oluştu:', saveError);
+      }
+
       res.status(400).json({
         success: false,
         message: error instanceof Error ? error.message : 'Ödeme işlemi başarısız'
