@@ -261,8 +261,8 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        _id: user._id,
+      user: {
+        id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
@@ -275,7 +275,23 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         instagram: user.instagram,
         facebook: user.facebook,
         twitter: user.twitter,
+        emailVerified: user.emailVerified,
+        locale: user.locale,
         createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionStartDate: user.subscriptionStartDate,
+        trialEndsAt: user.trialEndsAt,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionPeriod: user.subscriptionPeriod,
+        subscriptionAmount: user.subscriptionAmount,
+        autoRenewal: user.autoRenewal,
+        paymentMethod: user.paymentMethod,
+        savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+        lastPaymentDate: user.lastPaymentDate,
+        nextPaymentDate: user.nextPaymentDate,
+        billingAddress: user.billingAddress,
+        vatNumber: user.vatNumber,
       },
     });
   } catch (err: any) {
