@@ -39,6 +39,7 @@ interface UserResponse {
   nextPaymentDate?: Date;
   billingAddress?: string;
   vatNumber?: string;
+  isSubscriptionActive?: boolean;
 }
 
 const createToken = (id: string): string => {
@@ -100,6 +101,8 @@ export const register = async (req: Request, res: Response) => {
 
     const token = createToken(user._id);
 
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+
     const userResponse: UserResponse = {
       id: user._id,
       firstName: user.firstName,
@@ -131,6 +134,7 @@ export const register = async (req: Request, res: Response) => {
       nextPaymentDate: user.nextPaymentDate,
       billingAddress: user.billingAddress,
       vatNumber: user.vatNumber,
+      isSubscriptionActive: hasActiveSubscription,
     };
 
     res.status(201).json({
@@ -179,6 +183,8 @@ export const login = async (req: Request, res: Response) => {
 
     const token = createToken(user._id);
 
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+
     const userResponse: UserResponse = {
       id: user._id,
       firstName: user.firstName,
@@ -210,6 +216,7 @@ export const login = async (req: Request, res: Response) => {
       nextPaymentDate: user.nextPaymentDate,
       billingAddress: user.billingAddress,
       vatNumber: user.vatNumber,
+      isSubscriptionActive: hasActiveSubscription,
     };
 
     res.status(200).json({
@@ -292,6 +299,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         nextPaymentDate: user.nextPaymentDate,
         billingAddress: user.billingAddress,
         vatNumber: user.vatNumber,
+        isSubscriptionActive: hasActiveSubscription,
       },
     });
   } catch (err: any) {
@@ -313,7 +321,7 @@ export const updateUser = async (req: Request, res: Response) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    let user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id);
     if (!user) {
       return res
         .status(404)
@@ -357,6 +365,8 @@ export const updateUser = async (req: Request, res: Response) => {
 
     await user.save();
 
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+
     const updatedUserResponse: UserResponse = {
       id: user._id,
       firstName: user.firstName,
@@ -388,6 +398,7 @@ export const updateUser = async (req: Request, res: Response) => {
       nextPaymentDate: user.nextPaymentDate,
       billingAddress: user.billingAddress,
       vatNumber: user.vatNumber,
+      isSubscriptionActive: hasActiveSubscription,
     };
 
     res.status(200).json({ success: true, user: updatedUserResponse });
@@ -408,6 +419,8 @@ export const getUserById = async (req: Request, res: Response) => {
         .status(404)
         .json({ success: false, message: "Kullanıcı bulunamadı" });
     }
+
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
 
     res.status(200).json({
       success: true,
@@ -442,6 +455,7 @@ export const getUserById = async (req: Request, res: Response) => {
         nextPaymentDate: user.nextPaymentDate,
         billingAddress: user.billingAddress,
         vatNumber: user.vatNumber,
+        isSubscriptionActive: hasActiveSubscription,
       },
     });
   } catch (err: any) {
@@ -462,7 +476,7 @@ export const addFavorite = async (req: Request, res: Response) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    let user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id);
     if (!user) {
       return res
         .status(404)
@@ -527,7 +541,7 @@ export const removeFavorite = async (req: Request, res: Response) => {
     }
 
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    let user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id);
     if (!user) {
       return res
         .status(404)
@@ -624,12 +638,19 @@ export const googleCallback = async (req: Request, res: Response) => {
     // JWT token oluştur
     const token = createToken(user._id);
 
+    // Abonelik durumunu kontrol et
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+
     // Kullanıcı bilgilerini hazırla
     const userResponse: UserResponse = {
       id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      createdAt: user.createdAt || new Date(),
+      updatedAt: user.updatedAt || new Date(),
+      isSubscriptionActive: hasActiveSubscription,
+      subscriptionStatus: user.subscriptionStatus,
     };
 
     // Başarılı yanıt
