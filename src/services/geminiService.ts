@@ -13,7 +13,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 interface FormData {
   companyName: string;
   companyLogo?: string;
-  companyType?: 'Enterprise' | 'Entrepreneur' | 'Investor' | 'Startup';
+  companyType?: 'Business' | 'Investor' | 'Startup';
   openForInvestments?: boolean;
   businessModel?: 'B2B' | 'B2C' | 'B2G' | 'C2C' | 'C2B' | 'D2C' | 'B2B2C';
   companySector?: string;
@@ -28,6 +28,21 @@ interface FormData {
   companyTwitter?: string;
   companyInstagram?: string;
   interestedSectors?: string[];
+  productName: string;
+  productLogo?: string;
+  productCategory: string;
+  productDescription: string;
+  tags: string[];
+  problems: string[];
+  solutions: string[];
+  improvements: string[];
+  keyFeatures: string[];
+  pricingModel: string;
+  releaseDate?: string;
+  productPrice?: number;
+  productWebsite?: string;
+  productLinkedIn?: string;
+  productTwitter?: string;
 }
 
 interface PageMetadata {
@@ -312,7 +327,7 @@ export class GeminiService {
         // Son çare olarak sayfadaki ilk resim
         'a img'
       ];
-      
+
       // Tüm seçicileri dene
       for (const selector of logoSelectors) {
         const element = document.querySelector(selector) as HTMLImageElement | SVGElement;
@@ -327,7 +342,7 @@ export class GeminiService {
           }
         }
       }
-      
+
       return "";
     });
 
@@ -561,7 +576,7 @@ ${addressInfo.join("\n")}
             'header a img',
             'a img'
           ];
-          
+
           for (const selector of logoSelectors) {
             const element = document.querySelector(selector) as HTMLImageElement | SVGElement;
             if (element) {
@@ -572,7 +587,7 @@ ${addressInfo.join("\n")}
               }
             }
           }
-          
+
           return "";
         });
 
@@ -612,10 +627,26 @@ Instructions:
      * Paragraph 3: Market focus and target audience
      * Paragraph 4: Company strengths and unique value propositions
      Write in third person, present tense, using professional business language. DO NOT use uncertain language like "appears to be" or "seems to". DO NOT mention the source of information or make observations about missing information.
-   - companyType: Based on the content, determine if it's 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup'
+   - companyType: Based on the content, determine if it's 'Business', 'Investor', or 'Startup'
    - businessModel: Based on their customer focus, determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
    - companySector: Determine their main industry sector
    - companySize: Based on any employee information, determine size ('1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+')
+   - productName: The name of the product.
+   - productLogo: The URL of the product logo.
+   - productCategory: The category of the product.
+   - productDescription: A short description of the product.
+   - detailedDescription: A detailed, multi-paragraph description of the product.
+   - tags: This field should contain short, descriptive keywords or labels that summarize the product. **Return as a JSON array. If no tags are found, return an empty array []**
+   - problems: This field should list the issues or challenges that the product aims to solve. For example, include problems like "high energy consumption", "inefficient workflow", "lack of user engagement", etc. **Return as a JSON array. If no problems are found, return an empty array []**
+   - solutions: This field should detail the solutions or approaches the product offers to address the identified problems. For example, include solutions like "automated process optimization", "real-time analytics", "cloud-based data management", etc. **Return as a JSON array. If no solutions are found, return an empty array []**
+   - improvements: This field should list potential improvements or areas where the product could be enhanced. For example, include suggestions like "enhanced UI design", "faster processing speed", "improved security features", etc. **Return as a JSON array. If no improvements are found, return an empty array []**
+   - keyFeatures: This field should include the product's standout features or primary benefits. For example, include key features like "intuitive interface", "high scalability", "robust performance", "seamless integration", etc. **Return as a JSON array. If no key features are found, return an empty array []**
+   - pricingModel: The pricing model (e.g., Free, Freemium, Subscription, One-time Payment, Other).
+   - releaseDate: The release date in YYYY-MM-DD format. 
+   - productPrice: The price if mentioned, otherwise an empty string.
+   - productWebsite: The product website URL.
+   - productLinkedIn: The product's LinkedIn URL if available.
+  - productTwitter: The product's Twitter URL if available.
 
 4. IMPORTANT NOTES:
    - DO NOT leave fields empty if information can be found or reasonably inferred from the content
@@ -625,6 +656,7 @@ Instructions:
    - Use proper formatting and separate multiple items with commas
    - NEVER include phrases like "based on the content", "appears to be", "seems to", or any other uncertain language
    - Write as if you are creating official company documentation
+   - If information is truly not found, return an empty string ("") for text fields and an empty array ([]) for array fields
 
 5. Return ONLY a JSON object with these exact field names
 6. If information is truly not found, use empty string ("")
@@ -656,6 +688,21 @@ ${websiteContent}`;
           companyLinkedIn: socialLinks.find((link: string) => link.includes("linkedin.com")) || "",
           companyTwitter: socialLinks.find((link: string) => link.includes("twitter.com")) || "",
           companyInstagram: socialLinks.find((link: string) => link.includes("instagram.com")) || "",
+          productName: parsed.productName || "",
+          productLogo: parsed.productLogo || "",
+          productCategory: parsed.productCategory || "",
+          productDescription: parsed.productDescription || "",
+          tags: parsed.tags || [],
+          problems: parsed.problems || [],
+          solutions: parsed.solutions || [],
+          improvements: parsed.improvements || [],
+          keyFeatures: parsed.keyFeatures || [],
+          pricingModel: parsed.pricingModel || "",
+          releaseDate: parsed.releaseDate || "",
+          productPrice: parsed.productPrice || 0,
+          productWebsite: parsed.productWebsite || url,
+          productLinkedIn: parsed.productLinkedIn || "",
+          productTwitter: parsed.productTwitter || "",
         };
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
@@ -687,7 +734,7 @@ Instructions:
      * Paragraph 3: Market focus and target audience
      * Paragraph 4: Company strengths and unique value propositions
      Write in third person, present tense, using professional business language.
-   - companyType: MUST be one of: 'Enterprise', 'Entrepreneur', 'Investor', or 'Startup' - Look for explicit mentions or infer from context
+   - companyType: MUST be one of: 'Business', 'Investor', or 'Startup' - Look for explicit mentions or infer from context
    - businessModel: MUST be one of: 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C' - Look for explicit mentions or infer from target audience
    - companySector: Main industry sector(s)
    - companySize: MUST be one of: '1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+' - Infer from context if not explicitly stated
@@ -713,7 +760,7 @@ ${documentText}`;
 
       try {
         const parsed = JSON.parse(text);
-        
+
         // Extract domain from email if website is empty
         let website = parsed.companyWebsite?.trim() || "";
         if (!website && parsed.companyEmail) {

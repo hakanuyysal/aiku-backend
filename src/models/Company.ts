@@ -4,20 +4,21 @@ export interface ICompany extends Document {
   companyName: string;
   companyLogo?: string;
   companyVideo?: string;
-  companyType: 'Enterprise' | 'Entrepreneur' | 'Investor' | 'Startup';
+  companyType: 'Business' | 'Investor' | 'Startup';
   openForInvestments?: boolean;
   businessModel: 'B2B' | 'B2C' | 'B2G' | 'C2C' | 'C2B' | 'D2C' | 'B2B2C';
   companySector: string;
   companySize: '1-10' | '11-50' | '51-200' | '201-500' | '501-1000' | '1001-5000' | '5001-10000' | '10001+';
+  businessScale: 'Micro' | 'Small' | 'Medium' | 'Large';
   companyEmail: string;
   companyPhone: string;
   companyInfo: string;
-  detailedDescription: string; 
+  detailedDescription: string;
   companyWebsite?: string;
   companyAddress: string;
   companyLinkedIn?: string;
   companyTwitter?: string;
-  companyInstagram?: string;  
+  companyInstagram?: string;
   interestedSectors?: string[];
   isIncorporated?: boolean;
   user: mongoose.Schema.Types.ObjectId;
@@ -25,7 +26,7 @@ export interface ICompany extends Document {
   slug: string;
 }
 
-interface ICompanyModel extends Model<ICompany> {}
+interface ICompanyModel extends Model<ICompany> { }
 
 const companySchema = new Schema<ICompany>(
   {
@@ -37,7 +38,7 @@ const companySchema = new Schema<ICompany>(
     },
     companyLogo: {
       type: String,
-      trim: true, 
+      trim: true,
     },
     companyVideo: {
       type: String,
@@ -46,7 +47,7 @@ const companySchema = new Schema<ICompany>(
     companyType: {
       type: String,
       required: [true, 'Company type is required'],
-      enum: ['Enterprise', 'Entrepreneur', 'Investor', 'Startup'],
+      enum: ['Business', 'Investor', 'Startup'],
     },
     openForInvestments: {
       type: Boolean,
@@ -65,6 +66,11 @@ const companySchema = new Schema<ICompany>(
       type: String,
       required: [true, 'Company size is required'],
       enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+'],
+    },
+    businessScale: {
+      type: String,
+      required: true,
+      enum: ['Micro', 'Small', 'Medium', 'Large'],
     },
     companyEmail: {
       type: String,

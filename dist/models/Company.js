@@ -49,7 +49,7 @@ const companySchema = new mongoose_1.Schema({
     companyType: {
         type: String,
         required: [true, 'Company type is required'],
-        enum: ['Enterprise', 'Entrepreneur', 'Investor', 'Startup'],
+        enum: ['Business', 'Investor', 'Startup'],
     },
     openForInvestments: {
         type: Boolean,

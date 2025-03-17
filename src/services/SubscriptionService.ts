@@ -217,7 +217,7 @@ class SubscriptionService {
       },
       business: {
         name: 'Business Plan',
-        description: 'For Companies & Enterprises',
+        description: 'For Companies & Businesss',
         features: [
           'AI discovery',
           'API integrations',
