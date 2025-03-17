@@ -145,7 +145,7 @@ export class LinkedInService {
       const jwtOptions: SignOptions = { expiresIn: process.env.JWT_EXPIRE || "24h" };
       
       const token = jwt.sign(
-        { userId: user._id.toString() },
+        { id: user._id.toString() },
         jwtSecret,
         jwtOptions
       );
