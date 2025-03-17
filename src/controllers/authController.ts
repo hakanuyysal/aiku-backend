@@ -605,8 +605,11 @@ export const getFavorites = async (req: Request, res: Response) => {
 };
 
 export const googleCallback = async (req: Request, res: Response) => {
+  console.log('[GoogleCallback] Google callback çağırıldı', { headers: req.headers, query: req.query });
+  
   try {
     if (!req.user) {
+      console.log('[GoogleCallback] Kullanıcı bulunamadı (req.user yok)');
       return res.status(401).json({
         success: false,
         message: "Google ile giriş başarısız",
@@ -614,14 +617,22 @@ export const googleCallback = async (req: Request, res: Response) => {
     }
 
     const user = req.user as any;
+    console.log('[GoogleCallback] Kullanıcı bulundu:', { id: user._id, email: user.email });
 
     // JWT token oluştur
+    console.log('[GoogleCallback] JWT token oluşturuluyor');
     const token = createToken(user._id);
+    console.log('[GoogleCallback] JWT token oluşturuldu');
 
     // Abonelik durumunu kontrol et
     const hasActiveSubscription =
       user.subscriptionStatus === "active" ||
       user.subscriptionStatus === "trial";
+    
+    console.log('[GoogleCallback] Abonelik durumu:', { 
+      subscriptionStatus: user.subscriptionStatus, 
+      isActive: hasActiveSubscription 
+    });
 
     // Kullanıcı bilgilerini hazırla
     const userResponse: UserResponse = {
@@ -637,8 +648,17 @@ export const googleCallback = async (req: Request, res: Response) => {
 
     // Başarılı yanıt
     const redirectUrl = `${process.env.CLIENT_URL}/auth/social-callback?token=${token}&firstName=${user.firstName}&lastName=${user.lastName}&email=${user.email}&id=${user._id}`;
+    console.log('[GoogleCallback] Yönlendirme yapılıyor:', { redirectUrl });
+    
     return res.redirect(redirectUrl);
-  } catch (error) {
+  } catch (error: any) {
+    console.error('[GoogleCallback] Hata oluştu:', error);
+    console.error('[GoogleCallback] Hata detayları:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     return res.redirect(
       `${process.env.CLIENT_URL}/auth/login?error=google-login-failed`
     );
@@ -1039,27 +1059,35 @@ export const checkAndRenewTrialSubscriptions = async (
  * @param res Express response
  */
 export const googleLogin = async (req: Request, res: Response) => {
+  console.log('[GoogleLogin] Giriş işlemi başlatıldı', { ip: req.ip, userAgent: req.headers['user-agent'] });
+  
   try {
+    console.log('[GoogleLogin] Request body:', JSON.stringify(req.body));
     const { idToken } = req.body;
 
     if (!idToken) {
+      console.log('[GoogleLogin] idToken bulunamadı');
       return res.status(400).json({
         success: false,
         error: 'Google ID token gerekli'
       });
     }
 
+    console.log('[GoogleLogin] idToken doğrulanıyor');
     // Firebase token'ını doğrula
     const decodedToken = await authService.verifyIdToken(idToken);
+    console.log('[GoogleLogin] Token doğrulandı:', { uid: decodedToken.uid, email: decodedToken.email });
     
     // Kullanıcı bilgilerini al
     const { uid, email, name, picture } = decodedToken;
     
+    console.log('[GoogleLogin] Kullanıcı veritabanında aranıyor:', { email });
     // Kullanıcı veritabanında var mı kontrol et
     let user = await User.findOne({ email });
     
     // Kullanıcı yoksa oluştur
     if (!user) {
+      console.log('[GoogleLogin] Kullanıcı bulunamadı, yeni kullanıcı oluşturuluyor');
       // İsmi parçalara ayır (varsa)
       let firstName = name || '';
       let lastName = '';
@@ -1079,7 +1107,9 @@ export const googleLogin = async (req: Request, res: Response) => {
         authProvider: "google",
         firebaseUid: uid
       });
+      console.log('[GoogleLogin] Yeni kullanıcı oluşturuldu:', { userId: user._id, email });
     } else {
+      console.log('[GoogleLogin] Mevcut kullanıcı bulundu:', { userId: user._id, email });
       // Kullanıcı varsa Google ile giriş yaptığını güncelle
       user.authProvider = "google";
       user.firebaseUid = uid;
@@ -1087,12 +1117,19 @@ export const googleLogin = async (req: Request, res: Response) => {
         user.profilePhoto = picture;
       }
       await user.save();
+      console.log('[GoogleLogin] Kullanıcı bilgileri güncellendi');
     }
     
     // JWT token oluştur
+    console.log('[GoogleLogin] JWT token oluşturuluyor');
     const token = createToken(user._id);
+    console.log('[GoogleLogin] JWT token oluşturuldu');
     
     const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+    console.log('[GoogleLogin] Abonelik durumu:', { 
+      subscriptionStatus: user.subscriptionStatus, 
+      isActive: hasActiveSubscription 
+    });
 
     const userResponse: UserResponse = {
       id: user._id,
@@ -1128,16 +1165,25 @@ export const googleLogin = async (req: Request, res: Response) => {
       isSubscriptionActive: hasActiveSubscription,
     };
     
+    console.log('[GoogleLogin] Başarılı giriş, yanıt gönderiliyor', { userId: user._id });
     res.status(200).json({
       success: true,
       token,
       user: userResponse,
     });
-  } catch (error) {
-    console.error('Google ile giriş yapılırken hata oluştu:', error);
+  } catch (error: any) {
+    console.error('[GoogleLogin] Hata oluştu:', error);
+    console.error('[GoogleLogin] Hata detayları:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      name: error.name
+    });
+    
     res.status(401).json({
       success: false,
-      message: 'Kimlik doğrulama başarısız'
+      message: 'Kimlik doğrulama başarısız',
+      error: error.message
     });
   }
 };

@@ -110,6 +110,12 @@ router.get(
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
+// Google OAuth rotası (POST isteği için)
+router.post(
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
 router.get(
   "/google/callback",
   passport.authenticate("google", {
