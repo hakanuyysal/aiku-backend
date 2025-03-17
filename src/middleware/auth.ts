@@ -21,12 +21,15 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
   // Token kontrolü
   if (req.headers.authorization?.startsWith("Bearer ")) {
     token = req.headers.authorization.split(" ")[1];
+  } else if (req.cookies?.token) {
+    token = req.cookies.token;
   }
 
   if (!token) {
-    // Eğer token yoksa, kullanıcıyı null olarak ayarla ve devam et
-    req.user = null;
-    return next();
+    return res.status(401).json({
+      success: false,
+      message: 'Oturum açmanız gerekiyor'
+    });
   }
 
   try {
@@ -47,6 +50,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
     req.user = user;
     next();
   } catch (err) {
+    console.error("Token doğrulama hatası:", err);
     return res.status(401).json({
       success: false,
       message: "Geçersiz veya süresi dolmuş token",

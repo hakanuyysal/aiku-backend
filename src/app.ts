@@ -30,6 +30,8 @@ const server = http.createServer(app);
 // Socket.IO kurulumu
 const allowedOrigins = [
   "http://localhost:3000",
+  "http://localhost:3004",
+  "https://accounts.google.com",
   "https://aikuaiplatform.com",
   "https://www.aikuaiplatform.com", 
   "https://api.aikuaiplatform.com",
@@ -61,16 +63,7 @@ io.on('connection', (socket) => {
 app.use(express.json());
 app.use(
   cors({
-    origin: function(origin, callback) {
-      // origin olmadan gelen isteklere izin ver (örn. Postman, API testleri)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        console.log("CORS izni reddedildi: ", origin);
-        callback(null, true); // Geliştirme aşamasında tüm originlere izin ver
-      }
-    },
+    origin: "*", // Geliştirme aşamasında tüm originlere izin ver
     credentials: true,
   })
 );

@@ -104,7 +104,7 @@ router.get(
   '/google/callback',
   passport.authenticate('google', { 
     session: false,
-    failureRedirect: '/login' 
+    failureRedirect: `${process.env.CLIENT_URL}/auth/login?error=google-login-failed` 
   }),
   googleCallback
 );
