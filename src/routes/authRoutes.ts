@@ -16,6 +16,7 @@ import {
 } from '../controllers/authController';
 import { protect } from '../middleware/auth';
 import passport from '../config/passport';
+import { LinkedInService } from '../services/linkedInService';
 
 const router = Router();
 
@@ -107,5 +108,31 @@ router.get(
   }),
   googleCallback
 );
+
+// LinkedIn Routes
+router.get('/linkedin', (req, res) => {
+  const linkedInService = new LinkedInService();
+  const authUrl = linkedInService.getAuthUrl();
+  res.json({ authUrl });
+});
+
+router.post('/linkedin', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    const linkedInService = new LinkedInService();
+    const accessToken = await linkedInService.getAccessToken(code);
+    const profile = await linkedInService.getProfile(accessToken);
+    const authResult = await linkedInService.handleAuth(profile);
+
+    res.json(authResult);
+  } catch (error: any) {
+    console.error('LinkedIn auth error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;
