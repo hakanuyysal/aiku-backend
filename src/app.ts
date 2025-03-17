@@ -29,7 +29,7 @@ const server = http.createServer(app);
 
 // Socket.IO kurulumu
 const allowedOrigins = [
-  process.env.CLIENT_URL || "http://localhost:3000",
+  "http://localhost:3000",
   "https://aikuaiplatform.com",
   "https://www.aikuaiplatform.com", 
   "https://api.aikuaiplatform.com",
