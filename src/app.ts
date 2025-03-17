@@ -49,9 +49,23 @@ app.use(express.json());
 
 // CORS middleware
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: function(origin, callback) {
+    const allowedOrigins = [
+      'https://aikuaiplatform.com',
+      'https://www.aikuaiplatform.com',
+      'http://localhost:3000',
+    ];
+    
+    // origin null olabilir (örneğin Postman veya doğrudan sunucu istekleri için)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS politikası tarafından engellenmiştir'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 
 // Passport middleware
