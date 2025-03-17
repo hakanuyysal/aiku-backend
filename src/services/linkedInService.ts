@@ -142,9 +142,11 @@ export class LinkedInService {
       }
 
       const token = jwt.sign(
-        { userId: user._id.toString() },
-        process.env.JWT_SECRET || "your-super-secret-jwt-key",
-        { expiresIn: process.env.JWT_EXPIRE || "24h" }
+        { id: user._id.toString() },
+        process.env.JWT_SECRET!,
+        {
+          expiresIn: process.env.JWT_EXPIRE,
+        }
       );
 
       return {
