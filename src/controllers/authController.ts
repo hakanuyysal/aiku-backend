@@ -1048,10 +1048,12 @@ export const googleLogin = async (req: Request, res: Response) => {
     console.log('[GoogleLogin] Request body:', JSON.stringify(req.body));
     console.log('[GoogleLogin] Request headers:', JSON.stringify(req.headers));
     
-    const { idToken } = req.body;
+    // idToken veya accessToken parametresini kontrol et
+    const { idToken, accessToken } = req.body;
+    const tokenToUse = idToken || accessToken;
 
-    if (!idToken) {
-      console.log('[GoogleLogin] idToken bulunamadı, request headers:', JSON.stringify(req.headers));
+    if (!tokenToUse) {
+      console.log('[GoogleLogin] Token bulunamadı, request headers:', JSON.stringify(req.headers));
       console.log('[GoogleLogin] Request body tam içerik:', JSON.stringify(req.body, null, 2));
       console.log('[GoogleLogin] Tüm istek bilgileri:', {
         method: req.method,
@@ -1063,18 +1065,159 @@ export const googleLogin = async (req: Request, res: Response) => {
       
       return res.status(400).json({
         success: false,
-        error: 'Google ID token gerekli'
+        error: 'Google ID token veya Access token gerekli'
       });
     }
 
-    // idToken'ın ilk ve son birkaç karakterini göster (güvenlik için)
-    console.log(`[GoogleLogin] idToken: ${idToken.substring(0, 10)}...${idToken.substring(idToken.length - 10)}`);
-    console.log(`[GoogleLogin] idToken uzunluğu: ${idToken.length} karakter`);
-    console.log('[GoogleLogin] idToken doğrulanıyor');
+    // Token'ın ilk ve son birkaç karakterini göster (güvenlik için)
+    console.log(`[GoogleLogin] Token: ${tokenToUse.substring(0, 10)}...${tokenToUse.substring(tokenToUse.length - 10)}`);
+    console.log(`[GoogleLogin] Token uzunluğu: ${tokenToUse.length} karakter`);
+    console.log('[GoogleLogin] Token doğrulanıyor');
     
-    // Google token'ını doğrula
+    // Eğer accessToken ise Google API ile kullanıcı bilgilerini al
+    if (accessToken && !idToken) {
+      try {
+        console.log('[GoogleLogin] Access token kullanılıyor, Google People API ile kullanıcı bilgileri alınıyor');
+        
+        // Axios ile Google'dan kullanıcı bilgilerini al
+        const axios = require('axios');
+        const googleUserInfo = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+        
+        if (googleUserInfo.data) {
+          const { sub, email, name, picture, email_verified } = googleUserInfo.data;
+          
+          if (!email) {
+            console.error('[GoogleLogin] Email adresi bulunamadı');
+            return res.status(400).json({
+              success: false,
+              error: 'Google hesabınızdan email adresi alınamadı'
+            });
+          }
+          
+          console.log('[GoogleLogin] Kullanıcı bilgileri alındı:', { 
+            sub, 
+            email,
+            name: name || 'N/A'
+          });
+          
+          console.log('[GoogleLogin] Kullanıcı veritabanında aranıyor:', { email });
+          // Kullanıcı veritabanında var mı kontrol et
+          let user = await User.findOne({ email });
+          
+          // Kullanıcı yoksa oluştur
+          if (!user) {
+            console.log('[GoogleLogin] Kullanıcı bulunamadı, yeni kullanıcı oluşturuluyor');
+            // İsmi parçalara ayır (varsa)
+            let firstName = '';
+            let lastName = '';
+            
+            if (name) {
+              if (name.includes(' ')) {
+                const nameParts = name.split(' ');
+                firstName = nameParts[0];
+                lastName = nameParts.slice(1).join(' ');
+              } else {
+                // Eğer isimde boşluk yoksa, ismi hem firstName hem de lastName olarak kullan
+                firstName = name;
+                lastName = name; // Veya "." ya da başka bir varsayılan değer atanabilir
+                console.log('[GoogleLogin] Tek parçalı isim, aynı değer firstName ve lastName için kullanılıyor');
+              }
+            } else {
+              // Ad yoksa, email'i hem isim hem soyisim olarak kullan
+              firstName = email.split('@')[0];
+              lastName = email.split('@')[0];
+              console.log('[GoogleLogin] İsim bulunamadı, email adı kullanılıyor');
+            }
+            
+            user = await User.create({
+              firstName,
+              lastName,
+              email,
+              profilePhoto: picture,
+              emailVerified: true,
+              authProvider: "google",
+              googleId: sub
+            });
+            console.log('[GoogleLogin] Yeni kullanıcı oluşturuldu:', { userId: user._id, email });
+          } else {
+            console.log('[GoogleLogin] Mevcut kullanıcı bulundu:', { userId: user._id, email });
+            // Kullanıcı varsa Google ile giriş yaptığını güncelle
+            user.authProvider = "google";
+            user.googleId = sub;
+            if (picture && !user.profilePhoto) {
+              user.profilePhoto = picture;
+            }
+            await user.save();
+            console.log('[GoogleLogin] Kullanıcı bilgileri güncellendi');
+          }
+          
+          // JWT token oluştur
+          console.log('[GoogleLogin] JWT token oluşturuluyor');
+          const token = createToken(user._id);
+          console.log('[GoogleLogin] JWT token oluşturuldu');
+          
+          const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+          console.log('[GoogleLogin] Abonelik durumu:', { 
+            subscriptionStatus: user.subscriptionStatus, 
+            isActive: hasActiveSubscription 
+          });
+          
+          const userResponse: UserResponse = {
+            id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            title: user.title,
+            location: user.location,
+            profileInfo: user.profileInfo,
+            profilePhoto: user.profilePhoto,
+            linkedin: user.linkedin,
+            instagram: user.instagram,
+            facebook: user.facebook,
+            twitter: user.twitter,
+            emailVerified: user.emailVerified,
+            locale: user.locale,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            subscriptionStatus: user.subscriptionStatus,
+            subscriptionStartDate: user.subscriptionStartDate,
+            trialEndsAt: user.trialEndsAt,
+            subscriptionPlan: user.subscriptionPlan,
+            subscriptionPeriod: user.subscriptionPeriod,
+            subscriptionAmount: user.subscriptionAmount,
+            autoRenewal: user.autoRenewal,
+            paymentMethod: user.paymentMethod,
+            savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+            lastPaymentDate: user.lastPaymentDate,
+            nextPaymentDate: user.nextPaymentDate,
+            billingAddress: user.billingAddress,
+            vatNumber: user.vatNumber,
+            isSubscriptionActive: hasActiveSubscription,
+          };
+          
+          console.log('[GoogleLogin] Başarılı giriş, yanıt gönderiliyor', { userId: user._id });
+          return res.status(200).json({
+            success: true,
+            token,
+            user: userResponse,
+          });
+        }
+      } catch (accessTokenError) {
+        console.error('[GoogleLogin] Access token ile bilgi alma hatası:', accessTokenError);
+        return res.status(401).json({
+          success: false, 
+          error: 'Google access token doğrulama hatası',
+          details: process.env.NODE_ENV === 'development' ? accessTokenError.message : 'Kimlik doğrulama başarısız'
+        });
+      }
+    }
+    
+    // ID Token ile kimlik doğrulama (mevcut kod)
     try {
-      const decodedToken = await authService.verifyIdToken(idToken);
+      const decodedToken = await authService.verifyIdToken(tokenToUse);
       console.log('[GoogleLogin] Token doğrulandı:', { 
         uid: decodedToken.uid, 
         email: decodedToken.email,
@@ -1102,13 +1245,25 @@ export const googleLogin = async (req: Request, res: Response) => {
       if (!user) {
         console.log('[GoogleLogin] Kullanıcı bulunamadı, yeni kullanıcı oluşturuluyor');
         // İsmi parçalara ayır (varsa)
-        let firstName = name || '';
+        let firstName = '';
         let lastName = '';
         
-        if (name && name.includes(' ')) {
-          const nameParts = name.split(' ');
-          firstName = nameParts[0];
-          lastName = nameParts.slice(1).join(' ');
+        if (name) {
+          if (name.includes(' ')) {
+            const nameParts = name.split(' ');
+            firstName = nameParts[0];
+            lastName = nameParts.slice(1).join(' ');
+          } else {
+            // Eğer isimde boşluk yoksa, ismi hem firstName hem de lastName olarak kullan
+            firstName = name;
+            lastName = name; // Veya "." ya da başka bir varsayılan değer atanabilir
+            console.log('[GoogleLogin] Tek parçalı isim, aynı değer firstName ve lastName için kullanılıyor');
+          }
+        } else {
+          // Ad yoksa, email'i hem isim hem soyisim olarak kullan
+          firstName = email.split('@')[0];
+          lastName = email.split('@')[0];
+          console.log('[GoogleLogin] İsim bulunamadı, email adı kullanılıyor');
         }
         
         user = await User.create({
@@ -1192,15 +1347,6 @@ export const googleLogin = async (req: Request, res: Response) => {
         name: tokenError.name,
         stack: tokenError.stack?.split('\n').slice(0, 3).join('\n')
       });
-      
-      // Token'ın ilk karakterlerini kontrol et (eksik veya yanlış format olabilir)
-      if (idToken.length < 50) {
-        console.error('[GoogleLogin] Token çok kısa, geçerli bir Google idToken değil!');
-      }
-      
-      if (!idToken.includes('.')) {
-        console.error('[GoogleLogin] Token JWT formatında değil!');
-      }
       
       return res.status(401).json({
         success: false,
