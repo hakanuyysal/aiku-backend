@@ -72,7 +72,7 @@ app.use((req, res, next) => {
     'http://localhost:3000'
   ];
   
-  // Origin kontrolü
+  // Origin kontrolü/
   if (origin && allowedOrigins.includes(origin)) {
     console.log('İzin verilen origin listesinde:', origin);
     res.setHeader('Access-Control-Allow-Origin', origin);
