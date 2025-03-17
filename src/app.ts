@@ -50,22 +50,50 @@ app.use(express.json());
 // CORS middleware
 app.use(cors({
   origin: function(origin, callback) {
-    const allowedOrigins = [
-      'https://aikuaiplatform.com',
-      'https://www.aikuaiplatform.com',
-      'http://localhost:3000',
-    ];
+    // Debug için origin bilgisini logla
+    console.log('İstek origin:', origin);
     
     // origin null olabilir (örneğin Postman veya doğrudan sunucu istekleri için)
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin) {
+      console.log('Origin null, izin verildi');
       callback(null, true);
-    } else {
-      callback(new Error('CORS politikası tarafından engellenmiştir'));
+      return;
     }
+    
+    // Yerel geliştirme ortamları için
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      console.log('Yerel geliştirme ortamı, izin verildi:', origin);
+      callback(null, true);
+      return;
+    }
+    
+    // aikuaiplatform.com ve tüm alt alan adları için
+    if (origin.includes('aikuaiplatform.com')) {
+      console.log('aikuaiplatform.com domain, izin verildi:', origin);
+      callback(null, true);
+      return;
+    }
+    
+    // Diğer izin verilen domainler
+    const allowedDomains = [
+      'https://aikuaiplatform.com',
+      'https://www.aikuaiplatform.com',
+      'http://localhost:3000'
+    ];
+    
+    if (allowedDomains.includes(origin)) {
+      console.log('İzin verilen domain listesinde, izin verildi:', origin);
+      callback(null, true);
+      return;
+    }
+    
+    console.log('CORS hatası: İzin verilmeyen origin:', origin);
+    callback(new Error('CORS politikası tarafından engellenmiştir'));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  exposedHeaders: ['Content-Length', 'X-Requested-With']
 }));
 
 // Passport middleware
