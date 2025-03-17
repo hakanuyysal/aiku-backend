@@ -605,63 +605,46 @@ export const getFavorites = async (req: Request, res: Response) => {
 };
 
 export const googleCallback = async (req: Request, res: Response) => {
-  console.log('[GoogleCallback] Google callback çağırıldı', { headers: req.headers, query: req.query });
-  
   try {
+    console.log('[GoogleCallback] Callback başladı');
+    
     if (!req.user) {
-      console.log('[GoogleCallback] Kullanıcı bulunamadı (req.user yok)');
-      return res.status(401).json({
-        success: false,
-        message: "Google ile giriş başarısız",
-      });
+      console.error('[GoogleCallback] Kullanıcı bulunamadı');
+      return res.redirect(`${process.env.CLIENT_URL}/auth/login?error=google-user-not-found`);
     }
-
-    const user = req.user as any;
-    console.log('[GoogleCallback] Kullanıcı bulundu:', { id: user._id, email: user.email });
-
+    
+    console.log('[GoogleCallback] Kullanıcı bilgileri alındı:', { 
+      userId: (req.user as IUser)._id,
+      email: (req.user as IUser).email 
+    });
+    
     // JWT token oluştur
-    console.log('[GoogleCallback] JWT token oluşturuluyor');
-    const token = createToken(user._id);
+    const token = createToken((req.user as IUser)._id);
     console.log('[GoogleCallback] JWT token oluşturuldu');
-
-    // Abonelik durumunu kontrol et
-    const hasActiveSubscription =
-      user.subscriptionStatus === "active" ||
-      user.subscriptionStatus === "trial";
     
-    console.log('[GoogleCallback] Abonelik durumu:', { 
-      subscriptionStatus: user.subscriptionStatus, 
-      isActive: hasActiveSubscription 
-    });
-
-    // Kullanıcı bilgilerini hazırla
-    const userResponse: UserResponse = {
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      createdAt: user.createdAt || new Date(),
-      updatedAt: user.updatedAt || new Date(),
-      isSubscriptionActive: hasActiveSubscription,
-      subscriptionStatus: user.subscriptionStatus,
-    };
-
-    // Başarılı yanıt
-    const redirectUrl = `${process.env.CLIENT_URL}/auth/social-callback?token=${token}&firstName=${user.firstName}&lastName=${user.lastName}&email=${user.email}&id=${user._id}`;
-    console.log('[GoogleCallback] Yönlendirme yapılıyor:', { redirectUrl });
+    // Frontend'e yönlendir
+    const user = req.user as IUser;
+    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
     
-    return res.redirect(redirectUrl);
-  } catch (error: any) {
-    console.error('[GoogleCallback] Hata oluştu:', error);
-    console.error('[GoogleCallback] Hata detayları:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-    
-    return res.redirect(
-      `${process.env.CLIENT_URL}/auth/login?error=google-login-failed`
+    const redirectUrl = encodeURIComponent(
+      JSON.stringify({
+        token,
+        user: {
+          id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          profilePhoto: user.profilePhoto,
+          isSubscriptionActive: hasActiveSubscription
+        }
+      })
     );
+    
+    console.log('[GoogleCallback] Frontend\'e yönlendirme:', `${process.env.CLIENT_URL}/auth/social-callback?data=${redirectUrl}`);
+    return res.redirect(`${process.env.CLIENT_URL}/auth/social-callback?data=${redirectUrl}`);
+  } catch (error) {
+    console.error('[GoogleCallback] Hata:', error);
+    return res.redirect(`${process.env.CLIENT_URL}/auth/login?error=google-callback-failed`);
   }
 };
 
@@ -1063,127 +1046,201 @@ export const googleLogin = async (req: Request, res: Response) => {
   
   try {
     console.log('[GoogleLogin] Request body:', JSON.stringify(req.body));
+    console.log('[GoogleLogin] Request headers:', JSON.stringify(req.headers));
+    
     const { idToken } = req.body;
 
     if (!idToken) {
-      console.log('[GoogleLogin] idToken bulunamadı');
+      console.log('[GoogleLogin] idToken bulunamadı, request headers:', JSON.stringify(req.headers));
+      console.log('[GoogleLogin] Request body tam içerik:', JSON.stringify(req.body, null, 2));
+      console.log('[GoogleLogin] Tüm istek bilgileri:', {
+        method: req.method,
+        path: req.path,
+        params: req.params,
+        query: req.query,
+        cookies: req.cookies
+      });
+      
       return res.status(400).json({
         success: false,
         error: 'Google ID token gerekli'
       });
     }
 
+    // idToken'ın ilk ve son birkaç karakterini göster (güvenlik için)
+    console.log(`[GoogleLogin] idToken: ${idToken.substring(0, 10)}...${idToken.substring(idToken.length - 10)}`);
+    console.log(`[GoogleLogin] idToken uzunluğu: ${idToken.length} karakter`);
     console.log('[GoogleLogin] idToken doğrulanıyor');
-    // Firebase token'ını doğrula
-    const decodedToken = await authService.verifyIdToken(idToken);
-    console.log('[GoogleLogin] Token doğrulandı:', { uid: decodedToken.uid, email: decodedToken.email });
     
-    // Kullanıcı bilgilerini al
-    const { uid, email, name, picture } = decodedToken;
-    
-    console.log('[GoogleLogin] Kullanıcı veritabanında aranıyor:', { email });
-    // Kullanıcı veritabanında var mı kontrol et
-    let user = await User.findOne({ email });
-    
-    // Kullanıcı yoksa oluştur
-    if (!user) {
-      console.log('[GoogleLogin] Kullanıcı bulunamadı, yeni kullanıcı oluşturuluyor');
-      // İsmi parçalara ayır (varsa)
-      let firstName = name || '';
-      let lastName = '';
-      
-      if (name && name.includes(' ')) {
-        const nameParts = name.split(' ');
-        firstName = nameParts[0];
-        lastName = nameParts.slice(1).join(' ');
-      }
-      
-      user = await User.create({
-        firstName,
-        lastName,
-        email,
-        profilePhoto: picture,
-        emailVerified: true,
-        authProvider: "google",
-        firebaseUid: uid
+    // Google token'ını doğrula
+    try {
+      const decodedToken = await authService.verifyIdToken(idToken);
+      console.log('[GoogleLogin] Token doğrulandı:', { 
+        uid: decodedToken.uid, 
+        email: decodedToken.email,
+        name: decodedToken.name || 'N/A', 
+        picture: decodedToken.picture ? 'Var' : 'Yok',
+        emailVerified: decodedToken.email_verified || false
       });
-      console.log('[GoogleLogin] Yeni kullanıcı oluşturuldu:', { userId: user._id, email });
-    } else {
-      console.log('[GoogleLogin] Mevcut kullanıcı bulundu:', { userId: user._id, email });
-      // Kullanıcı varsa Google ile giriş yaptığını güncelle
-      user.authProvider = "google";
-      user.firebaseUid = uid;
-      if (picture && !user.profilePhoto) {
-        user.profilePhoto = picture;
+      
+      // Kullanıcı bilgilerini al
+      const { uid, email, name, picture } = decodedToken;
+      
+      if (!email) {
+        console.error('[GoogleLogin] Email adresi bulunamadı');
+        return res.status(400).json({
+          success: false,
+          error: 'Google hesabınızdan email adresi alınamadı'
+        });
       }
-      await user.save();
-      console.log('[GoogleLogin] Kullanıcı bilgileri güncellendi');
-    }
-    
-    // JWT token oluştur
-    console.log('[GoogleLogin] JWT token oluşturuluyor');
-    const token = createToken(user._id);
-    console.log('[GoogleLogin] JWT token oluşturuldu');
-    
-    const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
-    console.log('[GoogleLogin] Abonelik durumu:', { 
-      subscriptionStatus: user.subscriptionStatus, 
-      isActive: hasActiveSubscription 
-    });
+      
+      console.log('[GoogleLogin] Kullanıcı veritabanında aranıyor:', { email });
+      // Kullanıcı veritabanında var mı kontrol et
+      let user = await User.findOne({ email });
+      
+      // Kullanıcı yoksa oluştur
+      if (!user) {
+        console.log('[GoogleLogin] Kullanıcı bulunamadı, yeni kullanıcı oluşturuluyor');
+        // İsmi parçalara ayır (varsa)
+        let firstName = name || '';
+        let lastName = '';
+        
+        if (name && name.includes(' ')) {
+          const nameParts = name.split(' ');
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(' ');
+        }
+        
+        user = await User.create({
+          firstName,
+          lastName,
+          email,
+          profilePhoto: picture,
+          emailVerified: true,
+          authProvider: "google",
+          googleId: uid
+        });
+        console.log('[GoogleLogin] Yeni kullanıcı oluşturuldu:', { userId: user._id, email });
+      } else {
+        console.log('[GoogleLogin] Mevcut kullanıcı bulundu:', { userId: user._id, email });
+        // Kullanıcı varsa Google ile giriş yaptığını güncelle
+        user.authProvider = "google";
+        user.googleId = uid;
+        if (picture && !user.profilePhoto) {
+          user.profilePhoto = picture;
+        }
+        await user.save();
+        console.log('[GoogleLogin] Kullanıcı bilgileri güncellendi');
+      }
+      
+      // JWT token oluştur
+      console.log('[GoogleLogin] JWT token oluşturuluyor');
+      const token = createToken(user._id);
+      console.log('[GoogleLogin] JWT token oluşturuldu');
+      
+      const hasActiveSubscription = user.subscriptionStatus === 'active' || user.subscriptionStatus === 'trial';
+      console.log('[GoogleLogin] Abonelik durumu:', { 
+        subscriptionStatus: user.subscriptionStatus, 
+        isActive: hasActiveSubscription 
+      });
 
-    const userResponse: UserResponse = {
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phone: user.phone,
-      title: user.title,
-      location: user.location,
-      profileInfo: user.profileInfo,
-      profilePhoto: user.profilePhoto,
-      linkedin: user.linkedin,
-      instagram: user.instagram,
-      facebook: user.facebook,
-      twitter: user.twitter,
-      emailVerified: user.emailVerified,
-      locale: user.locale,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      subscriptionStatus: user.subscriptionStatus,
-      subscriptionStartDate: user.subscriptionStartDate,
-      trialEndsAt: user.trialEndsAt,
-      subscriptionPlan: user.subscriptionPlan,
-      subscriptionPeriod: user.subscriptionPeriod,
-      subscriptionAmount: user.subscriptionAmount,
-      autoRenewal: user.autoRenewal,
-      paymentMethod: user.paymentMethod,
-      savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
-      lastPaymentDate: user.lastPaymentDate,
-      nextPaymentDate: user.nextPaymentDate,
-      billingAddress: user.billingAddress,
-      vatNumber: user.vatNumber,
-      isSubscriptionActive: hasActiveSubscription,
-    };
-    
-    console.log('[GoogleLogin] Başarılı giriş, yanıt gönderiliyor', { userId: user._id });
-    res.status(200).json({
-      success: true,
-      token,
-      user: userResponse,
-    });
+      const userResponse: UserResponse = {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        title: user.title,
+        location: user.location,
+        profileInfo: user.profileInfo,
+        profilePhoto: user.profilePhoto,
+        linkedin: user.linkedin,
+        instagram: user.instagram,
+        facebook: user.facebook,
+        twitter: user.twitter,
+        emailVerified: user.emailVerified,
+        locale: user.locale,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        subscriptionStatus: user.subscriptionStatus,
+        subscriptionStartDate: user.subscriptionStartDate,
+        trialEndsAt: user.trialEndsAt,
+        subscriptionPlan: user.subscriptionPlan,
+        subscriptionPeriod: user.subscriptionPeriod,
+        subscriptionAmount: user.subscriptionAmount,
+        autoRenewal: user.autoRenewal,
+        paymentMethod: user.paymentMethod,
+        savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
+        lastPaymentDate: user.lastPaymentDate,
+        nextPaymentDate: user.nextPaymentDate,
+        billingAddress: user.billingAddress,
+        vatNumber: user.vatNumber,
+        isSubscriptionActive: hasActiveSubscription,
+      };
+      
+      console.log('[GoogleLogin] Başarılı giriş, yanıt gönderiliyor', { userId: user._id });
+      res.status(200).json({
+        success: true,
+        token,
+        user: userResponse,
+      });
+    } catch (tokenError: any) {
+      console.error('[GoogleLogin] Token doğrulama hatası:', tokenError);
+      console.error('[GoogleLogin] Token doğrulama hata detayları:', {
+        message: tokenError.message,
+        code: tokenError.code,
+        name: tokenError.name,
+        stack: tokenError.stack?.split('\n').slice(0, 3).join('\n')
+      });
+      
+      // Token'ın ilk karakterlerini kontrol et (eksik veya yanlış format olabilir)
+      if (idToken.length < 50) {
+        console.error('[GoogleLogin] Token çok kısa, geçerli bir Google idToken değil!');
+      }
+      
+      if (!idToken.includes('.')) {
+        console.error('[GoogleLogin] Token JWT formatında değil!');
+      }
+      
+      return res.status(401).json({
+        success: false,
+        error: 'Google kimlik doğrulama hatası',
+        details: process.env.NODE_ENV === 'development' ? tokenError.message : 'Kimlik doğrulama başarısız',
+        errorCode: tokenError.code || 'token_verification_failed'
+      });
+    }
   } catch (error: any) {
     console.error('[GoogleLogin] Hata oluştu:', error);
     console.error('[GoogleLogin] Hata detayları:', {
       message: error.message,
-      stack: error.stack,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
       code: error.code,
       name: error.name
     });
     
+    let errorMessage = 'Kimlik doğrulama başarısız';
+    let errorCode = 'auth_error';
+    
+    if (error.code) {
+      errorCode = error.code;
+      
+      // Yaygın hata kodları için daha açıklayıcı mesajlar
+      if (error.code === 'auth/id-token-expired') {
+        errorMessage = 'Token süresi dolmuş, lütfen tekrar giriş yapın';
+      } else if (error.code === 'auth/id-token-revoked') {
+        errorMessage = 'Token geçersiz kılınmış, lütfen tekrar giriş yapın';
+      } else if (error.code === 'auth/invalid-id-token') {
+        errorMessage = 'Geçersiz token formatı';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = 'Kullanıcı hesabı devre dışı bırakılmış';
+      }
+    }
+    
     res.status(401).json({
       success: false,
-      message: 'Kimlik doğrulama başarısız',
-      error: error.message
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : errorMessage,
+      errorCode
     });
   }
 };
@@ -1198,13 +1255,13 @@ export const logout = async (req: Request, res: Response) => {
     // Burada kendi session/token yönetiminize göre oturum kapatma işlemi yapabilirsiniz
     res.status(200).json({
       success: true,
-      message: 'Oturum başarıyla kapatıldı'
+      message: "Oturum başarıyla kapatıldı",
     });
   } catch (error) {
-    console.error('Oturum kapatılırken hata oluştu:', error);
+    console.error("Oturum kapatılırken hata oluştu:", error);
     res.status(500).json({
       success: false,
-      message: 'Oturum kapatılırken bir hata oluştu'
+      message: "Oturum kapatılırken bir hata oluştu",
     });
   }
 };

@@ -6,20 +6,17 @@ import dotenv from 'dotenv';
 // Çevre değişkenlerini yükle
 dotenv.config();
 
-// Passport serileştirme/deserileştirme ayarları
+// Kullanıcı serileştirme (session için)
 passport.serializeUser((user: any, done) => {
-  console.log('[Passport] Kullanıcı serileştiriliyor:', { userId: user.id });
-  done(null, user.id);
+  done(null, user._id);
 });
 
+// Kullanıcı deserileştirme (session için)
 passport.deserializeUser(async (id: string, done) => {
-  console.log('[Passport] Kullanıcı deserileştirme işlemi başladı:', { userId: id });
   try {
     const user = await User.findById(id);
-    console.log('[Passport] Kullanıcı deserileştirildi:', { userId: id, userFound: !!user });
     done(null, user);
   } catch (error) {
-    console.error('[Passport] Deserileştirme hatası:', error);
     done(error, null);
   }
 });
@@ -39,6 +36,8 @@ passport.use(
         displayName: profile.displayName,
         email: profile.emails?.[0]?.value
       });
+      console.log('[GoogleStrategy] Access Token:', accessToken.substring(0, 10) + '...');
+      console.log('[GoogleStrategy] Profile tam:', JSON.stringify(profile, null, 2));
 
       try {
         // Google ID'si ile kullanıcıyı ara
@@ -60,24 +59,28 @@ passport.use(
             email: profile.emails?.[0].value,
             profilePhoto: profile.photos?.[0].value,
             authProvider: 'google',
-            emailVerified: true
+            emailVerified: true,
+            googleId: profile.id
           });
           console.log('[GoogleStrategy] Yeni kullanıcı oluşturuldu:', { userId: user._id });
         } else {
           console.log('[GoogleStrategy] Mevcut kullanıcı bulundu:', { userId: user._id });
           // Eğer kullanıcı var ama Google ile giriş yapmıyorsa güncelle
-          if (user.authProvider !== 'google') {
+          if (user.authProvider !== 'google' || !user.googleId) {
             user.authProvider = 'google';
+            user.googleId = profile.id;
+            if (profile.photos?.[0]?.value && !user.profilePhoto) {
+              user.profilePhoto = profile.photos[0].value;
+            }
             await user.save();
             console.log('[GoogleStrategy] Kullanıcı auth provider Google olarak güncellendi');
           }
         }
 
-        console.log('[GoogleStrategy] Google stratejisi tamamlandı, kullanıcı döndürülüyor:', { userId: user._id });
         return done(null, user);
-      } catch (error) {
-        console.error('[GoogleStrategy] Google stratejisi hatası:', error);
-        return done(error as Error, undefined);
+      } catch (err) {
+        console.error('[GoogleStrategy] Hata:', err);
+        return done(err as Error, undefined);
       }
     }
   )
