@@ -1,7 +1,7 @@
 import axios from "axios";
 import { GeminiService } from "./geminiService";
 import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions, Secret } from "jsonwebtoken";
 import { User } from "../models/User";
 
 dotenv.config();
@@ -141,12 +141,13 @@ export class LinkedInService {
         await user.save();
       }
 
+      const jwtSecret: Secret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
+      const jwtOptions: SignOptions = { expiresIn: process.env.JWT_EXPIRE || "24h" };
+      
       const token = jwt.sign(
-        { id: user._id.toString() },
-        process.env.JWT_SECRET!,
-        {
-          expiresIn: process.env.JWT_EXPIRE,
-        }
+        { userId: user._id.toString() },
+        jwtSecret,
+        jwtOptions
       );
 
       return {

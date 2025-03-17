@@ -16,7 +16,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import aiRoutes from './routes/aiRoutes';
 import cardRoutes from './routes/cardRoutes';
 import paymentRoutes from './routes/paymentRoutes';
-// import linkedInRoutes from './routes/linkedInRoutes';
+import linkedInRoutes from './routes/linkedInRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
 import applicantRoutes from './routes/applicantRoutes';
 
@@ -93,7 +93,7 @@ app.use('/api/product', productRoutes);
 app.use('/api/team-members', teamMemberRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', aiRoutes);
-// app.use('/api', linkedInRoutes);
+app.use('/api', linkedInRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
