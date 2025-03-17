@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Server } from 'socket.io';
@@ -28,24 +27,7 @@ const app = express();
 const server = http.createServer(app);
 
 // Socket.IO kurulumu
-const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:3004",
-  "https://accounts.google.com",
-  "https://aikuaiplatform.com",
-  "https://www.aikuaiplatform.com", 
-  "https://api.aikuaiplatform.com",
-  "http://164.92.207.75"
-];
-
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Tüm originlere izin ver
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
-  },
-});
+const io = new Server(server);
 
 // Socket.IO olaylarını dinle
 io.on('connection', (socket) => {
@@ -63,14 +45,6 @@ io.on('connection', (socket) => {
 
 // Middleware'leri ekle
 app.use(express.json());
-app.use(
-  cors({
-    origin: "*", // Tüm originlere izin ver
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
-  })
-);
 
 // Passport middleware
 app.use(passport.initialize());
