@@ -1,17 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { IUser, User } from '../models/User';
+import { User } from '../models/User';
 
 interface JwtPayload {
   id: string;
 }
 
-// Request tipini genişletiyoruz
-declare global {
-  namespace Express {
-    interface Request {
-      user?: IUser;
-    }
+// Request tipini genişletiyoruz - module augmentation kullanarak
+import 'express';
+declare module 'express' {
+  interface Request {
+    user?: any; // any kullanarak tip uyumsuzluğunu geçici olarak çözüyoruz
   }
 }
 
