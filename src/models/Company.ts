@@ -26,6 +26,7 @@ export interface ICompany extends Document {
   slug: string;
 }
 
+
 interface ICompanyModel extends Model<ICompany> { }
 
 const companySchema = new Schema<ICompany>(
