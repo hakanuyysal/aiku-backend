@@ -40,8 +40,10 @@ const allowedOrigins = [
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: "*", // Tüm originlere izin ver
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
   },
 });
 
@@ -63,8 +65,10 @@ io.on('connection', (socket) => {
 app.use(express.json());
 app.use(
   cors({
-    origin: "*", // Geliştirme aşamasında tüm originlere izin ver
+    origin: "*", // Tüm originlere izin ver
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
   })
 );
 
