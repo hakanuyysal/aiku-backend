@@ -16,6 +16,7 @@ export interface IUser extends Document {
   facebook?: string;
   twitter?: string;
   authProvider?: string;
+  firebaseUid?: string;
   emailVerified: boolean;
   locale?: {
     country: string;
@@ -130,6 +131,11 @@ const userSchema = new Schema<IUser>({
     type: String,
     enum: ['email', 'linkedin', 'google'],
     default: 'email'
+  },
+  firebaseUid: {
+    type: String,
+    sparse: true,
+    index: true
   },
   emailVerified: {
     type: Boolean,

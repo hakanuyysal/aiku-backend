@@ -7,6 +7,9 @@ import http from 'http';
 import passport from './config/passport';
 import cors from 'cors';
 
+// Firebase yapılandırmasını import et
+import './config/firebase';
+
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
 import companyRoutes from './routes/companyRoutes';
