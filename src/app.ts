@@ -5,6 +5,7 @@ import path from 'path';
 import { Server } from 'socket.io';
 import http from 'http';
 import passport from './config/passport';
+import cors from 'cors';
 
 // Route'ları import et
 import authRoutes from './routes/authRoutes';
@@ -45,6 +46,13 @@ io.on('connection', (socket) => {
 
 // Middleware'leri ekle
 app.use(express.json());
+
+// CORS middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // Passport middleware
 app.use(passport.initialize());
