@@ -18,6 +18,7 @@ import cardRoutes from './routes/cardRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import linkedInRoutes from './routes/linkedInRoutes';
 import subscriptionRoutes from './routes/subscriptionRoutes';
+import applicantRoutes from './routes/applicantRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -79,6 +80,7 @@ app.use('/api', linkedInRoutes);
 app.use('/api/cards', cardRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/applicants', applicantRoutes);
 
 // Ana route
 app.get('/', (_req: Request, res: Response) => {
