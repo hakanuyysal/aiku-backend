@@ -28,7 +28,35 @@ const app = express();
 const server = http.createServer(app);
 
 // Socket.IO kurulumu
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: function(origin, callback) {
+      // origin null olabilir (örneğin Postman veya doğrudan sunucu istekleri için)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      
+      // Tüm aikuaiplatform.com domainlerine izin ver (alt domainler dahil)
+      if (origin === 'https://aikuaiplatform.com' || 
+          origin === 'https://www.aikuaiplatform.com' || 
+          origin.endsWith('.aikuaiplatform.com')) {
+        callback(null, true);
+        return;
+      }
+      
+      // Yerel geliştirme ortamları için
+      if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        callback(null, true);
+        return;
+      }
+      
+      callback(new Error('CORS politikası tarafından engellenmiştir'));
+    },
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 // Socket.IO olaylarını dinle
 io.on('connection', (socket) => {
@@ -47,6 +75,18 @@ io.on('connection', (socket) => {
 // Middleware'leri ekle
 app.use(express.json());
 
+// OPTIONS istekleri için middleware
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    console.log('OPTIONS isteği alındı:', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    return res.status(200).json({});
+  }
+  next();
+});
+
 // CORS middleware
 app.use(cors({
   origin: function(origin, callback) {
@@ -60,29 +100,18 @@ app.use(cors({
       return;
     }
     
-    // Yerel geliştirme ortamları için
-    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-      console.log('Yerel geliştirme ortamı, izin verildi:', origin);
-      callback(null, true);
-      return;
-    }
-    
-    // aikuaiplatform.com ve tüm alt alan adları için
-    if (origin.includes('aikuaiplatform.com')) {
+    // Tüm aikuaiplatform.com domainlerine izin ver (alt domainler dahil)
+    if (origin === 'https://aikuaiplatform.com' || 
+        origin === 'https://www.aikuaiplatform.com' || 
+        origin.endsWith('.aikuaiplatform.com')) {
       console.log('aikuaiplatform.com domain, izin verildi:', origin);
       callback(null, true);
       return;
     }
     
-    // Diğer izin verilen domainler
-    const allowedDomains = [
-      'https://aikuaiplatform.com',
-      'https://www.aikuaiplatform.com',
-      'http://localhost:3000'
-    ];
-    
-    if (allowedDomains.includes(origin)) {
-      console.log('İzin verilen domain listesinde, izin verildi:', origin);
+    // Yerel geliştirme ortamları için
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+      console.log('Yerel geliştirme ortamı, izin verildi:', origin);
       callback(null, true);
       return;
     }
