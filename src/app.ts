@@ -92,7 +92,11 @@ const corsOptions = {
   maxAge: 86400 // Preflight sonuçlarını 24 saat önbelleğe al
 };
 
-// CORS middleware'ini en başta ekle
+// Body parsing middleware'lerini ekle
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// CORS middleware'ini ekle
 app.use(cors(corsOptions));
 
 // CORS hata yakalama middleware'i

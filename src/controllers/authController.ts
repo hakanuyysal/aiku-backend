@@ -204,7 +204,7 @@ export const login = async (req: Request, res: Response) => {
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
     const supabaseUser = req.user;
-    
+
     if (!supabaseUser) {
       return res.status(401).json({
         success: false,
@@ -214,7 +214,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
     // Supabase ID'si ile kullanıcıyı bul
     const user = await User.findOne({ supabaseId: supabaseUser.id });
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -268,7 +268,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Kullanıcı bilgileri alınırken bir hata oluştu",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -1043,34 +1043,34 @@ export const googleLogin = async (req: Request, res: Response) => {
   try {
     console.log("Google login isteği alındı:", {
       body: req.body,
-      headers: req.headers
+      headers: req.headers,
     });
 
     const { accessToken } = req.body;
-    
+
     if (!accessToken) {
       console.log("Token bulunamadı:", req.body);
       return res.status(400).json({
         success: false,
         error: "Access token gereklidir",
         details: "Kimlik doğrulama başarısız",
-        errorCode: 400
+        errorCode: 400,
       });
     }
 
     const googleService = new GoogleService();
     const authResult = await googleService.handleAuth({
       user: {
-        access_token: accessToken
-      }
+        access_token: accessToken,
+      },
     });
 
     console.log("Google login başarılı:", { userId: authResult.user.id });
-    
+
     // Frontend'in beklediği formatta yanıt döndür
     res.json({
       token: authResult.token,
-      user: authResult.user
+      user: authResult.user,
     });
   } catch (error: any) {
     console.error("Google login error:", error);
@@ -1078,7 +1078,7 @@ export const googleLogin = async (req: Request, res: Response) => {
       success: false,
       error: error.message,
       details: "Sunucu hatası",
-      errorCode: 500
+      errorCode: 500,
     });
   }
 };

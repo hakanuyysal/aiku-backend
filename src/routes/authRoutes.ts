@@ -41,8 +41,8 @@ router.post(
 router.post(
   "/login",
   [
-    check("email", "Lütfen geçerli bir email adresi giriniz").isEmail(),
-    check("password", "Şifre alanı zorunludur").exists(),
+    check("email", "Lütfen geçerli bir email adresi giriniz").trim().isEmail().normalizeEmail(),
+    check("password", "Şifre alanı zorunludur").trim().notEmpty(),
   ],
   login
 );
