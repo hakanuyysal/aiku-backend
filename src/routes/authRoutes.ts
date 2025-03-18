@@ -19,6 +19,7 @@ import {
 import { protect } from "../middleware/auth";
 import passport from "../config/passport";
 import { LinkedInService } from "../services/linkedInService";
+import { supabase } from "../config/supabase";
 
 const router = Router();
 
@@ -105,30 +106,39 @@ router.delete(
 router.get("/favorites", protect, getFavorites);
 
 // Google OAuth rotaları
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+router.get("/auth/google", (req, res) => {
+  const { data } = supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${process.env.CLIENT_URL}/auth/callback`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  });
+  res.redirect(data.url);
+});
 
-// Google OAuth rotası (POST isteği için)
-router.post(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+// Google callback endpoint'i
+router.get("/auth/callback", async (req, res) => {
+  const { code } = req.query;
+  if (!code) {
+    return res.redirect(`${process.env.CLIENT_URL}/auth/login?error=no-code`);
+  }
 
-router.get(
-  "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: `${process.env.CLIENT_URL}/auth/login?error=google-login-failed`,
-  }),
-  googleCallback
-);
+  try {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code.toString());
+    if (error) throw error;
 
-// Google login endpoint'i - Token ile veya token olmadan kullanılabilir
-router.post("/google/login", googleLogin);
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback?session=${JSON.stringify(data)}`);
+  } catch (error) {
+    console.error("Google callback error:", error);
+    res.redirect(`${process.env.CLIENT_URL}/auth/login?error=callback-failed`);
+  }
+});
 
-// Alternatif path için aynı endpoint
+// Google login endpoint'i - Token ile giriş
 router.post("/auth/google/login", googleLogin);
 
 // Oturum kapatma rotası
