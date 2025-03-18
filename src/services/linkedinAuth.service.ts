@@ -7,7 +7,7 @@ dotenv.config();
 class LinkedInAuthService {
   // LinkedIn ile oturum açma URL'sini oluştur
   getLinkedInAuthURL(): string {
-    const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:3000/auth/social-callback';
+    const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
     const linkedInClientId = process.env.LINKEDIN_CLIENT_ID;
     
     if (!linkedInClientId) {
@@ -24,7 +24,7 @@ class LinkedInAuthService {
   // LinkedIn'den gelen auth code ile token alma
   async getTokenFromCode(code: string): Promise<any> {
     try {
-      const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:3000/auth/social-callback';
+      const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
       const linkedInClientId = process.env.LINKEDIN_CLIENT_ID;
       const linkedInClientSecret = process.env.LINKEDIN_CLIENT_SECRET;
       
