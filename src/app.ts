@@ -31,20 +31,40 @@ const server = http.createServer(app);
 const whitelist = [
   'https://aikuaiplatform.com',
   'https://www.aikuaiplatform.com',
+  'https://api.aikuaiplatform.com',
   'http://localhost:3000'
 ];
+
+// CORS origin kontrolü için fonksiyon
+const corsOriginCheck = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  // Origin yoksa (örn. aynı origin'den istek veya Postman gibi araçlar)
+  if (!origin) {
+    callback(null, true);
+    return;
+  }
+  
+  // Tam eşleşme kontrolü
+  if (whitelist.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+  
+  // Localhost için port kontrolünü gevşet (development için)
+  const localhostRegex = /^http:\/\/localhost:\d+$/;
+  if (localhostRegex.test(origin)) {
+    callback(null, true);
+    return;
+  }
+  
+  // Diğer tüm istekleri reddet
+  console.log(`⛔ CORS engellendi: ${origin}`);
+  callback(null, false);
+};
 
 // Socket.IO kurulumu
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || whitelist.some(domain => origin.includes(domain))) {
-        callback(null, true);
-      } else {
-        console.log(`⛔ Socket.IO CORS engellendi: ${origin}`);
-        callback(new Error("CORS engellendi"), false);
-      }
-    },
+    origin: corsOriginCheck,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"]
@@ -71,14 +91,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // CORS ayarları
 const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    if (!origin || whitelist.some(domain => origin.includes(domain))) {
-      callback(null, true);
-    } else {
-      console.log(`⛔ CORS engellendi: ${origin}`);
-      callback(null, false);
-    }
-  },
+  origin: corsOriginCheck,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
