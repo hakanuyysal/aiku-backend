@@ -35,7 +35,7 @@ const io = new Server(server, {
       "https://www.aikuaiplatform.com",
       "http://localhost:3000",
     ],
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true,
   },
 });
