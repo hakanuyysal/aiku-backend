@@ -128,6 +128,12 @@ router.get(
 // Firebase Google ile giriş rotası
 router.post("/google/login", googleLogin);
 
+// Frontend'den POST isteği alarak Google OAuth akışını başlat
+router.post("/google/redirect", (req, res) => {
+  console.log("[GoogleRedirect] Frontend'den Google OAuth isteği alındı");
+  res.redirect('/api/auth/google');
+});
+
 // Oturum kapatma rotası
 router.post("/logout", protect, logout);
 
