@@ -35,7 +35,8 @@ const whitelist = [
   'https://www.aikuaiplatform.com',
   'https://api.aikuaiplatform.com',
   'http://localhost:3000',
-  'http://localhost:3004'
+  'http://localhost:3004',
+  'https://bevakpqfycmxnpzrkecv.supabase.co'
 ];
 
 // CORS origin kontrolü için fonksiyon
@@ -56,6 +57,18 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
   
   // Tam eşleşme kontrolü
   if (whitelist.includes(origin)) {
+    callback(null, true);
+    return;
+  }
+  
+  // Subdomain kontrolü
+  const isSubdomain = whitelist.some(domain => {
+    const whitelistDomain = domain.replace(/^https?:\/\//, '');
+    const requestDomain = origin.replace(/^https?:\/\//, '');
+    return requestDomain.endsWith(whitelistDomain);
+  });
+
+  if (isSubdomain) {
     callback(null, true);
     return;
   }
