@@ -5,6 +5,7 @@ import path from "path";
 import { Server } from "socket.io";
 import http from "http";
 import passport from "./config/passport";
+import cors from "cors";
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -27,7 +28,21 @@ const app = express();
 const server = http.createServer(app);
 
 // Socket.IO kurulumu
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin || whitelist.some(domain => origin.includes(domain))) {
+        callback(null, true);
+      } else {
+        console.log(`⛔ Socket.IO CORS engellendi: ${origin}`);
+        callback(new Error("CORS engellendi"), false);
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"]
+  },
+});
 
 // Socket.IO olaylarını dinle
 io.on("connection", (socket) => {
@@ -47,11 +62,53 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// İstek loglaması
+// CORS ayarları
+const whitelist = [
+  'https://aikuaiplatform.com',
+  'https://www.aikuaiplatform.com',
+  'http://localhost:3000'
+];
+
+const corsOptions = {
+  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (!origin || whitelist.some(domain => origin.includes(domain))) {
+      callback(null, true);
+    } else {
+      console.log(`⛔ CORS engellendi: ${origin}`);
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
+};
+
+app.use(cors(corsOptions));
+
+// Tüm isteklere manuel CORS başlıkları ekle
 app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
+  
+  if (!origin || whitelist.some(domain => origin.includes(domain))) {
+    res.setHeader("Access-Control-Allow-Origin", origin || "*");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Origin, Accept"
+    );
+  }
+
+  // OPTIONS istekleri için hemen yanıt ver
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // İstek loglaması
   console.log(
-    `🔄 İstek - Method: ${req.method}, URL: ${req.url}`
+    `🔄 İstek - Origin: ${origin}, Method: ${req.method}, URL: ${req.url}`
   );
+
   next();
 });
 
