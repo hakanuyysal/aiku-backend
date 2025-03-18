@@ -20,6 +20,7 @@ import { protect } from "../middleware/auth";
 import passport from "../config/passport";
 import { LinkedInService } from "../services/linkedInService";
 import { supabase } from "../config/supabase";
+import { GoogleService } from "../services/googleService";
 
 const router = Router();
 
@@ -106,18 +107,27 @@ router.delete(
 router.get("/favorites", protect, getFavorites);
 
 // Google OAuth rotaları
-router.get("/auth/google", (req, res) => {
-  const { data } = supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${process.env.CLIENT_URL}/auth/callback`,
-      queryParams: {
-        access_type: 'offline',
-        prompt: 'consent',
+router.get("/auth/google", async (req, res) => {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${process.env.CLIENT_URL}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
-    },
-  });
-  res.redirect(data.url);
+    });
+
+    if (error) throw error;
+    if (!data.url) throw new Error('Auth URL alınamadı');
+
+    res.redirect(data.url);
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.redirect(`${process.env.CLIENT_URL}/auth/login?error=auth-failed`);
+  }
 });
 
 // Google callback endpoint'i
@@ -131,7 +141,13 @@ router.get("/auth/callback", async (req, res) => {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code.toString());
     if (error) throw error;
 
-    res.redirect(`${process.env.CLIENT_URL}/auth/callback?session=${JSON.stringify(data)}`);
+    // MongoDB ile senkronizasyon
+    const googleService = new GoogleService();
+    const authResult = await googleService.handleAuth(data);
+
+    res.redirect(
+      `${process.env.CLIENT_URL}/auth/callback?session=${encodeURIComponent(JSON.stringify(authResult))}`
+    );
   } catch (error) {
     console.error("Google callback error:", error);
     res.redirect(`${process.env.CLIENT_URL}/auth/login?error=callback-failed`);
@@ -139,7 +155,35 @@ router.get("/auth/callback", async (req, res) => {
 });
 
 // Google login endpoint'i - Token ile giriş
-router.post("/auth/google/login", googleLogin);
+router.post("/google/login", async (req, res) => {
+  try {
+    const { access_token } = req.body;
+    
+    if (!access_token) {
+      return res.status(400).json({
+        success: false,
+        error: "Access token gereklidir"
+      });
+    }
+
+    const googleService = new GoogleService();
+    const authResult = await googleService.handleAuth({
+      access_token,
+      ...req.body
+    });
+
+    res.json({
+      success: true,
+      data: authResult
+    });
+  } catch (error: any) {
+    console.error("Google login error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 // Oturum kapatma rotası
 router.post("/logout", protect, logout);

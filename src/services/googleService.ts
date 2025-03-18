@@ -1,22 +1,13 @@
 import { User } from "../models/User";
-import supabase from "../config/supabaseClient";
-import jwt, { SignOptions, Secret } from "jsonwebtoken";
+import { supabase } from "../config/supabase";
+import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 export class GoogleService {
-  async handleAuth(googleData: any) {
+  async handleAuth(authData: any) {
     try {
-      // Supabase ile Google oturumu aç
-      const { data: authData, error: authError } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: googleData.access_token,
-        nonce: googleData.nonce
-      });
-
-      if (authError) throw new Error(authError.message);
-
       if (!authData.user?.email) {
         throw new Error("Google hesabından email bilgisi alınamadı");
       }
@@ -43,16 +34,15 @@ export class GoogleService {
         await user.save();
       }
 
-      const jwtSecret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
-      const jwtOptions = { expiresIn: process.env.JWT_EXPIRE || "24h" };
-      
       const token = jwt.sign(
         { 
           id: user._id.toString(), 
           supabaseId: authData.user.id 
         },
-        jwtSecret,
-        jwtOptions
+        process.env.JWT_SECRET || "your-super-secret-jwt-key",
+        { 
+          expiresIn: parseInt(process.env.JWT_EXPIRE || "86400") // 24 saat
+        }
       );
 
       return {
