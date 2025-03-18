@@ -128,6 +128,9 @@ router.get(
 // Google login endpoint'i - Token ile veya token olmadan kullanılabilir
 router.post("/google/login", googleLogin);
 
+// Alternatif path için aynı endpoint
+router.post("/auth/google/login", googleLogin);
+
 // Oturum kapatma rotası
 router.post("/logout", protect, logout);
 
