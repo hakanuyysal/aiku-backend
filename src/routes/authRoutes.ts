@@ -157,30 +157,43 @@ router.get("/auth/callback", async (req, res) => {
 // Google login endpoint'i - Token ile giriş
 router.post("/google/login", async (req, res) => {
   try {
-    const { access_token } = req.body;
+    console.log("Google login isteği alındı:", {
+      body: req.body,
+      headers: req.headers
+    });
+
+    const { accessToken } = req.body;
     
-    if (!access_token) {
+    if (!accessToken) {
+      console.log("Token bulunamadı:", req.body);
       return res.status(400).json({
         success: false,
-        error: "Access token gereklidir"
+        error: "Access token gereklidir",
+        details: "Kimlik doğrulama başarısız",
+        errorCode: 400
       });
     }
 
     const googleService = new GoogleService();
     const authResult = await googleService.handleAuth({
-      access_token,
-      ...req.body
+      user: {
+        access_token: accessToken
+      }
     });
 
+    console.log("Google login başarılı:", { userId: authResult.user.id });
+    
     res.json({
-      success: true,
-      data: authResult
+      token: authResult.token,
+      user: authResult.user
     });
   } catch (error: any) {
     console.error("Google login error:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      details: "Sunucu hatası",
+      errorCode: 500
     });
   }
 });
