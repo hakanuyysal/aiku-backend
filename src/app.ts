@@ -61,14 +61,9 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
     return;
   }
   
-  // Subdomain kontrolü
-  const isSubdomain = whitelist.some(domain => {
-    const whitelistDomain = domain.replace(/^https?:\/\//, '');
-    const requestDomain = origin.replace(/^https?:\/\//, '');
-    return requestDomain.endsWith(whitelistDomain);
-  });
-
-  if (isSubdomain) {
+  // Wildcard subdomain kontrolü
+  const isAikuDomain = origin.match(/^https:\/\/([a-zA-Z0-9-]+\.)?aikuaiplatform\.com$/);
+  if (isAikuDomain) {
     callback(null, true);
     return;
   }
@@ -85,34 +80,6 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
   callback(new Error('CORS politikası tarafından engellendi'));
 };
 
-// Socket.IO kurulumu
-const io = new Server(server, {
-  cors: {
-    origin: corsOriginCheck,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"]
-  },
-});
-
-// Socket.IO olaylarını dinle
-io.on("connection", (socket) => {
-  console.log("👤 Yeni kullanıcı bağlandı");
-
-  socket.on("send_message", (message) => {
-    console.log("📨 Mesaj alındı:", message);
-    io.emit("receive_message", message);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("👋 Kullanıcı ayrıldı");
-  });
-});
-
-// Middleware'leri ekle
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-
 // CORS ayarları
 const corsOptions = {
   origin: corsOriginCheck,
@@ -125,7 +92,7 @@ const corsOptions = {
   maxAge: 86400 // Preflight sonuçlarını 24 saat önbelleğe al
 };
 
-// Tek bir CORS middleware'i kullanılıyor
+// CORS middleware'ini en başta ekle
 app.use(cors(corsOptions));
 
 // CORS hata yakalama middleware'i
@@ -140,6 +107,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   }
   next(err);
 });
+
+// OPTIONS istekleri için özel işleyici
+app.options('*', cors(corsOptions));
 
 // İstek loglaması için middleware
 app.use((req, res, next) => {
