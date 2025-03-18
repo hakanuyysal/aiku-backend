@@ -203,16 +203,18 @@ export const login = async (req: Request, res: Response) => {
 
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
-    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
-    const userId = req.user?._id;
-    if (!userId) {
+    const supabaseUser = req.user;
+    
+    if (!supabaseUser) {
       return res.status(401).json({
         success: false,
         message: "Oturum açmanız gerekiyor",
       });
     }
 
-    const user = await User.findById(userId);
+    // Supabase ID'si ile kullanıcıyı bul
+    const user = await User.findOne({ supabaseId: supabaseUser.id });
+    
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -224,24 +226,6 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     const hasActiveSubscription =
       user.subscriptionStatus === "active" ||
       user.subscriptionStatus === "trial";
-
-    // Debug bilgileri
-    const subscriptionDebug = {
-      statusValue: user.subscriptionStatus,
-      statusType: typeof user.subscriptionStatus,
-      statusLength: user.subscriptionStatus
-        ? user.subscriptionStatus.length
-        : 0,
-      statusCharCodes: user.subscriptionStatus
-        ? Array.from(user.subscriptionStatus).map((c) => c.charCodeAt(0))
-        : [],
-      trimmedStatus: user.subscriptionStatus
-        ? user.subscriptionStatus.trim()
-        : "",
-      isEqualActive: user.subscriptionStatus === "active",
-      isEqualTrial: user.subscriptionStatus === "trial",
-      manualCalculation: hasActiveSubscription,
-    };
 
     res.status(200).json({
       success: true,
@@ -280,9 +264,11 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
+    console.error("Kullanıcı bilgileri alınırken hata:", err);
     res.status(500).json({
       success: false,
       message: "Kullanıcı bilgileri alınırken bir hata oluştu",
+      error: err.message
     });
   }
 };

@@ -17,6 +17,7 @@ import {
   logout,
 } from "../controllers/authController";
 import { protect } from "../middleware/auth";
+import { verifySupabaseToken } from "../middleware/supabaseAuth";
 import passport from "../config/passport";
 import { LinkedInService } from "../services/linkedInService";
 import { supabase } from "../config/supabase";
@@ -47,13 +48,13 @@ router.post(
 );
 
 // Giriş yapmış kullanıcının bilgilerini alma rotası
-router.get("/currentUser", protect, getCurrentUser);
+router.get("/currentUser", verifySupabaseToken, getCurrentUser);
 
 // Kullanıcı bilgilerini güncelleme rotası
-router.put("/updateUser", protect, updateUser);
+router.put("/updateUser", verifySupabaseToken, updateUser);
 
 // Kullanıcı id'si ile bilgilerini alma rotası
-router.get("/user/:id", protect, getUserById);
+router.get("/user/:id", verifySupabaseToken, getUserById);
 
 // Abonelik durumunu kontrol et ve düzelt
 router.get("/fix-subscription", protect, fixSubscription);
