@@ -58,13 +58,21 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS ayarları - özel middleware yerine cors paketi kullanımı
+// CORS ayarları
 const corsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "https://aikuaiplatform.com",
-    "https://www.aikuaiplatform.com",
-  ],
+  origin: function(origin: any, callback: any) {
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "https://aikuaiplatform.com",
+      "https://www.aikuaiplatform.com"
+    ];
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS politikası tarafından engellendi'));
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
@@ -72,40 +80,16 @@ const corsOptions = {
     "Authorization",
     "X-Requested-With",
     "Origin",
-    "Accept",
-  ],
+    "Accept"
+  ]
 };
 
+// CORS middleware'ini ekle
 app.use(cors(corsOptions));
 
-// Tüm isteklere CORS başlıklarını ekleyen middleware
+// İstek loglaması için middleware
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  } else {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-  }
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Origin, Accept"
-  );
-
-  // OPTIONS istekleri için hemen yanıt ver
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  // İstek loglaması
-  console.log(
-    `🔄 İstek - Origin: ${origin}, Method: ${req.method}, URL: ${req.url}`
-  );
-
+  console.log(`🔄 İstek - Origin: ${req.headers.origin}, Method: ${req.method}, URL: ${req.url}`);
   next();
 });
 
