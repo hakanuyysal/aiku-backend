@@ -58,8 +58,59 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// CORS ayarları - özel middleware yerine cors paketi kullanımı
+const corsOptions = {
+  origin: [
+    "http://localhost:3000",
+    "https://aikuaiplatform.com",
+    "https://www.aikuaiplatform.com",
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Origin",
+    "Accept",
+  ],
+};
+
+app.use(cors(corsOptions));
+
+// Tüm isteklere CORS başlıklarını ekleyen middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+  }
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With, Origin, Accept"
+  );
+
+  // OPTIONS istekleri için hemen yanıt ver
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // İstek loglaması
+  console.log(
+    `🔄 İstek - Origin: ${origin}, Method: ${req.method}, URL: ${req.url}`
+  );
+
+  next();
+});
+
 // Test için Google OAuth sayfası
-app.get('/test-google-auth', (req, res) => {
+app.get("/test-google-auth", (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -206,85 +257,17 @@ app.get('/test-google-auth', (req, res) => {
   `);
 });
 
-// CORS için tüm isteklere header ekle
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-
-  // CORS Loglama
-  console.log(`🔄 CORS İsteği - Origin: ${origin}, Method: ${req.method}, URL: ${req.url}`);
-  console.log(`📋 İstek Başlıkları:`, JSON.stringify(req.headers));
-
-  // İzin verilen originler
-  const allowedOrigins = [
-    "https://aikuaiplatform.com",
-    "https://www.aikuaiplatform.com",
-    "http://localhost:3000",
-    "http://localhost:3004",
-    "https://accounts.google.com",  // Google OAuth için
-    "https://apis.google.com",      // Google API'ları
-    "https://googleusercontent.com",// Google içerik sunucuları 
-    "https://www.googleapis.com"    // Google API'ları
-  ];
-
-  // Origin kontrolü
-  if (origin) {
-    // Kesin eşleşme kontrolü
-    if (allowedOrigins.includes(origin)) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    } 
-    // Domain sonu kontrolü
-    else if (origin.endsWith(".aikuaiplatform.com")) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    } 
-    // Google domain'leri kontrolü
-    else if (origin.includes("google") || 
-             origin.includes("gstatic") || 
-             origin.includes("googleapis") || 
-             origin.includes("googleusercontent")) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    }
-    // Yerel geliştirme kontrolü 
-    else if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    }
-    // Diğer durumlarda varsayılan
-    else {
-      res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-    }
-  } else {
-    // Origin yoksa varsayılan olarak localhost'a izin ver
-    res.setHeader("Access-Control-Allow-Origin", "http://localhost:3000");
-  }
-
-  // Diğer CORS başlıkları
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, DELETE, PATCH, OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, Origin, Accept, access-control-allow-origin"
-  );
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-
-  // OPTIONS istekleri için hemen yanıt ver
-  if (req.method === "OPTIONS") {
-    console.log("⚠️ OPTIONS isteği alındı - Preflight yanıtı gönderiliyor");
-    return res.status(200).json({});
-  }
-
-  next();
-});
-
 // Hata yakalama middleware'i
 app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error('❌ CORS veya Sunucu Hatası:', err);
-  if (err.name === 'CORSError' || err.message?.includes('CORS')) {
-    console.error(`⛔ CORS Hatası - Origin: ${req.headers.origin}, Method: ${req.method}, URL: ${req.url}`);
+  console.error("❌ CORS veya Sunucu Hatası:", err);
+  if (err.name === "CORSError" || err.message?.includes("CORS")) {
+    console.error(
+      `⛔ CORS Hatası - Origin: ${req.headers.origin}, Method: ${req.method}, URL: ${req.url}`
+    );
   }
   res.status(err.status || 500).json({
-    message: err.message || 'Sunucu hatası',
-    error: process.env.NODE_ENV === 'development' ? err : {}
+    message: err.message || "Sunucu hatası",
+    error: process.env.NODE_ENV === "development" ? err : {},
   });
 });
 
