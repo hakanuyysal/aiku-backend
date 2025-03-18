@@ -125,7 +125,7 @@ router.get(
   googleCallback
 );
 
-// Firebase Google ile giriş rotası
+// Google login endpoint'i - Token ile veya token olmadan kullanılabilir
 router.post("/google/login", googleLogin);
 
 // Oturum kapatma rotası

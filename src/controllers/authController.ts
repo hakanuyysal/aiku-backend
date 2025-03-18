@@ -1053,20 +1053,9 @@ export const googleLogin = async (req: Request, res: Response) => {
     const tokenToUse = idToken || accessToken;
 
     if (!tokenToUse) {
-      console.log('[GoogleLogin] Token bulunamadı, request headers:', JSON.stringify(req.headers));
-      console.log('[GoogleLogin] Request body tam içerik:', JSON.stringify(req.body, null, 2));
-      console.log('[GoogleLogin] Tüm istek bilgileri:', {
-        method: req.method,
-        path: req.path,
-        params: req.params,
-        query: req.query,
-        cookies: req.cookies
-      });
-      
-      return res.status(400).json({
-        success: false,
-        error: 'Google ID token veya Access token gerekli'
-      });
+      console.log('[GoogleLogin] Token bulunamadı, Google OAuth akışı başlatılıyor');
+      // Token yoksa, Google OAuth akışına yönlendir
+      return res.redirect('/api/auth/google');
     }
 
     // Token'ın ilk ve son birkaç karakterini göster (güvenlik için)
