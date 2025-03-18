@@ -27,6 +27,13 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+// CORS için izin verilen domainler
+const whitelist = [
+  'https://aikuaiplatform.com',
+  'https://www.aikuaiplatform.com',
+  'http://localhost:3000'
+];
+
 // Socket.IO kurulumu
 const io = new Server(server, {
   cors: {
@@ -63,12 +70,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // CORS ayarları
-const whitelist = [
-  'https://aikuaiplatform.com',
-  'https://www.aikuaiplatform.com',
-  'http://localhost:3000'
-];
-
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     if (!origin || whitelist.some(domain => origin.includes(domain))) {
@@ -81,29 +82,17 @@ const corsOptions = {
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 };
 
+// Tek bir CORS middleware'i kullanılıyor
 app.use(cors(corsOptions));
 
-// Tüm isteklere manuel CORS başlıkları ekle
+// İstek loglaması için middleware
 app.use((req, res, next) => {
   const origin = req.headers.origin || "";
   
-  if (!origin || whitelist.some(domain => origin.includes(domain))) {
-    res.setHeader("Access-Control-Allow-Origin", origin || "*");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Requested-With, Origin, Accept"
-    );
-  }
-
-  // OPTIONS istekleri için hemen yanıt ver
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
   // İstek loglaması
   console.log(
     `🔄 İstek - Origin: ${origin}, Method: ${req.method}, URL: ${req.url}`
