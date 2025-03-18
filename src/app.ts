@@ -19,6 +19,8 @@ import paymentRoutes from "./routes/paymentRoutes";
 import linkedInRoutes from "./routes/linkedInRoutes";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
 import applicantRoutes from "./routes/applicantRoutes";
+import linkedinAuthRoutes from "./routes/linkedinAuth.routes";
+import supabaseAuthRoutes from "./routes/supabaseAuth.routes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -32,11 +34,20 @@ const whitelist = [
   'https://aikuaiplatform.com',
   'https://www.aikuaiplatform.com',
   'https://api.aikuaiplatform.com',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:3004'
 ];
 
 // CORS origin kontrolü için fonksiyon
 const corsOriginCheck = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  console.log('🔒 CORS isteği origin:', origin);
+  
+  // Development ortamında tüm originlere izin ver
+  if (process.env.NODE_ENV === 'development') {
+    callback(null, true);
+    return;
+  }
+  
   // Origin yoksa (örn. aynı origin'den istek veya Postman gibi araçlar)
   if (!origin) {
     callback(null, true);
@@ -58,7 +69,7 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
   
   // Diğer tüm istekleri reddet
   console.log(`⛔ CORS engellendi: ${origin}`);
-  callback(null, false);
+  callback(new Error('CORS politikası tarafından engellendi'));
 };
 
 // Socket.IO kurulumu
@@ -93,23 +104,50 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const corsOptions = {
   origin: corsOriginCheck,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Origin', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
   preflightContinue: false,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 204,
+  maxAge: 86400 // Preflight sonuçlarını 24 saat önbelleğe al
 };
 
 // Tek bir CORS middleware'i kullanılıyor
 app.use(cors(corsOptions));
 
+// CORS hata yakalama middleware'i
+app.use((err: any, req: Request, res: Response, next: any) => {
+  if (err.name === 'CORSError') {
+    console.error('❌ CORS Hatası:', err.message);
+    return res.status(403).json({
+      success: false,
+      message: 'CORS hatası: İstek engellendi',
+      error: err.message
+    });
+  }
+  next(err);
+});
+
 // İstek loglaması için middleware
 app.use((req, res, next) => {
-  const origin = req.headers.origin || "";
+  const origin = req.headers.origin || '';
+  const method = req.method;
+  const url = req.url;
   
   // İstek loglaması
   console.log(
-    `🔄 İstek - Origin: ${origin}, Method: ${req.method}, URL: ${req.url}`
+    `🔄 İstek - Origin: ${origin}, Method: ${method}, URL: ${url}`
   );
+
+  // CORS başlıklarını kontrol et ve logla
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin'),
+    'Access-Control-Allow-Methods': res.getHeader('Access-Control-Allow-Methods'),
+    'Access-Control-Allow-Headers': res.getHeader('Access-Control-Allow-Headers'),
+    'Access-Control-Allow-Credentials': res.getHeader('Access-Control-Allow-Credentials')
+  };
+  
+  console.log('🔑 CORS Başlıkları:', corsHeaders);
 
   next();
 });
@@ -295,6 +333,8 @@ app.use("/api/cards", cardRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/applicants", applicantRoutes);
+app.use("/api", linkedinAuthRoutes);
+app.use("/api", supabaseAuthRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

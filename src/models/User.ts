@@ -17,6 +17,9 @@ export interface IUser extends Document {
   twitter?: string;
   authProvider?: string;
   googleId?: string;
+  linkedinId?: string; // LinkedIn ID 
+  supabaseId?: string; // Supabase ID
+  supabaseMetadata?: any; // Supabase meta verileri
   emailVerified: boolean;
   locale?: {
     country: string;
@@ -129,13 +132,26 @@ const userSchema = new Schema<IUser>({
   },
   authProvider: {
     type: String,
-    enum: ['email', 'linkedin', 'google'],
+    enum: ['email', 'linkedin', 'google', 'supabase'],
     default: 'email'
   },
   googleId: {
     type: String,
     sparse: true,
     index: true
+  },
+  linkedinId: { // LinkedIn için ID alanı
+    type: String,
+    sparse: true,
+    index: true
+  },
+  supabaseId: { // Supabase için ID alanı
+    type: String,
+    sparse: true,
+    index: true
+  },
+  supabaseMetadata: { // Supabase meta verileri için alan
+    type: Schema.Types.Mixed
   },
   emailVerified: {
     type: Boolean,
