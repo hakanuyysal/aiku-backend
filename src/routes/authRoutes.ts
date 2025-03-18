@@ -155,7 +155,7 @@ router.get("/auth/callback", async (req, res) => {
 });
 
 // Google login endpoint'i - Token ile giriş
-router.post("/auth/google/login", async (req, res) => {
+router.post("/google/login", async (req, res) => {
   try {
     console.log("Google login isteği alındı:", {
       body: req.body,
