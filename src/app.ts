@@ -139,7 +139,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Test için Google OAuth sayfası
+// Test için Google OAuth sayfasıa
 app.get("/test-google-auth", (req, res) => {
   res.send(`
     <!DOCTYPE html>
