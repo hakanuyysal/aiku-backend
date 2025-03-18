@@ -5,7 +5,6 @@ import path from "path";
 import { Server } from "socket.io";
 import http from "http";
 import passport from "./config/passport";
-import cors from "cors";
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -28,17 +27,7 @@ const app = express();
 const server = http.createServer(app);
 
 // Socket.IO kurulumu
-const io = new Server(server, {
-  cors: {
-    origin: [
-      "https://aikuaiplatform.com",
-      "https://www.aikuaiplatform.com",
-      "http://localhost:3000",
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
-  },
-});
+const io = new Server(server);
 
 // Socket.IO olaylarını dinle
 io.on("connection", (socket) => {
@@ -58,38 +47,11 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS ayarları
-const corsOptions = {
-  origin: function(origin: any, callback: any) {
-    const allowedOrigins = [
-      "http://localhost:3000",
-      "https://aikuaiplatform.com",
-      "https://www.aikuaiplatform.com"
-    ];
-    
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS politikası tarafından engellendi'));
-    }
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Origin",
-    "Accept"
-  ]
-};
-
-// CORS middleware'ini ekle
-app.use(cors(corsOptions));
-
-// İstek loglaması için middleware
+// İstek loglaması
 app.use((req, res, next) => {
-  console.log(`🔄 İstek - Origin: ${req.headers.origin}, Method: ${req.method}, URL: ${req.url}`);
+  console.log(
+    `🔄 İstek - Method: ${req.method}, URL: ${req.url}`
+  );
   next();
 });
 
@@ -243,12 +205,7 @@ app.get("/test-google-auth", (req, res) => {
 
 // Hata yakalama middleware'i
 app.use((err: any, req: Request, res: Response, next: any) => {
-  console.error("❌ CORS veya Sunucu Hatası:", err);
-  if (err.name === "CORSError" || err.message?.includes("CORS")) {
-    console.error(
-      `⛔ CORS Hatası - Origin: ${req.headers.origin}, Method: ${req.method}, URL: ${req.url}`
-    );
-  }
+  console.error("❌ Sunucu Hatası:", err);
   res.status(err.status || 500).json({
     message: err.message || "Sunucu hatası",
     error: process.env.NODE_ENV === "development" ? err : {},
