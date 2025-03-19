@@ -1,6 +1,7 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface IInvestment extends Document {
+  investmentTitle:string;
   companyName: string;
   companyId: mongoose.Schema.Types.ObjectId;
   productName: string;
@@ -18,6 +19,11 @@ interface IInvestmentModel extends Model<IInvestment> {}
 
 const investmentSchema = new Schema<IInvestment>(
   {
+    investmentTitle: {
+      type: String,
+      required: [true, 'Investment title is required'],
+      trim: true,
+    },
     companyName: {
       type: String,
       required: [true, 'Company name is required'],

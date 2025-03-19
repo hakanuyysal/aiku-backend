@@ -31,6 +31,7 @@ router.post(
   '/',
   protect,
   [
+    check('investmentTitle', 'Başlık zorunludur').not().isEmpty(),
     check('companyName', 'Şirket adı zorunludur').not().isEmpty(),
     check('companyId', 'Şirket ID\'si zorunludur').not().isEmpty(),
     check('productName', 'Ürün adı zorunludur').not().isEmpty(),

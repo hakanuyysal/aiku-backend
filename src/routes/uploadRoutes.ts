@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { Company } from '../models/Company';
 import { Product } from '../models/Product';
 import { TeamMember } from '../models/TeamMember';
+import { Investment } from '../models/Investment';
 import { deleteFile } from '../utils/fileUtils';
 
 const router = Router();
@@ -287,6 +288,80 @@ router.delete('/product-logo/:productId', protect, async (req: Request, res: Res
     res.status(200).json({
       success: true,
       message: 'Ürün logosu başarıyla silindi'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Dosya silme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+  }
+});
+
+// Yatırım Teklifi Logosunu Yükleme / Güncelleme
+router.post('/investment-logo/:investmentId', protect, upload.single('logo'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lütfen bir dosya yükleyin'
+      });
+    }
+
+    const investment = await Investment.findById(req.params.investmentId);
+    if (!investment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Yatırım teklifi bulunamadı'
+      });
+    }
+
+    // Eski logoyu sil
+    if (investment.logo) {
+      deleteFile(investment.logo);
+    }
+
+    // Dosya yolu oluşturma
+    const fileUrl = `/uploads/images/${req.file.filename}`;
+
+    // Yatırım teklifinin logosunu güncelleme
+    investment.logo = fileUrl;
+    await investment.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Yatırım teklifi logosu başarıyla yüklendi',
+      data: { url: fileUrl }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Dosya yükleme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+  }
+});
+
+// Yatırım Teklifi Logosunu Silme
+router.delete('/investment-logo/:investmentId', protect, async (req: Request, res: Response) => {
+  try {
+    const investment = await Investment.findById(req.params.investmentId);
+    if (!investment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Yatırım teklifi bulunamadı'
+      });
+    }
+
+    if (investment.logo) {
+      deleteFile(investment.logo);
+      investment.logo = undefined;
+      await investment.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Yatırım teklifi logosu başarıyla silindi'
     });
   } catch (error) {
     res.status(500).json({
