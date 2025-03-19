@@ -16,7 +16,7 @@ import {
   googleLogin,
   logout,
 } from "../controllers/authController";
-import { protect } from "../middleware/auth";
+import { protect, optionalSupabaseToken } from "../middleware/auth";
 import { verifySupabaseToken } from "../middleware/supabaseAuth";
 import passport from "../config/passport";
 import { LinkedInService } from "../services/linkedInService";
@@ -48,13 +48,13 @@ router.post(
 );
 
 // Giriş yapmış kullanıcının bilgilerini alma rotası
-router.get("/currentUser", verifySupabaseToken, getCurrentUser);
+router.get("/currentUser", optionalSupabaseToken, getCurrentUser);
 
 // Kullanıcı bilgilerini güncelleme rotası
-router.put("/updateUser", verifySupabaseToken, updateUser);
+router.put("/updateUser", optionalSupabaseToken, updateUser);
 
 // Kullanıcı id'si ile bilgilerini alma rotası
-router.get("/user/:id", verifySupabaseToken, getUserById);
+router.get("/user/:id", optionalSupabaseToken, getUserById);
 
 // Abonelik durumunu kontrol et ve düzelt
 router.get("/fix-subscription", protect, fixSubscription);

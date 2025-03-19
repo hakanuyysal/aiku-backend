@@ -203,22 +203,12 @@ export const login = async (req: Request, res: Response) => {
 
 export const getCurrentUser = async (req: Request, res: Response) => {
   try {
-    const supabaseUser = req.user;
+    const user = req.user;
 
-    if (!supabaseUser) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: "Oturum açmanız gerekiyor",
-      });
-    }
-
-    // Supabase ID'si ile kullanıcıyı bul
-    const user = await User.findOne({ supabaseId: supabaseUser.id });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Kullanıcı bulunamadı",
       });
     }
 
@@ -275,22 +265,16 @@ export const getCurrentUser = async (req: Request, res: Response) => {
 
 export const updateUser = async (req: Request, res: Response) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) {
+    const user = req.user;
+
+    if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Yetkilendirme başarısız, token bulunamadı",
+        message: "Oturum açmanız gerekiyor",
       });
     }
 
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
-    const user = await User.findById(decoded.id);
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Kullanıcı bulunamadı" });
-    }
-
+    // Güncellenmek istenen alanları al
     const {
       firstName,
       lastName,
@@ -305,8 +289,10 @@ export const updateUser = async (req: Request, res: Response) => {
       facebook,
       twitter,
       password,
+      locale,
     } = req.body;
 
+    // Gerekli alanları güncelle
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
     if (email) user.email = email;
@@ -319,58 +305,45 @@ export const updateUser = async (req: Request, res: Response) => {
     if (instagram) user.instagram = instagram;
     if (facebook) user.facebook = facebook;
     if (twitter) user.twitter = twitter;
+    if (locale) user.locale = locale;
 
     // Şifre güncelleniyorsa hashle
-    if (password) {
+    if (password && password.length >= 6) {
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(password, salt);
     }
 
+    // Güncellenmiş kullanıcıyı kaydet
     await user.save();
 
-    const hasActiveSubscription =
-      user.subscriptionStatus === "active" ||
-      user.subscriptionStatus === "trial";
-
-    const updatedUserResponse: UserResponse = {
-      id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      phone: user.phone,
-      title: user.title,
-      location: user.location,
-      profileInfo: user.profileInfo,
-      profilePhoto: user.profilePhoto,
-      linkedin: user.linkedin,
-      instagram: user.instagram,
-      facebook: user.facebook,
-      twitter: user.twitter,
-      emailVerified: user.emailVerified,
-      locale: user.locale,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      subscriptionStatus: user.subscriptionStatus,
-      subscriptionStartDate: user.subscriptionStartDate,
-      trialEndsAt: user.trialEndsAt,
-      subscriptionPlan: user.subscriptionPlan,
-      subscriptionPeriod: user.subscriptionPeriod,
-      subscriptionAmount: user.subscriptionAmount,
-      autoRenewal: user.autoRenewal,
-      paymentMethod: user.paymentMethod,
-      savedCardId: user.savedCardId ? user.savedCardId.toString() : undefined,
-      lastPaymentDate: user.lastPaymentDate,
-      nextPaymentDate: user.nextPaymentDate,
-      billingAddress: user.billingAddress,
-      vatNumber: user.vatNumber,
-      isSubscriptionActive: hasActiveSubscription,
-    };
-
-    res.status(200).json({ success: true, user: updatedUserResponse });
+    res.status(200).json({
+      success: true,
+      message: "Kullanıcı bilgileri başarıyla güncellendi",
+      user: {
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phone: user.phone,
+        title: user.title,
+        location: user.location,
+        profileInfo: user.profileInfo,
+        profilePhoto: user.profilePhoto,
+        linkedin: user.linkedin,
+        instagram: user.instagram,
+        facebook: user.facebook,
+        twitter: user.twitter,
+        emailVerified: user.emailVerified,
+        locale: user.locale,
+      },
+    });
   } catch (err: any) {
-    res
-      .status(500)
-      .json({ success: false, message: "Sunucu hatası", error: err.message });
+    console.error("Kullanıcı güncelleme hatası:", err);
+    res.status(500).json({
+      success: false,
+      message: "Kullanıcı bilgileri güncellenirken bir hata oluştu",
+      error: err.message,
+    });
   }
 };
 
