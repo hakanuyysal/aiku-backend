@@ -19,6 +19,7 @@ import paymentRoutes from "./routes/paymentRoutes";
 import linkedInRoutes from "./routes/linkedInRoutes";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
 import applicantRoutes from "./routes/applicantRoutes";
+import investmentRoutes from "./routes/investmentRoutes";
 import linkedinAuthRoutes from "./routes/linkedinAuth.routes";
 import supabaseAuthRoutes from "./routes/supabaseAuth.routes";
 
@@ -320,6 +321,7 @@ app.use("/api/cards", cardRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/applicants", applicantRoutes);
+app.use("/api/investments", investmentRoutes)
 app.use("/api", linkedinAuthRoutes);
 app.use("/api", supabaseAuthRoutes);
 
