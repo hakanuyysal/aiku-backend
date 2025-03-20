@@ -30,6 +30,7 @@ export const createInvestment = async (req: Request, res: Response) => {
             targetedInvestment,
             minimumTicket,
             deadline,
+            investmentType,
             description,
             logo,
         } = req.body;
@@ -44,6 +45,7 @@ export const createInvestment = async (req: Request, res: Response) => {
             targetedInvestment,
             minimumTicket,
             deadline,
+            investmentType,
             description,
             logo,
             // Eğer modelinizde user alanı varsa:

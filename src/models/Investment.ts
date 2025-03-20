@@ -9,6 +9,7 @@ export interface IInvestment extends Document {
   targetedInvestment: number;
   minimumTicket: number;
   deadline: Date;
+  investmentType: string;
   description: string;
   logo?: string;
   createdAt: Date;
@@ -57,6 +58,11 @@ const investmentSchema = new Schema<IInvestment>(
     deadline: {
       type: Date,
       required: [true, 'Deadline is required'],
+    },
+    investmentType: {
+      type: String,
+      required: [true, 'Investment type is required'],
+      trim: true,
     },
     description: {
       type: String,
