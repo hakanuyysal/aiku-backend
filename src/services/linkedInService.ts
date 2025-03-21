@@ -3,6 +3,7 @@ import { GeminiService } from "./geminiService";
 import dotenv from "dotenv";
 import jwt, { SignOptions, Secret } from "jsonwebtoken";
 import { User } from "../models/User";
+import { supabase } from "../config/supabase";
 
 dotenv.config();
 
@@ -117,55 +118,126 @@ export class LinkedInService {
     };
   }
 
-  async handleAuth(linkedInData: any) {
+  async handleAuth(data: any) {
     try {
-      let user = await User.findOne({ email: linkedInData.email });
+      console.log("LinkedInService.handleAuth başladı:", data);
 
-      const userData = {
-        firstName: linkedInData.name.split(" ")[0],
-        lastName: linkedInData.name.split(" ").slice(1).join(" "),
-        email: linkedInData.email,
-        profilePhoto: linkedInData.picture,
-        locale: linkedInData.locale,
-        emailVerified: linkedInData.emailVerified,
-        linkedin: linkedInData.linkedinUrl,
-        authProvider: "linkedin",
-        lastLogin: new Date(),
-      };
+      // Supabase'den kullanıcı bilgilerini al
+      const user = data.user;
+      
+      if (!user || !user.email) {
+        throw new Error("Kullanıcı bilgileri alınamadı");
+      }
+      
+      console.log("LinkedIn kullanıcı bilgileri:", user);
 
-      if (!user) {
-        user = new User(userData);
-        await user.save();
+      // Metadata'dan bilgileri çıkart
+      const firstName = user.user_metadata?.given_name || user.user_metadata?.name?.split(' ')[0] || '';
+      const lastName = user.user_metadata?.family_name || 
+                      (user.user_metadata?.name?.split(' ').length > 1 ? 
+                       user.user_metadata?.name?.split(' ').slice(1).join(' ') : '');
+      const profilePhoto = user.user_metadata?.picture || user.user_metadata?.avatar_url || '';
+      const linkedinId = user.user_metadata?.sub || user.user_metadata?.id || '';
+      
+      console.log("Ayıklanmış kullanıcı bilgileri:", {
+        firstName, lastName, profilePhoto, linkedinId
+      });
+
+      // MongoDB'de kullanıcıyı ara veya oluştur
+      let mongoUser = await User.findOne({ email: user.email });
+      
+      if (!mongoUser) {
+        console.log("LinkedIn: Yeni kullanıcı oluşturuluyor:", user.email);
+        
+        // Yeni kullanıcı oluştur
+        mongoUser = new User({
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email,
+          profilePhoto: profilePhoto,
+          supabaseId: user.id,
+          linkedinId: linkedinId,
+          emailVerified: true,
+          authProvider: "linkedin_oidc",
+          lastLogin: new Date(),
+          linkedin: linkedinId ? `https://www.linkedin.com/in/${linkedinId}/` : undefined
+        });
+        
+        await mongoUser.save();
+        console.log("LinkedIn: Yeni kullanıcı kaydedildi, ID:", mongoUser._id);
       } else {
-        user.set(userData);
-        await user.save();
+        console.log("LinkedIn: Mevcut kullanıcı güncelleniyor, ID:", mongoUser._id);
+        
+        // Kullanıcıyı güncelle
+        mongoUser.lastLogin = new Date();
+        mongoUser.supabaseId = user.id;
+        
+        // LinkedIn ID güncellemesi
+        if (linkedinId && !mongoUser.linkedinId) {
+          mongoUser.linkedinId = linkedinId;
+        }
+        
+        // Diğer eksik bilgileri güncelle
+        if (!mongoUser.firstName && firstName) {
+          mongoUser.firstName = firstName;
+        }
+        if (!mongoUser.lastName && lastName) {
+          mongoUser.lastName = lastName;
+        }
+        if (!mongoUser.profilePhoto && profilePhoto) {
+          mongoUser.profilePhoto = profilePhoto;
+        }
+        if (!mongoUser.linkedin && linkedinId) {
+          mongoUser.linkedin = `https://www.linkedin.com/in/${linkedinId}/`;
+        }
+        
+        await mongoUser.save();
+        console.log("LinkedIn: Kullanıcı güncellendi:", mongoUser.email);
       }
 
-      const jwtSecret: Secret = process.env.JWT_SECRET || "your-super-secret-jwt-key";
-      const jwtOptions: SignOptions = { expiresIn: process.env.JWT_EXPIRE || "24h" };
-      
+      // JWT token oluştur
       const token = jwt.sign(
-        { id: user._id.toString() },
-        jwtSecret,
-        jwtOptions
+        { 
+          id: mongoUser._id.toString(),
+          linkedinId: linkedinId
+        },
+        process.env.JWT_SECRET || "your-super-secret-jwt-key",
+        { 
+          expiresIn: process.env.JWT_EXPIRE || "24h"
+        }
       );
+
+      console.log("LinkedIn: JWT token oluşturuldu");
 
       return {
         user: {
-          id: user._id.toString(),
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          profilePhoto: user.profilePhoto,
-          linkedin: user.linkedin,
-          locale: user.locale,
-          emailVerified: user.emailVerified,
+          id: mongoUser._id.toString(),
+          firstName: mongoUser.firstName,
+          lastName: mongoUser.lastName,
+          email: mongoUser.email,
+          profilePhoto: mongoUser.profilePhoto,
+          emailVerified: mongoUser.emailVerified,
+          linkedinId: mongoUser.linkedinId,
+          authProvider: "linkedin_oidc"
         },
-        token,
+        token
       };
     } catch (error: any) {
       console.error("LinkedIn auth error:", error);
       throw new Error("LinkedIn ile giriş işlemi başarısız: " + error.message);
+    }
+  }
+
+  // LinkedIn profil bilgilerini gerekirse doğrudan alma
+  private async getLinkedInUserInfo(accessToken: string) {
+    try {
+      const response = await axios.get('https://api.linkedin.com/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error("LinkedIn userinfo error:", error.response?.data || error.message);
+      throw new Error("LinkedIn kullanıcı bilgileri alınamadı");
     }
   }
 }
