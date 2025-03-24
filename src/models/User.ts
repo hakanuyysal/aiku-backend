@@ -65,6 +65,7 @@ export interface IUser extends Document {
 
 interface IUserModel extends Model<IUser> {
   // Model statik metodları buraya eklenebilir
+  //test
 }
 
 const userSchema = new Schema<IUser>({
