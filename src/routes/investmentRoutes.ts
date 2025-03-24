@@ -15,7 +15,7 @@ import { optionalAuth } from '../middleware/optionalAuth';
 const router = Router();
 
 // **Tüm Yatırım Tekliflerini Getirme (örn: GET /api/investments/all)**
-router.get('/all', optionalAuth, getAllInvestments);
+router.get('/all-investments', optionalAuth, getAllInvestments);
 
 // **Belirli Bir Şirkete Ait Yatırım Tekliflerini Getirme (örn: GET /api/investments/company/:companyId)**
 router.get('/company/:companyId', getInvestmentsByCompany);
