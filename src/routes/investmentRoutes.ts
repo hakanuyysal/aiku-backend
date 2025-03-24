@@ -17,9 +17,6 @@ const router = Router();
 // **Tüm Yatırım Tekliflerini Getirme (örn: GET /api/investments/all)**
 router.get('/all', optionalAuth, getAllInvestments);
 
-// **Belirli Bir Yatırım Teklifini Getirme (örn: GET /api/investments/:id)**
-router.get('/:id', getInvestmentById);
-
 // **Belirli Bir Şirkete Ait Yatırım Tekliflerini Getirme (örn: GET /api/investments/company/:companyId)**
 router.get('/company/:companyId', getInvestmentsByCompany);
 
@@ -43,6 +40,9 @@ router.post(
   ],
   createInvestment
 );
+
+// **Belirli Bir Yatırım Teklifini Getirme (örn: GET /api/investments/:id)**
+router.get('/:id', getInvestmentById);
 
 // **Yatırım Teklifini Güncelleme (örn: PUT /api/investments/:id)**
 router.put('/:id', protect, updateInvestment);
