@@ -35,6 +35,9 @@ export class GoogleService {
         await user.save();
       } else {
         console.log("Mevcut kullanıcı güncelleniyor:", { userId: user._id });
+        if (!user.profilePhoto && userData.profilePhoto) {
+          user.profilePhoto = userData.profilePhoto;
+        }
         user.set(userData);
         await user.save();
       }
