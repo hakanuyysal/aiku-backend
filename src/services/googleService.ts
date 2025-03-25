@@ -73,7 +73,7 @@ export class GoogleService {
         }
       );
 
-      console.log("JWT token oluşturuldu");
+      console.log("JWT token oluşturuldu", token);
 
       return {
         user: {
