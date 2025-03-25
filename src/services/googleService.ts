@@ -37,18 +37,26 @@ export class GoogleService {
         });
         await user.save();
       } else {
+        const currentProfilePhoto = user.profilePhoto;
         console.log("Mevcut kullanıcı güncelleniyor:", { 
           userId: user._id,
-          mevcutProfilFoto: user.profilePhoto
+          mevcutProfilFoto: currentProfilePhoto
         });
 
-        // Mevcut kullanıcıyı güncelle
-        Object.assign(user, userData);
-        
-        // Sadece profil fotoğrafı yoksa ekle
-        if (!user.profilePhoto && googleUserInfo.picture) {
+        // Önce diğer bilgileri güncelle
+        user.firstName = userData.firstName;
+        user.lastName = userData.lastName;
+        user.emailVerified = userData.emailVerified;
+        user.authProvider = userData.authProvider;
+        user.lastLogin = userData.lastLogin;
+        user.googleId = userData.googleId;
+
+        // Eğer mevcut profil fotoğrafı yoksa, Google'dan gelen fotoğrafı kullan
+        if (!currentProfilePhoto && googleUserInfo.picture) {
           console.log("Profil fotoğrafı ekleniyor çünkü mevcut fotoğraf yok");
           user.profilePhoto = googleUserInfo.picture;
+        } else {
+          console.log("Mevcut profil fotoğrafı korunuyor:", currentProfilePhoto);
         }
         
         await user.save();
