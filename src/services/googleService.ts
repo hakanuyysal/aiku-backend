@@ -34,16 +34,37 @@ export class GoogleService {
         user = new User(userData);
         await user.save();
       } else {
-        console.log("Mevcut kullanıcı güncelleniyor:", { userId: user._id });
+        console.log("Mevcut kullanıcı güncelleniyor:", { 
+          userId: user._id,
+          mevcutProfilFoto: user.profilePhoto,
+          yeniProfilFoto: userData.profilePhoto
+        });
+        
+        // Sadece profil fotoğrafı yoksa güncelle
         if (!user.profilePhoto && userData.profilePhoto) {
+          console.log("Profil fotoğrafı güncelleniyor çünkü mevcut fotoğraf yok");
           user.profilePhoto = userData.profilePhoto;
+        } else {
+          console.log("Profil fotoğrafı güncellenmedi:", {
+            mevcutFotoVar: !!user.profilePhoto,
+            yeniFotoVar: !!userData.profilePhoto
+          });
         }
+
+        // Diğer alanları manuel olarak güncelle
         user.firstName = userData.firstName;
         user.lastName = userData.lastName;
         user.emailVerified = userData.emailVerified;
         user.authProvider = userData.authProvider;
         user.lastLogin = userData.lastLogin;
         user.googleId = userData.googleId;
+        
+        console.log("Kullanıcı güncelleniyor:", {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profilePhoto: user.profilePhoto
+        });
+        
         await user.save();
       }
 
