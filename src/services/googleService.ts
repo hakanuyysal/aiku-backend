@@ -38,7 +38,12 @@ export class GoogleService {
         if (!user.profilePhoto && userData.profilePhoto) {
           user.profilePhoto = userData.profilePhoto;
         }
-        user.set(userData);
+        user.firstName = userData.firstName;
+        user.lastName = userData.lastName;
+        user.emailVerified = userData.emailVerified;
+        user.authProvider = userData.authProvider;
+        user.lastLogin = userData.lastLogin;
+        user.googleId = userData.googleId;
         await user.save();
       }
 
