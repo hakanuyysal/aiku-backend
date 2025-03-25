@@ -22,7 +22,6 @@ export class GoogleService {
         firstName: googleUserInfo.given_name || googleUserInfo.email?.split('@')[0],
         lastName: googleUserInfo.family_name || '',
         email: googleUserInfo.email,
-        profilePhoto: googleUserInfo.picture,
         emailVerified: googleUserInfo.email_verified,
         authProvider: "google",
         lastLogin: new Date(),
@@ -31,7 +30,11 @@ export class GoogleService {
 
       if (!user) {
         console.log("Yeni kullanıcı oluşturuluyor:", userData);
-        user = new User(userData);
+        // Yeni kullanıcı için profil fotoğrafını ekle
+        user = new User({
+          ...userData,
+          profilePhoto: googleUserInfo.picture
+        });
         await user.save();
       } else {
         console.log("Mevcut kullanıcı güncelleniyor:", { 
@@ -39,21 +42,13 @@ export class GoogleService {
           mevcutProfilFoto: user.profilePhoto
         });
 
-        // Profil fotoğrafını userData'dan çıkar
-        const { profilePhoto, ...userDataWithoutPhoto } = userData;
-
-        // Diğer alanları güncelle
-        Object.assign(user, userDataWithoutPhoto);
+        // Mevcut kullanıcıyı güncelle
+        Object.assign(user, userData);
         
-        // Sadece profil fotoğrafı yoksa güncelle
-        if (!user.profilePhoto && profilePhoto) {
-          console.log("Profil fotoğrafı güncelleniyor çünkü mevcut fotoğraf yok");
-          user.profilePhoto = profilePhoto;
-        } else {
-          console.log("Profil fotoğrafı korunuyor:", {
-            mevcutFoto: user.profilePhoto,
-            yeniFoto: profilePhoto
-          });
+        // Sadece profil fotoğrafı yoksa ekle
+        if (!user.profilePhoto && googleUserInfo.picture) {
+          console.log("Profil fotoğrafı ekleniyor çünkü mevcut fotoğraf yok");
+          user.profilePhoto = googleUserInfo.picture;
         }
         
         await user.save();
