@@ -72,7 +72,7 @@ export const getUserSubscription = async (
         lastPaymentDate: user.lastPaymentDate,
         autoRenewal: user.autoRenewal,
         planDetails: planDetails,
-        isSubscriptionActive: user.isSubscriptionActive
+        isSubscriptionActive: user.isSubscriptionActive,
       },
     });
   } catch (error: any) {
@@ -92,7 +92,6 @@ export const changeSubscriptionPlan = async (
   res: express.Response
 ) => {
   try {
-    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
     const userId = req.user?._id;
 
     if (!userId) {
@@ -121,41 +120,74 @@ export const changeSubscriptionPlan = async (
 
     // Kullanıcıyı bul
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: "Kullanıcı bulunamadı",
       });
     }
-    
+
+    // Abonelik planlarını al
+    const subscriptionPlans = SubscriptionService.getSubscriptionPlans();
+
+    // Kullanıcının daha önce bir aboneliği olup olmadığını kontrol et
+    const isFirstTimeSubscription =
+      !user.paymentHistory || user.paymentHistory.length === 0;
+
     // Abonelik planını ve periyodunu güncelle
     user.subscriptionPlan = plan as "startup" | "business" | "investor";
     user.subscriptionPeriod = period as "monthly" | "yearly";
-    
-    // Eğer startup planı seçilmişse, her zaman trial durumuna ayarla
+
+    // Eğer startup planı seçilmişse ve kullanıcının ilk aboneliği ise free trial uygula
     if (plan === "startup") {
-      user.subscriptionStatus = "trial";
-      const trialEndDate = new Date();
-      trialEndDate.setMonth(trialEndDate.getMonth() + 3);
-      user.trialEndsAt = trialEndDate;
-      user.nextPaymentDate = trialEndDate;
-    } else {
-      // Startup dışında bir plan seçilmişse
+      const planPricing =
+        subscriptionPlans.startup.pricing[period as "monthly" | "yearly"];
+
+      // İlk abonelik ise ve freeTrial sadece ilk abonelikte geçerliyse
+      if (
+        isFirstTimeSubscription &&
+        "isFirstTimeOnly" in planPricing &&
+        planPricing.isFirstTimeOnly
+      ) {
+        user.subscriptionStatus = "trial";
+        const trialEndDate = new Date();
+        const trialPeriod =
+          "trialPeriod" in planPricing ? planPricing.trialPeriod : 3;
+        trialEndDate.setMonth(trialEndDate.getMonth() + trialPeriod);
+        user.trialEndsAt = trialEndDate;
+        user.nextPaymentDate = trialEndDate;
+      } else {
+        // Daha önce abonelik yapmış bir kullanıcıysa
+        user.subscriptionStatus = "pending"; // Ödeme yapılana kadar pending
+        user.trialEndsAt = undefined; // Trial süresini kaldır
+
+        // Bir sonraki ödeme tarihini şimdi olarak ayarla (hemen ödeme alınacak)
+        user.nextPaymentDate = new Date();
+      }
+    } else if (period === "yearly") {
+      // Business veya Investor planında yıllık abonelikte ek süre ekle
       user.subscriptionStatus = "pending"; // Ödeme yapılana kadar pending
       user.trialEndsAt = undefined; // Trial süresini kaldır
-      
+
+      // Bir sonraki ödeme tarihini şimdi olarak ayarla (hemen ödeme alınacak)
+      user.nextPaymentDate = new Date();
+    } else {
+      // Aylık Business veya Investor planı
+      user.subscriptionStatus = "pending"; // Ödeme yapılana kadar pending
+      user.trialEndsAt = undefined; // Trial süresini kaldır
+
       // Bir sonraki ödeme tarihini şimdi olarak ayarla (hemen ödeme alınacak)
       user.nextPaymentDate = new Date();
     }
-    
+
     // Abonelik başlangıç tarihini güncelle
     user.subscriptionStartDate = new Date();
-    
+
     await user.save();
-    
+
     // Abonelik planı bilgilerini al
-    const planDetails = SubscriptionService.getSubscriptionPlans()[plan as keyof ReturnType<typeof SubscriptionService.getSubscriptionPlans>];
+    const planDetails = SubscriptionService.getSubscriptionPlans()[plan];
 
     res.status(200).json({
       success: true,
@@ -169,8 +201,9 @@ export const changeSubscriptionPlan = async (
         trialEndsAt: user.trialEndsAt,
         nextPaymentDate: user.nextPaymentDate,
         planDetails: planDetails,
-        isSubscriptionActive: user.isSubscriptionActive
-      }
+        isSubscriptionActive: user.isSubscriptionActive,
+        isFirstTimeSubscription: isFirstTimeSubscription,
+      },
     });
   } catch (error: any) {
     res.status(500).json({

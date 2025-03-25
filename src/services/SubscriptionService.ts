@@ -62,6 +62,9 @@ class SubscriptionService {
       let successCount = 0;
       let failCount = 0;
       
+      // Abonelik planlarını al
+      const subscriptionPlans = this.getSubscriptionPlans();
+      
       for (const user of users) {
         try {
           // Ödeme işlemini yap
@@ -75,7 +78,19 @@ class SubscriptionService {
             if (user.subscriptionPeriod === 'monthly') {
               nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
             } else if (user.subscriptionPeriod === 'yearly') {
-              nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
+              // Yıllık abonelik için extra ayları da dikkate al
+              let extraMonths = 0;
+              
+              // Tüm planlar için extraMonths değerini alma
+              if (user.subscriptionPlan === 'startup') {
+                // Startup planı için extraMonths yok, standart 12 ay
+                extraMonths = 0;
+              } else if (user.subscriptionPlan === 'business' || user.subscriptionPlan === 'investor') {
+                // Business ve Investor planları için extraMonths var
+                extraMonths = 3; // Sabit 3 ay olarak belirtilmiş
+              }
+              
+              nextBillingDate.setMonth(nextBillingDate.getMonth() + 12 + extraMonths);
             }
             
             user.nextPaymentDate = nextBillingDate;
@@ -88,7 +103,9 @@ class SubscriptionService {
               date: new Date(),
               status: 'success',
               transactionId: paymentResult.transactionId,
-              description: `Otomatik ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} abonelik ödemesi`
+              description: `Otomatik ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} abonelik ödemesi`,
+              plan: user.subscriptionPlan || undefined,
+              period: user.subscriptionPeriod
             });
             
             await user.save();
@@ -100,7 +117,9 @@ class SubscriptionService {
               amount: user.subscriptionAmount || 0,
               date: new Date(),
               status: 'failed',
-              description: `Otomatik ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} abonelik ödemesi başarısız`
+              description: `Otomatik ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} abonelik ödemesi başarısız`,
+              plan: user.subscriptionPlan || undefined,
+              period: user.subscriptionPeriod
             });
             
             // Başarısız ödeme sayısına göre abonelik durumunu değiştirebiliriz
@@ -207,11 +226,14 @@ class SubscriptionService {
         pricing: {
           monthly: {
             price: 49,
-            trialPeriod: 3 // ay
+            trialPeriod: 3, // ay
+            isFirstTimeOnly: true // Sadece ilk abonelikte geçerli
           },
           yearly: {
             price: 529,
-            discount: '10% off'
+            discount: '10% off',
+            trialPeriod: 3, // ay
+            isFirstTimeOnly: true // Sadece ilk abonelikte geçerli
           }
         }
       },
@@ -229,7 +251,8 @@ class SubscriptionService {
           },
           yearly: {
             price: 810,
-            discount: '10% off'
+            discount: '10% off',
+            extraMonths: 3 // Yıllık ödemede 3 ay fazla (12+3=15 ay)
           }
         }
       },
@@ -247,7 +270,8 @@ class SubscriptionService {
           },
           yearly: {
             price: 1069,
-            discount: '10% off'
+            discount: '10% off',
+            extraMonths: 3 // Yıllık ödemede 3 ay fazla (12+3=15 ay)
           }
         }
       }
