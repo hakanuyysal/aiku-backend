@@ -22,6 +22,7 @@ import applicantRoutes from "./routes/applicantRoutes";
 import investmentRoutes from "./routes/investmentRoutes";
 import linkedinAuthRoutes from "./routes/linkedinAuth.routes";
 import supabaseAuthRoutes from "./routes/supabaseAuth.routes";
+import chatRoutes from "./routes/chatRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -37,8 +38,57 @@ const whitelist = [
   'https://api.aikuaiplatform.com',
   'http://localhost:3000',
   'http://localhost:3004',
+  'http://127.0.0.1:5500',
   'https://bevakpqfycmxnpzrkecv.supabase.co'
 ];
+
+// Socket.io sunucusunu oluştur
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Tüm kaynaklara izin ver (geliştirme için)
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
+  },
+  allowEIO3: true, // Engine.IO 3 uyumluluğu
+  transports: ['websocket', 'polling'] // Önce WebSocket, sonra polling dene
+});
+
+// Socket.io bağlantılarını yönet
+io.on('connection', (socket) => {
+  console.log('👋 Yeni bir kullanıcı bağlandı:', socket.id);
+
+  // Şirket id'sine göre chat odası katılımı
+  socket.on('join-company-chat', (companyId) => {
+    socket.join(`company-${companyId}`);
+    console.log(`🏢 ${socket.id} kullanıcısı ${companyId} şirket odasına katıldı`);
+  });
+
+  // Sohbet oturum id'sine göre chat odası katılımı
+  socket.on('join-chat-session', (chatSessionId) => {
+    socket.join(`chat-${chatSessionId}`);
+    console.log(`💬 ${socket.id} kullanıcısı ${chatSessionId} sohbet odasına katıldı`);
+  });
+
+  // Özel chat odalarından ayrılma
+  socket.on('leave-company-chat', (companyId) => {
+    socket.leave(`company-${companyId}`);
+    console.log(`🚪 ${socket.id} kullanıcısı ${companyId} şirket odasından ayrıldı`);
+  });
+
+  socket.on('leave-chat-session', (chatSessionId) => {
+    socket.leave(`chat-${chatSessionId}`);
+    console.log(`🚪 ${socket.id} kullanıcısı ${chatSessionId} sohbet odasından ayrıldı`);
+  });
+
+  // Bağlantı kesildiğinde
+  socket.on('disconnect', () => {
+    console.log('👋 Bir kullanıcı ayrıldı:', socket.id);
+  });
+});
+
+// Dışa socket.io instance'ını aktarma (başka dosyalardan erişilebilmesi için)
+export { io };
 
 // CORS origin kontrolü için fonksiyon
 const corsOriginCheck = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
@@ -46,6 +96,7 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
   
   // Development ortamında tüm originlere izin ver
   if (process.env.NODE_ENV === 'development') {
+    console.log('💻 Development modu: Tüm CORS isteklerine izin veriliyor');
     callback(null, true);
     return;
   }
@@ -69,9 +120,10 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
     return;
   }
   
-  // Localhost için port kontrolünü gevşet (development için)
-  const localhostRegex = /^http:\/\/localhost:\d+$/;
-  if (localhostRegex.test(origin)) {
+  // Localhost ve 127.0.0.1 için port kontrolünü gevşet (development için)
+  const localDevRegex = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+  if (localDevRegex.test(origin)) {
+    console.log('🧪 Yerel test origin\'i kabul edildi:', origin);
     callback(null, true);
     return;
   }
@@ -303,6 +355,14 @@ app.use(passport.initialize());
 // Statik dosya servisi
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// Socket.io test için statik sayfa servisi
+app.use("/test", express.static(path.join(__dirname, "../test")));
+
+// Socket.io test sayfası
+app.get("/socket-test", (_req: Request, res: Response) => {
+  res.sendFile(path.join(__dirname, "../test/socket-test.html"));
+});
+
 // MongoDB bağlantısı
 mongoose
   .connect(process.env.MONGODB_URI!)
@@ -324,6 +384,7 @@ app.use("/api/applicants", applicantRoutes);
 app.use("/api/investments", investmentRoutes)
 app.use("/api", linkedinAuthRoutes);
 app.use("/api", supabaseAuthRoutes);
+app.use("/api/chat", chatRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
