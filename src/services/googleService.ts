@@ -1,6 +1,6 @@
 import { User } from "../models/User";
 import { supabase } from "../config/supabase";
-import jwt from "jsonwebtoken";
+import jwt, { SignOptions } from "jsonwebtoken";
 import dotenv from "dotenv";
 import axios from "axios";
 
@@ -12,20 +12,23 @@ export class GoogleService {
       console.log("GoogleService.handleAuth başladı:", data);
 
       // Google'dan kullanıcı bilgilerini al
-      const googleUserInfo = await this.getGoogleUserInfo(data.user.access_token);
+      const googleUserInfo = await this.getGoogleUserInfo(
+        data.user.access_token
+      );
       console.log("Google kullanıcı bilgileri alındı:", googleUserInfo);
 
       // MongoDB'de kullanıcıyı ara veya oluştur
       let user = await User.findOne({ email: googleUserInfo.email });
 
       const userData = {
-        firstName: googleUserInfo.given_name || googleUserInfo.email?.split('@')[0],
-        lastName: googleUserInfo.family_name || '',
+        firstName:
+          googleUserInfo.given_name || googleUserInfo.email?.split("@")[0],
+        lastName: googleUserInfo.family_name || "",
         email: googleUserInfo.email,
         emailVerified: googleUserInfo.email_verified,
         authProvider: "google",
         lastLogin: new Date(),
-        googleId: googleUserInfo.sub
+        googleId: googleUserInfo.sub,
       };
 
       if (!user) {
@@ -33,14 +36,14 @@ export class GoogleService {
         // Yeni kullanıcı için profil fotoğrafını ekle
         user = new User({
           ...userData,
-          profilePhoto: googleUserInfo.picture
+          profilePhoto: googleUserInfo.picture,
         });
         await user.save();
       } else {
         const currentProfilePhoto = user.profilePhoto;
-        console.log("Mevcut kullanıcı güncelleniyor:", { 
+        console.log("Mevcut kullanıcı güncelleniyor:", {
           userId: user._id,
-          mevcutProfilFoto: currentProfilePhoto
+          mevcutProfilFoto: currentProfilePhoto,
         });
 
         // Önce diğer bilgileri güncelle
@@ -56,21 +59,27 @@ export class GoogleService {
           console.log("Profil fotoğrafı ekleniyor çünkü mevcut fotoğraf yok");
           user.profilePhoto = googleUserInfo.picture;
         } else {
-          console.log("Mevcut profil fotoğrafı korunuyor:", currentProfilePhoto);
+          console.log(
+            "Mevcut profil fotoğrafı korunuyor:",
+            currentProfilePhoto
+          );
         }
-        
+
         await user.save();
       }
+      const jwtOptions: SignOptions = {
+        expiresIn: process.env.JWT_EXPIRE
+          ? parseInt(process.env.JWT_EXPIRE)
+          : "24h",
+      };
 
       const token = jwt.sign(
-        { 
+        {
           id: user._id.toString(),
-          googleId: googleUserInfo.sub
+          googleId: googleUserInfo.sub,
         },
         process.env.JWT_SECRET || "your-super-secret-jwt-key",
-        { 
-          expiresIn: parseInt(process.env.JWT_EXPIRE || "86400") // 24 saat
-        }
+        jwtOptions
       );
 
       console.log("JWT token oluşturuldu", token);
@@ -83,9 +92,9 @@ export class GoogleService {
           email: user.email,
           profilePhoto: user.profilePhoto,
           emailVerified: user.emailVerified,
-          googleId: user.googleId
+          googleId: user.googleId,
         },
-        token
+        token,
       };
     } catch (error: any) {
       console.error("Google auth error:", error);
@@ -95,13 +104,19 @@ export class GoogleService {
 
   private async getGoogleUserInfo(accessToken: string) {
     try {
-      const response = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
+      const response = await axios.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
       return response.data;
     } catch (error: any) {
-      console.error("Google userinfo error:", error.response?.data || error.message);
+      console.error(
+        "Google userinfo error:",
+        error.response?.data || error.message
+      );
       throw new Error("Google kullanıcı bilgileri alınamadı");
     }
   }
-} 
+}
