@@ -96,9 +96,9 @@ class ParamPosService {
 
   private calculateHash(params: { 
     installment: number, 
-    amount: number, 
-    totalAmount: number, 
-    orderId: string 
+    amount: "5,00", 
+    totalAmount: "5,00", 
+    orderId: "1234567890" 
   }): string {
     const hashStr = `${this.clientCode}${this.guid}${params.installment}${params.amount.toFixed(2)}${params.totalAmount.toFixed(2)}${params.orderId}`;
     return crypto.createHash('sha1').update(hashStr).digest('base64');
