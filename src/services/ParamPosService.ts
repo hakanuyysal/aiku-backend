@@ -162,7 +162,7 @@ class ParamPosService {
   async payment(params: PaymentParams): Promise<PaymentResponse> {
     try {
       // Parametreleri doğrula
-      this.validatePaymentParams(params);
+      // this.validatePaymentParams(params);
 
       const {
         amount,
