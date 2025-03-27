@@ -104,9 +104,9 @@ class ParamPosService {
 
   private calculateHash(params: {
     installment: number;
-    amount: "5,00";
-    totalAmount: "5,00";
-    orderId: "1234567890";
+    amount: number;
+    totalAmount: number;
+    orderId: string;
   }): string {
     const hashStr = `${this.clientCode}${this.guid}${
       params.installment
@@ -182,9 +182,9 @@ class ParamPosService {
       const transactionGuid = uuidv4();
       const hash = this.calculateHash({
         installment,
-        amount: "5,00",
-        totalAmount: "5,00",
-        orderId: "1234567890",
+        amount: amount,
+        totalAmount: totalAmount,
+        orderId: orderId,
       });
 
       const commonParams = {
@@ -201,10 +201,10 @@ class ParamPosService {
         KK_SK_Yil: expireYear,
         KK_CVC: cvc,
         Taksit: "1",
-        Islem_Tutar: "5,00",
-        Toplam_Tutar: "5,00",
+        Islem_Tutar: amount,
+        Toplam_Tutar: totalAmount,
         Islem_Hash: hash,
-        Siparis_ID: "1234567890",
+        Siparis_ID: orderId,
         Islem_ID: orderId,
         IPAdr: ipAddress,
         Ref_URL: process.env.PRODUCTION_URL || "https://aiku.com.tr",
