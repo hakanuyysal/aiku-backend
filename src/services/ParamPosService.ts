@@ -215,7 +215,7 @@ class ParamPosService {
         Data5: "",
       };
 
-      const soapMethod = is3D ? "TP_WMD_UCD" : "TP_WMD_Pay";
+      const soapMethod = is3D ? "TP_WMD_UCD" : "TP_WMD_UCD";
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap:Body>
