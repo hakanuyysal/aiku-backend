@@ -177,8 +177,8 @@ class ParamPosService {
         ipAddress = "127.0.0.1",
       } = params;
 
-      const orderId = Date.now().toString();
-      const totalAmount = await this.calculateCommission(amount, installment);
+      const orderId = "1234567890";
+      const totalAmount = amount;
       const transactionGuid = uuidv4();
       const hash = this.calculateHash({
         installment,
