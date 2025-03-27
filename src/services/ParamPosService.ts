@@ -185,6 +185,7 @@ class ParamPosService {
         Islem_Tutar: "5,00",
         Toplam_Tutar: "5,00",
         Islem_Hash: hash,
+        Siparis_ID: "1234567890",
         Islem_ID: orderId,
         IPAdr: ipAddress,
         Ref_URL: process.env.PRODUCTION_URL || 'https://aiku.com.tr',
