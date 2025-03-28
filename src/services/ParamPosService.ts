@@ -17,13 +17,18 @@ interface PaymentResponse {
   TURKPOS_RETVAL_Siparis_ID: string;
   TURKPOS_RETVAL_Islem_ID: string;
   UCD_URL?: string;
+  UCD_HTML?: string;
+  UCD_MD?: string;
   isRedirect?: boolean;
   html?: string;
 }
 
 interface InitializePaymentResponse {
   Islem_ID: string;
-  UCD_URL: string;
+  UCD_URL?: string;
+  UCD_HTML?: string;
+  UCD_MD?: string;
+  Siparis_ID: string;
   Sonuc: number;
   Sonuc_Str: string;
   Banka_Sonuc_Kod?: string;
@@ -271,14 +276,21 @@ class ParamPosService {
         throw new Error(result.Sonuc_Str ? result.Sonuc_Str[0] : "Ödeme işlemi başarısız");
       }
 
-      // UCD_URL kontrol et
-      if (!result.UCD_URL || !result.UCD_URL[0]) {
-        throw new Error("3D doğrulama URL'si alınamadı");
+      // HTML veya URL kontrol et - Param bazen UCD_HTML, bazen UCD_URL dönüyor
+      const hasRedirectContent = 
+        (result.UCD_HTML && result.UCD_HTML[0]) || 
+        (result.UCD_URL && result.UCD_URL[0]);
+
+      if (!hasRedirectContent) {
+        throw new Error("3D doğrulama içeriği alınamadı");
       }
 
       return {
         Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
-        UCD_URL: result.UCD_URL[0],
+        UCD_URL: result.UCD_URL ? result.UCD_URL[0] : undefined,
+        UCD_HTML: result.UCD_HTML ? result.UCD_HTML[0] : undefined,
+        UCD_MD: result.UCD_MD ? result.UCD_MD[0] : undefined,
+        Siparis_ID: result.Siparis_ID ? result.Siparis_ID[0] : orderId,
         Sonuc: parseInt(result.Sonuc[0]),
         Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
         Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
@@ -380,7 +392,10 @@ class ParamPosService {
       // İlk adım: 3D ekranını alma
       const initResponse = await this.initializePayment(params);
       
-      // 3D işleminde her zaman URL'i döndür
+      // Hangi içerik dönmüşse onu kullan (UCD_HTML veya UCD_URL)
+      const redirectContent = initResponse.UCD_HTML || initResponse.UCD_URL || "";
+      
+      // 3D işleminde her zaman URL veya HTML içeriğini döndür
       return {
         TURKPOS_RETVAL_Sonuc: initResponse.Sonuc,
         TURKPOS_RETVAL_Sonuc_Str: initResponse.Sonuc_Str,
@@ -389,11 +404,13 @@ class ParamPosService {
         TURKPOS_RETVAL_Dekont_ID: "",
         TURKPOS_RETVAL_Tahsilat_Tutari: params.amount.toString(),
         TURKPOS_RETVAL_Odeme_Tutari: params.amount.toString(),
-        TURKPOS_RETVAL_Siparis_ID: "",
+        TURKPOS_RETVAL_Siparis_ID: initResponse.Siparis_ID,
         TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
         UCD_URL: initResponse.UCD_URL,
+        UCD_HTML: initResponse.UCD_HTML,
+        UCD_MD: initResponse.UCD_MD,
         isRedirect: true,
-        html: initResponse.UCD_URL
+        html: redirectContent
       };
       
       // Not: Burada ikinci adım olan completePayment() metodu kullanıcı 3D sayfasını 
