@@ -191,7 +191,6 @@ class ParamPosService {
         expireYear,
         cvc,
         installment = 1,
-        is3D = true,
         userId,
         ipAddress = "127.0.0.1",
       } = params;
@@ -229,7 +228,7 @@ class ParamPosService {
               <Islem_Tutar>${amount.toFixed(2).replace(".", ",")}</Islem_Tutar>
               <Toplam_Tutar>${totalAmount.toFixed(2).replace(".", ",")}</Toplam_Tutar>
               <Islem_Hash>${hash}</Islem_Hash>
-              <Islem_Guvenlik_Tip>${is3D ? "3D" : "NS"}</Islem_Guvenlik_Tip>
+              <Islem_Guvenlik_Tip>3D</Islem_Guvenlik_Tip>
               <Islem_ID></Islem_ID>
               <IPAdr>${ipAddress}</IPAdr>
               <Ref_URL>${process.env.PRODUCTION_URL || "https://aiku.com.tr"}</Ref_URL>
@@ -267,21 +266,23 @@ class ParamPosService {
 
       const result = parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0];
 
-      // Başarısız işlem kontrolü
-      if (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) === -1) {
-        throw new Error(result.Sonuc_Str[0] || "Ödeme işlemi başarısız");
+      // Başarısız işlem kontrolü - hem -1 hem de negatif değerleri kontrol et
+      if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
+        throw new Error(result.Sonuc_Str ? result.Sonuc_Str[0] : "Ödeme işlemi başarısız");
       }
 
-      // NonSecure işlem kontrolü
-      const isNonSecure = result.UCD_URL && result.UCD_URL[0] === "NONSECURE";
-      
+      // UCD_URL kontrol et
+      if (!result.UCD_URL || !result.UCD_URL[0]) {
+        throw new Error("3D doğrulama URL'si alınamadı");
+      }
+
       return {
-        Islem_ID: result.Islem_ID[0],
+        Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
         UCD_URL: result.UCD_URL[0],
         Sonuc: parseInt(result.Sonuc[0]),
-        Sonuc_Str: result.Sonuc_Str[0],
+        Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
         Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
-        isRedirect: !isNonSecure // NonSecure işlemse yönlendirme yapmıyoruz
+        isRedirect: true // Her zaman 3D olduğu için her zaman yönlendirme yapılacak
       };
     } catch (error) {
       console.error("Ödeme başlatma hatası:", error);
@@ -373,25 +374,13 @@ class ParamPosService {
   // Eski payment metodu şimdi iki adımı kapsıyor
   async payment(params: PaymentParams): Promise<PaymentResponse> {
     try {
+      // is3D parametresini true olarak zorla
+      params.is3D = true;
+      
       // İlk adım: 3D ekranını alma
       const initResponse = await this.initializePayment(params);
       
-      // NonSecure işlemse doğrudan sonucu döndür
-      if (initResponse.UCD_URL === "NONSECURE") {
-        return {
-          TURKPOS_RETVAL_Sonuc: initResponse.Sonuc,
-          TURKPOS_RETVAL_Sonuc_Str: initResponse.Sonuc_Str,
-          TURKPOS_RETVAL_GUID: this.guid,
-          TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
-          TURKPOS_RETVAL_Dekont_ID: initResponse.Islem_ID,
-          TURKPOS_RETVAL_Tahsilat_Tutari: params.amount.toString(),
-          TURKPOS_RETVAL_Odeme_Tutari: params.amount.toString(),
-          TURKPOS_RETVAL_Siparis_ID: "",
-          TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
-        };
-      }
-      
-      // 3D işlemse URL'i döndür
+      // 3D işleminde her zaman URL'i döndür
       return {
         TURKPOS_RETVAL_Sonuc: initResponse.Sonuc,
         TURKPOS_RETVAL_Sonuc_Str: initResponse.Sonuc_Str,
@@ -403,7 +392,7 @@ class ParamPosService {
         TURKPOS_RETVAL_Siparis_ID: "",
         TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
         UCD_URL: initResponse.UCD_URL,
-        isRedirect: initResponse.isRedirect,
+        isRedirect: true,
         html: initResponse.UCD_URL
       };
       
