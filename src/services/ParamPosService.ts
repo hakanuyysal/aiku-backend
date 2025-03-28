@@ -16,9 +16,18 @@ interface PaymentResponse {
   TURKPOS_RETVAL_Odeme_Tutari: string;
   TURKPOS_RETVAL_Siparis_ID: string;
   TURKPOS_RETVAL_Islem_ID: string;
-  UCD_HTML?: string;
+  UCD_URL?: string;
   isRedirect?: boolean;
   html?: string;
+}
+
+interface InitializePaymentResponse {
+  Islem_ID: string;
+  UCD_URL: string;
+  Sonuc: number;
+  Sonuc_Str: string;
+  Banka_Sonuc_Kod?: string;
+  isRedirect: boolean;
 }
 
 interface PaymentParams {
@@ -34,12 +43,20 @@ interface PaymentParams {
   ipAddress?: string;
 }
 
+interface CompletePaymentParams {
+  ucdMD: string;
+  islemId: string;
+  siparisId: string;
+}
+
 class ParamPosService {
   private clientCode: string;
   private clientUsername: string;
   private clientPassword: string;
   private guid: string;
   private baseUrl: string;
+  private successUrl: string;
+  private errorUrl: string;
 
   constructor() {
     this.clientCode = process.env.PARAM_CLIENT_CODE || "";
@@ -49,6 +66,8 @@ class ParamPosService {
     this.baseUrl =
       process.env.PARAM_BASE_URL ||
       "https://posws.param.com.tr/turkpos.ws/service_turkpos_prod.asmx";
+    this.successUrl = process.env.PARAM_SUCCESS_URL || "https://aiku.com.tr/payment/success";
+    this.errorUrl = process.env.PARAM_ERROR_URL || "https://aiku.com.tr/payment/error";
 
     if (
       !this.clientCode ||
@@ -110,7 +129,7 @@ class ParamPosService {
   }): string {
     const hashStr = `${this.clientCode}${this.guid}${
       params.installment
-    }${params.amount.toFixed(2)}${params.totalAmount.toFixed(2)}${
+    }${params.amount.toFixed(2).replace(".", ",")}${params.totalAmount.toFixed(2).replace(".", ",")}${
       params.orderId
     }`;
     return crypto.createHash("sha1").update(hashStr).digest("base64");
@@ -159,10 +178,10 @@ class ParamPosService {
     }
   }
 
-  async payment(params: PaymentParams): Promise<PaymentResponse> {
+  // İlk adım: 3D ekranını almak için TP_WMD_UCD isteği yapma
+  async initializePayment(params: PaymentParams): Promise<InitializePaymentResponse> {
     try {
-      // Parametreleri doğrula
-      // this.validatePaymentParams(params);
+      this.validatePaymentParams(params);
 
       const {
         amount,
@@ -177,9 +196,8 @@ class ParamPosService {
         ipAddress = "127.0.0.1",
       } = params;
 
-      const orderId = "1234567890";
-      const totalAmount = amount;
-      const transactionGuid = uuidv4();
+      const orderId = `ORDER_${Date.now()}`;
+      const totalAmount = await this.calculateCommission(amount, installment);
       const hash = this.calculateHash({
         installment,
         amount: amount,
@@ -187,119 +205,212 @@ class ParamPosService {
         orderId: orderId,
       });
 
-      const commonParams = {
-        G: {
-          CLIENT_CODE: this.clientCode,
-          CLIENT_USERNAME: this.clientUsername,
-          CLIENT_PASSWORD: this.clientPassword,
-        },
-        GUID: this.guid,
-        Islem_GUID: transactionGuid,
-        KK_Sahibi: cardHolderName,
-        KK_No: cardNumber,
-        KK_SK_Ay: expireMonth,
-        KK_SK_Yil: expireYear,
-        KK_CVC: cvc,
-        Taksit: "1",
-        Islem_Tutar: amount,
-        Toplam_Tutar: totalAmount,
-        Islem_Hash: hash,
-        Siparis_ID: orderId,
-        Islem_ID: orderId,
-        IPAdr: ipAddress,
-        Ref_URL: process.env.PRODUCTION_URL || "https://aiku.com.tr",
-        Data1: userId || "",
-        Data2: "",
-        Data3: "",
-        Data4: "",
-        Data5: "",
-      };
-
-      const soapMethod = is3D ? "TP_WMD_UCD" : "TP_WMD_UCD";
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap:Body>
-            <${soapMethod} xmlns="https://turkpos.com.tr/">
-              ${Object.entries(commonParams)
-                .map(([key, value]) => {
-                  if (typeof value === "object") {
-                    return `<${key}>${Object.entries(value)
-                      .map(([k, v]) => `<${k}>${v}</${k}>`)
-                      .join("")}</${key}>`;
-                  }
-                  return `<${key}>${value}</${key}>`;
-                })
-                .join("")}
-            </${soapMethod}>
+            <TP_WMD_UCD xmlns="https://turkpos.com.tr/">
+              <G>
+                <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
+                <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
+                <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
+              </G>
+              <GUID>${this.guid}</GUID>
+              <KK_Sahibi>${cardHolderName}</KK_Sahibi>
+              <KK_No>${cardNumber}</KK_No>
+              <KK_SK_Ay>${expireMonth}</KK_SK_Ay>
+              <KK_SK_Yil>${expireYear}</KK_SK_Yil>
+              <KK_CVC>${cvc}</KK_CVC>
+              <KK_Sahibi_GSM></KK_Sahibi_GSM>
+              <Hata_URL>${this.errorUrl}</Hata_URL>
+              <Basarili_URL>${this.successUrl}</Basarili_URL>
+              <Siparis_ID>${orderId}</Siparis_ID>
+              <Siparis_Aciklama></Siparis_Aciklama>
+              <Taksit>${installment}</Taksit>
+              <Islem_Tutar>${amount.toFixed(2).replace(".", ",")}</Islem_Tutar>
+              <Toplam_Tutar>${totalAmount.toFixed(2).replace(".", ",")}</Toplam_Tutar>
+              <Islem_Hash>${hash}</Islem_Hash>
+              <Islem_Guvenlik_Tip>${is3D ? "3D" : "NS"}</Islem_Guvenlik_Tip>
+              <Islem_ID></Islem_ID>
+              <IPAdr>${ipAddress}</IPAdr>
+              <Ref_URL>${process.env.PRODUCTION_URL || "https://aiku.com.tr"}</Ref_URL>
+              <Data1>${userId || ""}</Data1>
+              <Data2></Data2>
+              <Data3></Data3>
+              <Data4></Data4>
+              <Data5></Data5>
+            </TP_WMD_UCD>
           </soap:Body>
         </soap:Envelope>`;
 
-      console.log("SOAP İsteği:", soapEnvelope);
+      console.log("TP_WMD_UCD İsteği:", soapEnvelope);
 
       const response = await axios.post(this.baseUrl, soapEnvelope, {
         headers: {
           "Content-Type": "text/xml;charset=UTF-8",
-          SOAPAction: `https://turkpos.com.tr/${soapMethod}`,
+          SOAPAction: "https://turkpos.com.tr/TP_WMD_UCD",
         },
       });
 
-      console.log("SOAP Yanıtı:", response.data);
+      console.log("TP_WMD_UCD Yanıtı:", response.data);
 
       const parsedResponse = await this.parseSoapResponse(response.data);
 
       if (
-        !parsedResponse[`${soapMethod}Response`] ||
-        !parsedResponse[`${soapMethod}Response`][0] ||
-        !parsedResponse[`${soapMethod}Response`][0][`${soapMethod}Result`] ||
-        !parsedResponse[`${soapMethod}Response`][0][`${soapMethod}Result`][0]
+        !parsedResponse["TP_WMD_UCDResponse"] ||
+        !parsedResponse["TP_WMD_UCDResponse"][0] ||
+        !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"] ||
+        !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0]
       ) {
         console.error("Geçersiz yanıt formatı:", parsedResponse);
         throw new Error("Geçersiz ödeme yanıtı formatı");
       }
 
-      const result =
-        parsedResponse[`${soapMethod}Response`][0][`${soapMethod}Result`][0];
+      const result = parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0];
 
       // Başarısız işlem kontrolü
-      if (result.Sonuc === "-1" || result.Sonuc === -1) {
-        throw new Error(result.Sonuc_Str || "Ödeme işlemi başarısız");
+      if (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) === -1) {
+        throw new Error(result.Sonuc_Str[0] || "Ödeme işlemi başarısız");
       }
 
-      // 3D yanıtını kontrol et
-      if (is3D && result.UCD_HTML && result.UCD_HTML !== "NONSECURE") {
-        return {
-          TURKPOS_RETVAL_Sonuc: parseInt(result.Sonuc),
-          TURKPOS_RETVAL_Sonuc_Str: result.Sonuc_Str || "",
-          TURKPOS_RETVAL_GUID: this.guid,
-          TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
-          TURKPOS_RETVAL_Dekont_ID: result.Dekont_ID || "",
-          TURKPOS_RETVAL_Tahsilat_Tutari: amount.toString(),
-          TURKPOS_RETVAL_Odeme_Tutari: totalAmount.toString(),
-          TURKPOS_RETVAL_Siparis_ID: orderId,
-          TURKPOS_RETVAL_Islem_ID: result.Islem_ID || orderId,
-          UCD_HTML: result.UCD_HTML,
-          isRedirect: true,
-          html: result.UCD_HTML,
-        };
-      }
-
-      // Normal ödeme yanıtı
+      // NonSecure işlem kontrolü
+      const isNonSecure = result.UCD_URL && result.UCD_URL[0] === "NONSECURE";
+      
       return {
-        TURKPOS_RETVAL_Sonuc: parseInt(result.Sonuc),
-        TURKPOS_RETVAL_Sonuc_Str: result.Sonuc_Str || "",
-        TURKPOS_RETVAL_GUID: this.guid,
-        TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
-        TURKPOS_RETVAL_Dekont_ID: result.Dekont_ID || "",
-        TURKPOS_RETVAL_Tahsilat_Tutari: amount.toString(),
-        TURKPOS_RETVAL_Odeme_Tutari: totalAmount.toString(),
-        TURKPOS_RETVAL_Siparis_ID: orderId,
-        TURKPOS_RETVAL_Islem_ID: result.Islem_ID || orderId,
+        Islem_ID: result.Islem_ID[0],
+        UCD_URL: result.UCD_URL[0],
+        Sonuc: parseInt(result.Sonuc[0]),
+        Sonuc_Str: result.Sonuc_Str[0],
+        Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
+        isRedirect: !isNonSecure // NonSecure işlemse yönlendirme yapmıyoruz
       };
     } catch (error) {
-      console.error("Ödeme hatası:", error);
+      console.error("Ödeme başlatma hatası:", error);
       if (error instanceof AxiosError && error.response) {
         console.error("SOAP Hata Detayı:", error.response.data);
       }
+      throw this.handleError(error);
+    }
+  }
+
+  // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
+  async completePayment(params: CompletePaymentParams): Promise<PaymentResponse> {
+    try {
+      const { ucdMD, islemId, siparisId } = params;
+
+      if (!ucdMD || !islemId || !siparisId) {
+        throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
+      }
+
+      const transactionGuid = uuidv4();
+
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Body>
+            <TP_WMD_Pay xmlns="https://turkpos.com.tr/">
+              <G>
+                <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
+                <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
+                <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
+              </G>
+              <GUID>${this.guid}</GUID>
+              <UCD_MD>${ucdMD}</UCD_MD>
+              <Islem_GUID>${transactionGuid}</Islem_GUID>
+              <Siparis_ID>${siparisId}</Siparis_ID>
+            </TP_WMD_Pay>
+          </soap:Body>
+        </soap:Envelope>`;
+
+      console.log("TP_WMD_Pay İsteği:", soapEnvelope);
+
+      const response = await axios.post(this.baseUrl, soapEnvelope, {
+        headers: {
+          "Content-Type": "text/xml;charset=UTF-8",
+          SOAPAction: "https://turkpos.com.tr/TP_WMD_Pay",
+        },
+      });
+
+      console.log("TP_WMD_Pay Yanıtı:", response.data);
+
+      const parsedResponse = await this.parseSoapResponse(response.data);
+
+      if (
+        !parsedResponse["TP_WMD_PayResponse"] ||
+        !parsedResponse["TP_WMD_PayResponse"][0] ||
+        !parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"] ||
+        !parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"][0]
+      ) {
+        console.error("Geçersiz TP_WMD_Pay yanıt formatı:", parsedResponse);
+        throw new Error("Geçersiz ödeme tamamlama yanıtı formatı");
+      }
+
+      const result = parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"][0];
+
+      // Başarısız işlem kontrolü
+      if (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) === -1) {
+        throw new Error(result.Sonuc_Str[0] || "Ödeme tamamlama işlemi başarısız");
+      }
+
+      return {
+        TURKPOS_RETVAL_Sonuc: parseInt(result.Sonuc[0]),
+        TURKPOS_RETVAL_Sonuc_Str: result.Sonuc_Str[0],
+        TURKPOS_RETVAL_GUID: this.guid,
+        TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
+        TURKPOS_RETVAL_Dekont_ID: result.Dekont_ID ? result.Dekont_ID[0] : "",
+        TURKPOS_RETVAL_Tahsilat_Tutari: result.Odeme_Tutari ? result.Odeme_Tutari[0] : "",
+        TURKPOS_RETVAL_Odeme_Tutari: result.Odeme_Tutari ? result.Odeme_Tutari[0] : "",
+        TURKPOS_RETVAL_Siparis_ID: siparisId,
+        TURKPOS_RETVAL_Islem_ID: islemId,
+      };
+    } catch (error) {
+      console.error("Ödeme tamamlama hatası:", error);
+      if (error instanceof AxiosError && error.response) {
+        console.error("SOAP Hata Detayı:", error.response.data);
+      }
+      throw this.handleError(error);
+    }
+  }
+
+  // Eski payment metodu şimdi iki adımı kapsıyor
+  async payment(params: PaymentParams): Promise<PaymentResponse> {
+    try {
+      // İlk adım: 3D ekranını alma
+      const initResponse = await this.initializePayment(params);
+      
+      // NonSecure işlemse doğrudan sonucu döndür
+      if (initResponse.UCD_URL === "NONSECURE") {
+        return {
+          TURKPOS_RETVAL_Sonuc: initResponse.Sonuc,
+          TURKPOS_RETVAL_Sonuc_Str: initResponse.Sonuc_Str,
+          TURKPOS_RETVAL_GUID: this.guid,
+          TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
+          TURKPOS_RETVAL_Dekont_ID: initResponse.Islem_ID,
+          TURKPOS_RETVAL_Tahsilat_Tutari: params.amount.toString(),
+          TURKPOS_RETVAL_Odeme_Tutari: params.amount.toString(),
+          TURKPOS_RETVAL_Siparis_ID: "",
+          TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
+        };
+      }
+      
+      // 3D işlemse URL'i döndür
+      return {
+        TURKPOS_RETVAL_Sonuc: initResponse.Sonuc,
+        TURKPOS_RETVAL_Sonuc_Str: initResponse.Sonuc_Str,
+        TURKPOS_RETVAL_GUID: this.guid,
+        TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
+        TURKPOS_RETVAL_Dekont_ID: "",
+        TURKPOS_RETVAL_Tahsilat_Tutari: params.amount.toString(),
+        TURKPOS_RETVAL_Odeme_Tutari: params.amount.toString(),
+        TURKPOS_RETVAL_Siparis_ID: "",
+        TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
+        UCD_URL: initResponse.UCD_URL,
+        isRedirect: initResponse.isRedirect,
+        html: initResponse.UCD_URL
+      };
+      
+      // Not: Burada ikinci adım olan completePayment() metodu kullanıcı 3D sayfasını 
+      // doğruladıktan sonra callback URL'inden çağrılacak
+    } catch (error) {
+      console.error("Ödeme hatası:", error);
       throw this.handleError(error);
     }
   }
