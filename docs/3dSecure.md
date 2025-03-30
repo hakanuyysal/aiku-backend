@@ -19,22 +19,24 @@ AIKU ödeme sistemi, Param POS entegrasyonu üzerinden 3D Secure ödeme işlemle
 
 ## Ödeme İşlem Akışı
 
-3D Secure ödeme işlemi iki adımda gerçekleştirilir:
+3D Secure ödeme işlemi **zorunlu olarak iki adımda** gerçekleştirilir:
 
-1. **İlk Adım**: Kart bilgileri gönderilerek 3D Secure doğrulama sayfası alınır
-2. **İkinci Adım**: Kullanıcı 3D doğrulamayı tamamladıktan sonra, ödeme tamamlanır
+1. **İlk Adım (TP_WMD_UCD)**: Kart bilgileri gönderilerek 3D Secure doğrulama sayfası alınır
+2. **İkinci Adım (TP_WMD_Pay)**: Kullanıcı 3D doğrulamayı tamamladıktan sonra, ödeme tamamlanır
+
+> **ÖNEMLİ:** İkinci adım olan TP_WMD_Pay çağrısını mutlaka yapmanız gerekir. Bu çağrı olmadan, 3D doğrulama başarılı olsa bile bankadan para çekilmez!
 
 ![3D Secure Akış Diyagramı](https://www.aiku.com.tr/img/3d-flow.png)
 
 ## API Endpoint ve Yanıt Formatı
 
-Ödeme işlemi başlatmak için aşağıdaki endpoint kullanılır:
+### 1. Ödeme İşlemi Başlatma
 
 ```
 POST /api/payments/process-payment
 ```
 
-### İstek Gövdesi (Request Body)
+#### İstek Gövdesi (Request Body)
 
 ```json
 {
@@ -48,7 +50,7 @@ POST /api/payments/process-payment
 }
 ```
 
-### Başarılı Yanıt Örneği
+#### Başarılı Yanıt Örneği
 
 ```json
 {
@@ -67,6 +69,41 @@ POST /api/payments/process-payment
     "UCD_MD": "eyJpZCI6IjAxMTE3ZGIyNDcyYi01OGFlLTQzOTMtYmYwNC0wNzRkNWFkYjM2ZWUiLCJ0aW1lIjoiMjAyNTAzMzAxNjI1MDkiLCJ2ZXJzaW9uIjoiMC4wM...",
     "isRedirect": true,
     "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">..."
+  }
+}
+```
+
+### 2. Ödeme Tamamlama (ÇOK ÖNEMLİ!)
+
+```
+POST /api/payments/complete-payment
+```
+
+#### İstek Gövdesi (Request Body)
+
+```json
+{
+  "ucdMD": "eyJpZCI6IjAxMTE3ZGIyNDcyYi01OGFlLTQzOTMtYmYwNC0wNzRkNWFkYjM2ZWUiLCJ0aW1lIjoiMjAyNTAzMzAxNjI1MDkiLCJ2ZXJzaW9uIjoiMC4wM...",
+  "islemId": "2221578869",
+  "siparisId": "ORDER_1743341109065_a08607c4"
+}
+```
+
+#### Başarılı Yanıt Örneği
+
+```json
+{
+  "success": true,
+  "data": {
+    "TURKPOS_RETVAL_Sonuc": 1,
+    "TURKPOS_RETVAL_Sonuc_Str": "İşlem Başarılı",
+    "TURKPOS_RETVAL_GUID": "1B52D752-1980-4835-A0EC-30E3CB1077A5",
+    "TURKPOS_RETVAL_Islem_Tarih": "2025-03-30T13:30:15.123Z",
+    "TURKPOS_RETVAL_Dekont_ID": "12345678",
+    "TURKPOS_RETVAL_Tahsilat_Tutari": "1",
+    "TURKPOS_RETVAL_Odeme_Tutari": "1",
+    "TURKPOS_RETVAL_Siparis_ID": "ORDER_1743341109065_a08607c4",
+    "TURKPOS_RETVAL_Islem_ID": "2221578869"
   }
 }
 ```
@@ -120,10 +157,8 @@ paymentForm.addEventListener('submit', async (e) => {
       return;
     }
     
-    // İşlem bilgilerini lokalde sakla (ödeme tamamlama için)
-    localStorage.setItem('param_islem_id', result.data.TURKPOS_RETVAL_Islem_ID);
-    localStorage.setItem('param_siparis_id', result.data.TURKPOS_RETVAL_Siparis_ID);
-    localStorage.setItem('param_ucd_md', result.data.UCD_MD);
+    // ÖNEMLİ: İşlem bilgilerini lokalde sakla (ödeme tamamlama için)
+    savePaymentData(result.data);
     
     // 3D Secure formunu göster
     showSecureForm(result.data);
@@ -132,6 +167,13 @@ paymentForm.addEventListener('submit', async (e) => {
     console.error(error);
   }
 });
+
+// ÖNEMLİ: Ödeme tamamlama için gerekli bilgileri sakla
+function savePaymentData(paymentResult) {
+  localStorage.setItem('param_islem_id', paymentResult.TURKPOS_RETVAL_Islem_ID);
+  localStorage.setItem('param_siparis_id', paymentResult.TURKPOS_RETVAL_Siparis_ID);
+  localStorage.setItem('param_ucd_md', paymentResult.UCD_MD);
+}
 ```
 
 ## 3D Secure Form Gösterimi
@@ -253,8 +295,11 @@ window.addEventListener('DOMContentLoaded', () => {
 ```javascript
 // /payment/callback.js
 document.addEventListener('DOMContentLoaded', async () => {
+  // URL parametrelerini al
   const urlParams = new URLSearchParams(window.location.search);
   const status = urlParams.get('status');
+  
+  // UCD_MD parametresini URL'den veya localStorage'dan al
   const ucdMD = urlParams.get('UCD_MD') || localStorage.getItem('param_ucd_md');
   
   if (!ucdMD) {
@@ -271,20 +316,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
   
-  // Ödemeyi tamamla
-  completePayment(ucdMD, islemId, siparisId);
+  // Ödemeyi tamamla - ÇOK ÖNEMLİ!
+  await completePayment(ucdMD, islemId, siparisId);
 });
 ```
 
 ## Ödeme Tamamlama
 
-3D doğrulama tamamlandıktan sonra, ödeme işlemini tamamlamak için backend'e istek yapılmalıdır:
+3D doğrulama tamamlandıktan sonra, ödeme işlemini tamamlamak için backend'e istek yapmanız **ZORUNLUDUR**. Bu adım atlanırsa, kullanıcı 3D doğrulamayı başarıyla tamamlasa bile bankadan para çekilmez!
 
 ```javascript
 async function completePayment(ucdMD, islemId, siparisId) {
   try {
     showLoadingSpinner('Ödeme tamamlanıyor...');
     
+    // ÖNEMLİ: Bu istek mutlaka yapılmalıdır, yoksa bankadan para çekilmez!
     const response = await fetch('/api/payments/complete-payment', {
       method: 'POST',
       headers: {
@@ -369,14 +415,18 @@ Test ortamında aşağıdaki test kartlarını kullanabilirsiniz:
 
 ## Sıkça Sorulan Sorular
 
+### 3D doğrulama başarılı ama bankadan para çekilmiyor, neden?
+Param entegrasyonundaki en yaygın sorun, 3D doğrulama sonrası TP_WMD_Pay API'sinin çağrılmamasıdır. 3D akışı iki adımdan oluşur:
+1. TP_WMD_UCD: 3D doğrulama sayfasını alır
+2. TP_WMD_Pay: 3D doğrulama tamamlandıktan sonra bankadan parayı çeker
+
+İkinci adımı atlarsanız, kullanıcı 3D doğrulamayı başarıyla tamamlasa bile ödeme gerçekleşmez. Bu nedenle **callback sayfanızda mutlaka `completePayment()` fonksiyonunu çağırmalısınız**.
+
 ### 3D Secure HTML içeriği yüklenmiyor, ne yapmalıyım?
 Tarayıcı konsolunda hata mesajlarını kontrol edin. Cross-Origin Resource Sharing (CORS) hatası alıyorsanız, iframe'in içeriğini doğrudan doküman içine yazabilirsiniz.
 
 ### 3D doğrulama sonrası callback URL'ye yönlenme olmuyor
 Backend'de tanımlanan `Basarili_URL` ve `Hata_URL` değerlerinin doğru olduğundan ve erişilebilir olduğundan emin olun.
-
-### İşlem başarılı görünüyor ama ödeme tamamlanmadı
-Ödeme tamamlama adımını (`completePayment`) doğru şekilde çağırdığınızdan emin olun. 3D doğrulaması başarılı olsa bile, ikinci adımı tamamlamazsanız ödeme gerçekleşmez.
 
 ### UCD_MD parametresi bulunamadı hatası alıyorum
 Banka, callback URL'ye yönlendirme yaparken bu parametreyi göndermemiş olabilir. Bu durumda localStorage'da sakladığınız yedek değeri kullanmayı deneyin.

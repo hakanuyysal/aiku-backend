@@ -113,4 +113,96 @@ router.post('/process-payment',
   }
 );
 
+// Yeni eklenen complete-payment endpoint'i
+router.post('/complete-payment',
+  protect,
+  [
+    body('ucdMD').isString().notEmpty().withMessage('UCD_MD değeri gereklidir'),
+    body('islemId').isString().notEmpty().withMessage('İşlem ID değeri gereklidir'),
+    body('siparisId').isString().notEmpty().withMessage('Sipariş ID değeri gereklidir'),
+    validateRequest
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const { ucdMD, islemId, siparisId } = req.body;
+      
+      console.log('3D ödeme tamamlama isteği:', { ucdMD, islemId, siparisId });
+      
+      // TP_WMD_Pay metodunu çağır
+      const result = await ParamPosService.completePayment({
+        ucdMD,
+        islemId,
+        siparisId
+      });
+      
+      console.log('3D ödeme tamamlama sonucu:', result);
+      
+      // Kullanıcıyı bul ve ödeme geçmişini güncelle
+      const user = req.user as IUser | undefined;
+      if (user && user._id) {
+        const updatedUser = await User.findById(user._id);
+        if (updatedUser) {
+          // Abonelik durumunu aktif olarak güncelle
+          updatedUser.subscriptionStatus = 'active';
+          updatedUser.subscriptionStartDate = new Date();
+          updatedUser.isSubscriptionActive = true;
+          
+          // Bir sonraki ödeme tarihini belirle
+          const nextPaymentDate = new Date();
+          if (updatedUser.subscriptionPeriod === 'monthly') {
+            nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+          } else {
+            nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + 1);
+          }
+          updatedUser.nextPaymentDate = nextPaymentDate;
+          updatedUser.lastPaymentDate = new Date();
+          
+          // Ödeme geçmişini güncelle
+          if (!updatedUser.paymentHistory) updatedUser.paymentHistory = [];
+          updatedUser.paymentHistory.push({
+            amount: parseFloat(result.TURKPOS_RETVAL_Odeme_Tutari) || 0,
+            date: new Date(),
+            status: 'success',
+            transactionId: result.TURKPOS_RETVAL_Islem_ID,
+            description: `3D Ödeme başarılı: ${result.TURKPOS_RETVAL_Odeme_Tutari || 0} TL, İşlem ID: ${result.TURKPOS_RETVAL_Islem_ID}`
+          });
+          await updatedUser.save();
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      console.error('3D ödeme tamamlama hatası:', error);
+      
+      // Hata durumunda da ödeme geçmişine ekle (başarısız olarak)
+      try {
+        const user = req.user as IUser | undefined;
+        if (user && user._id) {
+          const updatedUser = await User.findById(user._id);
+          if (updatedUser) {
+            if (!updatedUser.paymentHistory) updatedUser.paymentHistory = [];
+            updatedUser.paymentHistory.push({
+              amount: 0,
+              date: new Date(),
+              status: 'failed',
+              description: `3D Ödeme tamamlama başarısız. Hata: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+            });
+            await updatedUser.save();
+          }
+        }
+      } catch (saveError) {
+        console.error('Ödeme hatası kaydedilirken hata oluştu:', saveError);
+      }
+
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Ödeme tamamlama işlemi başarısız'
+      });
+    }
+  }
+);
+
 export default router;
