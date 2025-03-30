@@ -336,10 +336,14 @@ class ParamPosService {
       
       // Test ortamında komisyon hesaplama yapmadan doğrudan tutarı kullan
       const totalAmount = amount;
+
+      // TP_Islem_Odeme için hash formatı farklı, SanalPOS_ID ekleniyor
+      const sanalPosId = 1; // Sabit değer
+      const hashStr = `${this.clientCode}${this.guid}${sanalPosId}${amount.toFixed(2).replace(".", ",")}${amount.toFixed(2).replace(".", ",")}${orderId}${this.successUrl}${this.errorUrl}`;
       
-      // Farklı bir hash algoritması deneyelim
-      const hashStr = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2).replace(".", ",")}${totalAmount.toFixed(2).replace(".", ",")}${orderId}`;
+      console.log("Test Hash String:", hashStr);
       const hash = crypto.createHash("sha1").update(hashStr).digest("base64");
+      console.log("Test Hash Value:", hash);
 
       // NSI değeri ile 3DS'i etkinleştiriyoruz - sadece test ortamı için
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
@@ -351,7 +355,7 @@ class ParamPosService {
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <SanalPOS_ID>1</SanalPOS_ID>
+              <SanalPOS_ID>${sanalPosId}</SanalPOS_ID>
               <GUID>${this.guid}</GUID>
               <KK_Sahibi>${cardHolderName}</KK_Sahibi>
               <KK_No>${cardNumber}</KK_No>
@@ -363,7 +367,7 @@ class ParamPosService {
               <Basarili_URL>${this.successUrl}</Basarili_URL>
               <Siparis_ID>${orderId}</Siparis_ID>
               <Siparis_Aciklama>Test işlemi</Siparis_Aciklama>
-              <Taksit>0</Taksit>
+              <Taksit>${validInstallment}</Taksit>
               <Islem_Tutar>${amount.toFixed(2).replace(".", ",")}</Islem_Tutar>
               <Toplam_Tutar>${amount.toFixed(2).replace(".", ",")}</Toplam_Tutar>
               <Islem_Hash>${hash}</Islem_Hash>
