@@ -67,6 +67,31 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 };
 
 /**
+ * Admin yetkilendirmesi için middleware
+ * protect middleware'inden sonra kullanılmalıdır
+ */
+export const adminProtect = (req: Request, res: Response, next: NextFunction) => {
+  // protect middleware'i req.user'ı oluşturmuş olmalı
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Oturum açmanız gerekiyor'
+    });
+  }
+
+  // Kullanıcının admin olup olmadığını kontrol et
+  if (!req.user.isAdmin) {
+    return res.status(403).json({
+      success: false,
+      message: 'Bu işlem için admin yetkileri gerekiyor'
+    });
+  }
+
+  // Admin yetkisi doğrulandı, bir sonraki middleware'e geç
+  next();
+};
+
+/**
  * Hem normal JWT token hem de Supabase token ile doğrulama yapan middleware
  * Önce JWT token kontrolü yapar, başarısız olursa Supabase token kontrolü yapar
  */
