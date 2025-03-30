@@ -23,6 +23,7 @@ import investmentRoutes from "./routes/investmentRoutes";
 import linkedinAuthRoutes from "./routes/linkedinAuth.routes";
 import supabaseAuthRoutes from "./routes/supabaseAuth.routes";
 import chatRoutes from "./routes/chatRoutes";
+import billingInfoRoutes from "./routes/billingInfoRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -385,6 +386,7 @@ app.use("/api/investments", investmentRoutes)
 app.use("/api", linkedinAuthRoutes);
 app.use("/api", supabaseAuthRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/billing-info", billingInfoRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
