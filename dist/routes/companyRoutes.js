@@ -1,12 +1,17 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const express_validator_1 = require("express-validator");
 const companyController_1 = require("../controllers/companyController");
 const auth_1 = require("../middleware/auth");
+const videoUpload_1 = __importDefault(require("../middleware/videoUpload"));
+const optionalAuth_1 = require("../middleware/optionalAuth");
 const router = (0, express_1.Router)();
 // Tüm şirketleri getirme rotası (örn: GET /api/company/all)
-router.get('/all', auth_1.protect, companyController_1.getAllCompanies);
+router.get('/all', optionalAuth_1.optionalAuth, companyController_1.getAllCompanies);
 // Giriş yapmış kullanıcıya ait tüm şirketleri getirme 
 router.get('/current', auth_1.protect, companyController_1.getCompaniesForUser);
 // Şirket oluşturma rotası (örn: POST /api/company)
@@ -30,4 +35,5 @@ router.get('/:id', auth_1.protect, companyController_1.getCompany);
 router.put('/:id', auth_1.protect, companyController_1.updateCompany);
 // Şirket silme (örn: DELETE /api/company/:id)
 router.delete('/:id', auth_1.protect, companyController_1.deleteCompany);
+router.post('/:id/upload-video', auth_1.protect, videoUpload_1.default.single('video'), companyController_1.uploadCompanyVideo);
 exports.default = router;

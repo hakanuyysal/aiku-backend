@@ -4,9 +4,10 @@ const express_1 = require("express");
 const express_validator_1 = require("express-validator");
 const productController_1 = require("../controllers/productController");
 const auth_1 = require("../middleware/auth");
+const optionalAuth_1 = require("../middleware/optionalAuth");
 const router = (0, express_1.Router)();
 // **Tüm Ürünleri Getirme (örn: GET /api/products)**
-router.get('/all', productController_1.getAllProducts);
+router.get('/all', optionalAuth_1.optionalAuth, productController_1.getAllProducts);
 // **Kullanıcının Ürünlerini Getirme (örn: GET /api/products/user)**
 router.get('/user', auth_1.protect, productController_1.getProductsByUser);
 // **Şirkete Ait Ürünleri Getirme (örn: GET /api/products/company/:companyId)**

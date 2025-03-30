@@ -46,6 +46,10 @@ const companySchema = new mongoose_1.Schema({
         type: String,
         trim: true,
     },
+    companyVideo: {
+        type: String,
+        trim: true,
+    },
     companyType: {
         type: String,
         required: [true, 'Company type is required'],
@@ -69,13 +73,18 @@ const companySchema = new mongoose_1.Schema({
         required: [true, 'Company size is required'],
         enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+'],
     },
+    businessScale: {
+        type: String,
+        required: true,
+        enum: ['Micro', 'Small', 'Medium', 'Large'],
+    },
     companyEmail: {
         type: String,
         required: [true, 'Company email is required'],
         trim: true,
         lowercase: true,
         unique: true,
-        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email address'],
+        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.[A-Za-z]{2,})+$/, 'Please enter a valid email address'],
     },
     companyPhone: {
         type: String,
@@ -118,7 +127,7 @@ const companySchema = new mongoose_1.Schema({
         type: String,
         trim: true,
         match: [
-            /^(https?:\/\/)?(www\.)?x\.com\/[A-Za-z0-9_]+\/?$/,
+            /^(https?:\/\/)?(www\.)?(twitter\.com|x\.com)\/[A-Za-z0-9_]+\/?$/,
             'Please enter a valid Twitter URL',
         ],
     },
@@ -134,6 +143,10 @@ const companySchema = new mongoose_1.Schema({
         type: [String],
         default: [],
     },
+    isIncorporated: {
+        type: Boolean,
+        default: false,
+    },
     user: {
         type: mongoose_1.default.Schema.Types.ObjectId,
         required: [true, 'User ID is required'],
@@ -142,7 +155,7 @@ const companySchema = new mongoose_1.Schema({
     createdAt: {
         type: Date,
         default: Date.now,
-    },
+    }
 }, {
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
