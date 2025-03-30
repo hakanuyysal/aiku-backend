@@ -333,24 +333,44 @@ class ParamPosService {
       const totalAmount = amount;
       const orderId = `ORDER_${Date.now()}`;
       
-      // Test ortamındaki hash hesaplama sorununu çözmek için TP_WMD_UCD kullanmaya dönelim
-      // Taksit değerini 0 olarak ayarla
+      // Test ortamında taksit değerini 0 olarak ayarla
       const validInstallment = 0;
       
-      // TP_WMD_UCD için test ortamında doğru hash formatı
-      console.log("Hash parametreleri:", {
-        clientCode: this.clientCode,
-        guid: this.guid,
-        taksit: validInstallment,
-        tutar: amount.toFixed(2).replace(".", ","),
-        siparisId: orderId
-      });
-      
-      const hashStr = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2).replace(".", ",")}${amount.toFixed(2).replace(".", ",")}${orderId}`;
-      console.log("Test ortamı hash string:", hashStr);
-      const hash = crypto.createHash("sha1").update(hashStr).digest("base64");
-      console.log("Test ortamı hash value:", hash);
+      // -------------------- HASH HESAPLAMA METODU 1 --------------------
+      // Hash için string oluşturma (FORMAT 1)
+      const hashStr1 = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2).replace(".", ",")}${amount.toFixed(2).replace(".", ",")}${orderId}`;
+      console.log("Hash String (Format 1):", hashStr1);
+      const hash1 = crypto.createHash("sha1").update(hashStr1).digest("base64");
+      console.log("Hash Value (Format 1):", hash1);
 
+      // -------------------- HASH HESAPLAMA METODU 2 --------------------
+      // Hash için string oluşturma (FORMAT 2 - GUID küçük harfli olabilir)
+      const guidLowercase = this.guid.toLowerCase();
+      const hashStr2 = `${this.clientCode}${guidLowercase}${validInstallment}${amount.toFixed(2).replace(".", ",")}${amount.toFixed(2).replace(".", ",")}${orderId}`;
+      console.log("Hash String (Format 2):", hashStr2);
+      const hash2 = crypto.createHash("sha1").update(hashStr2).digest("base64");
+      console.log("Hash Value (Format 2):", hash2);
+
+      // -------------------- HASH HESAPLAMA METODU 3 --------------------
+      // Hash için string oluşturma (FORMAT 3 - noktalarla ve SHA256)
+      const hashStr3 = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2)}${amount.toFixed(2)}${orderId}`;
+      console.log("Hash String (Format 3):", hashStr3);
+      const hash3 = crypto.createHash("sha256").update(hashStr3).digest("base64");
+      console.log("Hash Value (Format 3):", hash3);
+
+      // -------------------- HASH HESAPLAMA METODU 4 --------------------
+      // Format 4 (virgül yerine nokta kullanarak)
+      const hashStr4 = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2)}${amount.toFixed(2)}${orderId}`;
+      console.log("Hash String (Format 4):", hashStr4);
+      const hash4 = crypto.createHash("sha1").update(hashStr4).digest("base64");
+      console.log("Hash Value (Format 4):", hash4);
+
+      // Hangi hash metodunu kullanacağız? Format 1'i deneyelim önce
+      const hashToUse = hash1;
+
+      console.log("Kullanılacak Hash Değeri:", hashToUse);
+      
+      // TP_WMD_UCD yerine sadece TP_WMD_Pay deneyelim
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap:Body>
@@ -374,7 +394,7 @@ class ParamPosService {
               <Taksit>${validInstallment}</Taksit>
               <Islem_Tutar>${amount.toFixed(2).replace(".", ",")}</Islem_Tutar>
               <Toplam_Tutar>${amount.toFixed(2).replace(".", ",")}</Toplam_Tutar>
-              <Islem_Hash>${hash}</Islem_Hash>
+              <Islem_Hash>${hashToUse}</Islem_Hash>
               <Islem_Guvenlik_Tip>3D</Islem_Guvenlik_Tip>
               <Islem_ID></Islem_ID>
               <IPAdr>${ipAddress}</IPAdr>
@@ -398,46 +418,55 @@ class ParamPosService {
       });
 
       console.log("TP_WMD_UCD Test Yanıtı:", response.data);
-
-      const parsedResponse = await this.parseSoapResponse(response.data);
-
-      if (
-        !parsedResponse["TP_WMD_UCDResponse"] ||
-        !parsedResponse["TP_WMD_UCDResponse"][0] ||
-        !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"] ||
-        !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0]
-      ) {
-        console.error("Geçersiz yanıt formatı:", parsedResponse);
-        throw new Error("Geçersiz ödeme yanıtı formatı");
+      
+      // Eğer hash hatası alırsak
+      if (response.data.includes("İşlem Hash geçersiz")) {
+        console.log("İşlem Hash geçersiz hatası alındı, Format 2 ile tekrar deneniyor...");
+        
+        // Format 2 ile tekrar deneyelim
+        const retryEnvelope = soapEnvelope.replace(`<Islem_Hash>${hashToUse}</Islem_Hash>`, 
+                                                  `<Islem_Hash>${hash2}</Islem_Hash>`);
+        
+        console.log("Retry Envelope:", retryEnvelope);
+        
+        const retryResponse = await axios.post(this.baseUrl, retryEnvelope, {
+          headers: {
+            "Content-Type": "text/xml;charset=UTF-8",
+            SOAPAction: "https://turkpos.com.tr/TP_WMD_UCD",
+          },
+        });
+        
+        console.log("TP_WMD_UCD Retry Yanıtı:", retryResponse.data);
+        
+        // Yine başarısız olursa, Format 4 ile deneyelim
+        if (retryResponse.data.includes("İşlem Hash geçersiz")) {
+          console.log("İşlem Hash hala geçersiz, Format 4 ile tekrar deneniyor...");
+          
+          const finalEnvelope = soapEnvelope.replace(`<Islem_Hash>${hashToUse}</Islem_Hash>`, 
+                                                    `<Islem_Hash>${hash4}</Islem_Hash>`);
+          
+          console.log("Final Envelope:", finalEnvelope);
+          
+          const finalResponse = await axios.post(this.baseUrl, finalEnvelope, {
+            headers: {
+              "Content-Type": "text/xml;charset=UTF-8",
+              SOAPAction: "https://turkpos.com.tr/TP_WMD_UCD",
+            },
+          });
+          
+          console.log("TP_WMD_UCD Final Yanıtı:", finalResponse.data);
+          
+          // Tüm hash değerleri başarısız olursa burada devam et
+          return this.parseWMDResponse(finalResponse.data, orderId);
+        }
+        
+        // Format 2 başarılı olursa
+        return this.parseWMDResponse(retryResponse.data, orderId);
       }
-
-      const result = parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0];
-
-      // Başarısız işlem kontrolü
-      if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
-        throw new Error(result.Sonuc_Str ? result.Sonuc_Str[0] : "Ödeme işlemi başarısız");
-      }
-
-      // HTML veya URL kontrol et
-      const hasRedirectContent = 
-        (result.UCD_HTML && result.UCD_HTML[0]) || 
-        (result.UCD_URL && result.UCD_URL[0]);
-
-      if (!hasRedirectContent) {
-        throw new Error("3D doğrulama içeriği alınamadı");
-      }
-
-      return {
-        Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
-        UCD_URL: result.UCD_URL ? result.UCD_URL[0] : undefined,
-        UCD_HTML: result.UCD_HTML ? result.UCD_HTML[0] : undefined,
-        UCD_MD: result.UCD_MD ? result.UCD_MD[0] : undefined,
-        Siparis_ID: result.Siparis_ID ? result.Siparis_ID[0] : orderId,
-        Sonuc: parseInt(result.Sonuc[0]),
-        Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
-        Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
-        isRedirect: true
-      };
+      
+      // İlk hash başarılı olursa
+      return this.parseWMDResponse(response.data, orderId);
+      
     } catch (error) {
       console.error("Test ödeme başlatma hatası:", error);
       if (error instanceof AxiosError && error.response) {
@@ -445,6 +474,49 @@ class ParamPosService {
       }
       throw this.handleError(error);
     }
+  }
+  
+  // WMD Yanıtını Parse Eden Yardımcı Metot
+  private async parseWMDResponse(responseData: string, orderId: string): Promise<InitializePaymentResponse> {
+    const parsedResponse = await this.parseSoapResponse(responseData);
+
+    if (
+      !parsedResponse["TP_WMD_UCDResponse"] ||
+      !parsedResponse["TP_WMD_UCDResponse"][0] ||
+      !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"] ||
+      !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0]
+    ) {
+      console.error("Geçersiz yanıt formatı:", parsedResponse);
+      throw new Error("Geçersiz ödeme yanıtı formatı");
+    }
+
+    const result = parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0];
+
+    // Başarısız işlem kontrolü
+    if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
+      throw new Error(result.Sonuc_Str ? result.Sonuc_Str[0] : "Ödeme işlemi başarısız");
+    }
+
+    // HTML veya URL kontrol et
+    const hasRedirectContent = 
+      (result.UCD_HTML && result.UCD_HTML[0]) || 
+      (result.UCD_URL && result.UCD_URL[0]);
+
+    if (!hasRedirectContent) {
+      throw new Error("3D doğrulama içeriği alınamadı");
+    }
+
+    return {
+      Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
+      UCD_URL: result.UCD_URL ? result.UCD_URL[0] : undefined,
+      UCD_HTML: result.UCD_HTML ? result.UCD_HTML[0] : undefined,
+      UCD_MD: result.UCD_MD ? result.UCD_MD[0] : undefined,
+      Siparis_ID: result.Siparis_ID ? result.Siparis_ID[0] : orderId,
+      Sonuc: parseInt(result.Sonuc[0]),
+      Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
+      Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
+      isRedirect: true
+    };
   }
 
   // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
