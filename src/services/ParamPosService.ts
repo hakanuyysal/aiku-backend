@@ -71,7 +71,7 @@ class ParamPosService {
     this.baseUrl =
       process.env.PARAM_BASE_URL ||
       "https://posws.param.com.tr/turkpos.ws/service_turkpos_prod.asmx";
-    this.successUrl = process.env.PARAM_SUCCESS_URL || "https://aiku.com.tr/payment/success";
+    this.successUrl = process.env.PARAM_SUCCESS_URL || "https://aikuaiplatform.com/payment";
     this.errorUrl = process.env.PARAM_ERROR_URL || "https://aiku.com.tr/payment/error";
 
     if (
@@ -200,7 +200,7 @@ class ParamPosService {
         ipAddress = "127.0.0.1",
       } = params;
 
-      const orderId = `ORDER_${Date.now()}`;
+      const orderId = `ORDER_${Date.now()}_${uuidv4().substring(0, 8)}`;
       const totalAmount = await this.calculateCommission(amount, installment);
       const hash = this.calculateHash({
         installment,
