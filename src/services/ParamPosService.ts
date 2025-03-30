@@ -169,34 +169,17 @@ class ParamPosService {
     installment: number
   ): Promise<number> {
     try {
-      // İşlem başlangıcında log kaydı
-      console.log(`Komisyon hesaplama: Tutar=${amount}, Taksit=${installment}`);
-      
       if (typeof amount !== "number" || amount <= 0) {
         throw new Error("Geçersiz tutar");
       }
 
-      // Tek çekim (installment=1) için komisyon hesaplamayı atla
-      if (installment <= 1) {
-        console.log("Tek çekim işlem, komisyon hesaplanmıyor");
-        return amount;
-      }
-
-      // Test ortamında komisyon hesaplama hatasını önlemek için
-      if (process.env.PARAM_CLIENT_CODE === '10738') {
-        console.log('Test ortamı tespit edildi, komisyon hesaplanmıyor');
-        return amount;
-      }
-      
-      // Taksitli ödemeler için komisyon hesaplama (şu an kullanılmıyor)
-      const commissionRate = 0; // Komisyon oranını 0 yapın
-      const totalAmount = Number((amount + (amount * commissionRate) / 100).toFixed(2));
-      
-      console.log(`Hesaplanan komisyon: ${commissionRate}%, Toplam: ${totalAmount}`);
-      return totalAmount;
+      // Komisyon oranı hesaplama için API çağrısı yapılabilir
+      // Şimdilik sabit bir oran kullanıyoruz
+      const commissionRate = installment > 1 ? 1.5 : 0;
+      return Number((amount + (amount * commissionRate) / 100).toFixed(2));
     } catch (error) {
       console.error("Komisyon hesaplama hatası:", error);
-      return amount; // Hata durumunda orijinal tutarı döndür
+      return amount;
     }
   }
 
@@ -216,6 +199,12 @@ class ParamPosService {
         userId,
         ipAddress = "127.0.0.1",
       } = params;
+
+      // Test ortamında farklı bir endpoint kullanalım
+      if (process.env.PARAM_CLIENT_CODE === '10738') {
+        console.log("Test ortamı için alternatif endpoint kullanılıyor...");
+        return this.initializeTestPayment(params);
+      }
 
       // installment'ın en az 1 olmasını sağla
       const validInstallment = Math.max(1, installment);
@@ -325,6 +314,131 @@ class ParamPosService {
     }
   }
 
+  // Test ortamı için özel ödeme başlatma metodu
+  private async initializeTestPayment(params: PaymentParams): Promise<InitializePaymentResponse> {
+    try {
+      const {
+        amount,
+        cardNumber,
+        cardHolderName,
+        expireMonth,
+        expireYear,
+        cvc,
+        installment = 1,
+        userId,
+        ipAddress = "127.0.0.1",
+      } = params;
+
+      // Taksit sayısını 0 olarak zorlayalım
+      const validInstallment = 0;
+      
+      const orderId = `ORDER_${Date.now()}`;
+      
+      // Test ortamında komisyon hesaplama yapmadan doğrudan tutarı kullan
+      const totalAmount = amount;
+      
+      // Farklı bir hash algoritması deneyelim
+      const hashStr = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2).replace(".", ",")}${totalAmount.toFixed(2).replace(".", ",")}${orderId}`;
+      const hash = crypto.createHash("sha1").update(hashStr).digest("base64");
+
+      // NSI değeri ile 3DS'i etkinleştiriyoruz - sadece test ortamı için
+      const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+          <soap:Body>
+            <TP_Islem_Odeme xmlns="https://turkpos.com.tr/">
+              <G>
+                <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
+                <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
+                <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
+              </G>
+              <SanalPOS_ID>1</SanalPOS_ID>
+              <GUID>${this.guid}</GUID>
+              <KK_Sahibi>${cardHolderName}</KK_Sahibi>
+              <KK_No>${cardNumber}</KK_No>
+              <KK_SK_Ay>${expireMonth}</KK_SK_Ay>
+              <KK_SK_Yil>${expireYear}</KK_SK_Yil>
+              <KK_CVC>${cvc}</KK_CVC>
+              <KK_Sahibi_GSM></KK_Sahibi_GSM>
+              <Hata_URL>${this.errorUrl}</Hata_URL>
+              <Basarili_URL>${this.successUrl}</Basarili_URL>
+              <Siparis_ID>${orderId}</Siparis_ID>
+              <Siparis_Aciklama>Test işlemi</Siparis_Aciklama>
+              <Taksit>0</Taksit>
+              <Islem_Tutar>${amount.toFixed(2).replace(".", ",")}</Islem_Tutar>
+              <Toplam_Tutar>${amount.toFixed(2).replace(".", ",")}</Toplam_Tutar>
+              <Islem_Hash>${hash}</Islem_Hash>
+              <Islem_ID></Islem_ID>
+              <IPAdr>${ipAddress}</IPAdr>
+              <Ref_URL>${process.env.PRODUCTION_URL || "https://aiku.com.tr"}</Ref_URL>
+              <Data1>${userId || ""}</Data1>
+              <Data2></Data2>
+              <Data3></Data3>
+              <Data4></Data4>
+              <Data5></Data5>
+              <Islem_Guvenlik_Tip>3D</Islem_Guvenlik_Tip>
+            </TP_Islem_Odeme>
+          </soap:Body>
+        </soap:Envelope>`;
+
+      console.log("TP_Islem_Odeme İsteği (Test):", soapEnvelope);
+
+      const response = await axios.post(this.baseUrl, soapEnvelope, {
+        headers: {
+          "Content-Type": "text/xml;charset=UTF-8",
+          SOAPAction: "https://turkpos.com.tr/TP_Islem_Odeme",
+        },
+      });
+
+      console.log("TP_Islem_Odeme Yanıtı (Test):", response.data);
+
+      const parsedResponse = await this.parseSoapResponse(response.data);
+
+      if (
+        !parsedResponse["TP_Islem_OdemeResponse"] ||
+        !parsedResponse["TP_Islem_OdemeResponse"][0] ||
+        !parsedResponse["TP_Islem_OdemeResponse"][0]["TP_Islem_OdemeResult"] ||
+        !parsedResponse["TP_Islem_OdemeResponse"][0]["TP_Islem_OdemeResult"][0]
+      ) {
+        console.error("Geçersiz yanıt formatı:", parsedResponse);
+        throw new Error("Geçersiz ödeme yanıtı formatı");
+      }
+
+      const result = parsedResponse["TP_Islem_OdemeResponse"][0]["TP_Islem_OdemeResult"][0];
+
+      // Başarısız işlem kontrolü
+      if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
+        throw new Error(result.Sonuc_Str ? result.Sonuc_Str[0] : "Ödeme işlemi başarısız");
+      }
+
+      // 3D HTML veya URL kontrolü
+      const redirectContent = result.UCD_HTML && result.UCD_HTML[0] 
+        ? result.UCD_HTML[0] 
+        : (result.UCD_URL && result.UCD_URL[0] ? result.UCD_URL[0] : "");
+
+      if (!redirectContent) {
+        throw new Error("3D doğrulama içeriği alınamadı");
+      }
+
+      return {
+        Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
+        UCD_URL: result.UCD_URL ? result.UCD_URL[0] : undefined,
+        UCD_HTML: result.UCD_HTML ? result.UCD_HTML[0] : undefined,
+        UCD_MD: result.UCD_MD ? result.UCD_MD[0] : undefined,
+        Siparis_ID: result.Siparis_ID ? result.Siparis_ID[0] : orderId,
+        Sonuc: parseInt(result.Sonuc[0]),
+        Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
+        Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
+        isRedirect: true // 3D doğrulama için
+      };
+    } catch (error) {
+      console.error("Test ödeme başlatma hatası:", error);
+      if (error instanceof AxiosError && error.response) {
+        console.error("Test SOAP Hata Detayı:", error.response.data);
+      }
+      throw this.handleError(error);
+    }
+  }
+
   // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
   async completePayment(params: CompletePaymentParams): Promise<PaymentResponse> {
     try {
@@ -408,9 +522,6 @@ class ParamPosService {
     try {
       // is3D parametresini true olarak zorla
       params.is3D = true;
-      
-      // installment'ın en az 1 olmasını sağla
-      params.installment = Math.max(1, params.installment || 1);
       
       // İlk adım: 3D ekranını alma
       const initResponse = await this.initializePayment(params);
