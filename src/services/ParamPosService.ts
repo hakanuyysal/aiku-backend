@@ -329,33 +329,37 @@ class ParamPosService {
         ipAddress = "127.0.0.1",
       } = params;
 
-      // Taksit sayısını 0 olarak zorlayalım
-      const validInstallment = 0;
-      
-      const orderId = `ORDER_${Date.now()}`;
-      
       // Test ortamında komisyon hesaplama yapmadan doğrudan tutarı kullan
       const totalAmount = amount;
-
-      // TP_Islem_Odeme için hash formatı farklı, SanalPOS_ID ekleniyor
-      const sanalPosId = 1; // Sabit değer
-      const hashStr = `${this.clientCode}${this.guid}${sanalPosId}${amount.toFixed(2).replace(".", ",")}${amount.toFixed(2).replace(".", ",")}${orderId}${this.successUrl}${this.errorUrl}`;
+      const orderId = `ORDER_${Date.now()}`;
       
-      console.log("Test Hash String:", hashStr);
+      // Test ortamındaki hash hesaplama sorununu çözmek için TP_WMD_UCD kullanmaya dönelim
+      // Taksit değerini 0 olarak ayarla
+      const validInstallment = 0;
+      
+      // TP_WMD_UCD için test ortamında doğru hash formatı
+      console.log("Hash parametreleri:", {
+        clientCode: this.clientCode,
+        guid: this.guid,
+        taksit: validInstallment,
+        tutar: amount.toFixed(2).replace(".", ","),
+        siparisId: orderId
+      });
+      
+      const hashStr = `${this.clientCode}${this.guid}${validInstallment}${amount.toFixed(2).replace(".", ",")}${amount.toFixed(2).replace(".", ",")}${orderId}`;
+      console.log("Test ortamı hash string:", hashStr);
       const hash = crypto.createHash("sha1").update(hashStr).digest("base64");
-      console.log("Test Hash Value:", hash);
+      console.log("Test ortamı hash value:", hash);
 
-      // NSI değeri ile 3DS'i etkinleştiriyoruz - sadece test ortamı için
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap:Body>
-            <TP_Islem_Odeme xmlns="https://turkpos.com.tr/">
+            <TP_WMD_UCD xmlns="https://turkpos.com.tr/">
               <G>
                 <CLIENT_CODE>${this.clientCode}</CLIENT_CODE>
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <SanalPOS_ID>${sanalPosId}</SanalPOS_ID>
               <GUID>${this.guid}</GUID>
               <KK_Sahibi>${cardHolderName}</KK_Sahibi>
               <KK_No>${cardNumber}</KK_No>
@@ -371,6 +375,7 @@ class ParamPosService {
               <Islem_Tutar>${amount.toFixed(2).replace(".", ",")}</Islem_Tutar>
               <Toplam_Tutar>${amount.toFixed(2).replace(".", ",")}</Toplam_Tutar>
               <Islem_Hash>${hash}</Islem_Hash>
+              <Islem_Guvenlik_Tip>3D</Islem_Guvenlik_Tip>
               <Islem_ID></Islem_ID>
               <IPAdr>${ipAddress}</IPAdr>
               <Ref_URL>${process.env.PRODUCTION_URL || "https://aiku.com.tr"}</Ref_URL>
@@ -379,47 +384,46 @@ class ParamPosService {
               <Data3></Data3>
               <Data4></Data4>
               <Data5></Data5>
-              <Islem_Guvenlik_Tip>3D</Islem_Guvenlik_Tip>
-            </TP_Islem_Odeme>
+            </TP_WMD_UCD>
           </soap:Body>
         </soap:Envelope>`;
 
-      console.log("TP_Islem_Odeme İsteği (Test):", soapEnvelope);
+      console.log("TP_WMD_UCD Test İsteği:", soapEnvelope);
 
       const response = await axios.post(this.baseUrl, soapEnvelope, {
         headers: {
           "Content-Type": "text/xml;charset=UTF-8",
-          SOAPAction: "https://turkpos.com.tr/TP_Islem_Odeme",
+          SOAPAction: "https://turkpos.com.tr/TP_WMD_UCD",
         },
       });
 
-      console.log("TP_Islem_Odeme Yanıtı (Test):", response.data);
+      console.log("TP_WMD_UCD Test Yanıtı:", response.data);
 
       const parsedResponse = await this.parseSoapResponse(response.data);
 
       if (
-        !parsedResponse["TP_Islem_OdemeResponse"] ||
-        !parsedResponse["TP_Islem_OdemeResponse"][0] ||
-        !parsedResponse["TP_Islem_OdemeResponse"][0]["TP_Islem_OdemeResult"] ||
-        !parsedResponse["TP_Islem_OdemeResponse"][0]["TP_Islem_OdemeResult"][0]
+        !parsedResponse["TP_WMD_UCDResponse"] ||
+        !parsedResponse["TP_WMD_UCDResponse"][0] ||
+        !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"] ||
+        !parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0]
       ) {
         console.error("Geçersiz yanıt formatı:", parsedResponse);
         throw new Error("Geçersiz ödeme yanıtı formatı");
       }
 
-      const result = parsedResponse["TP_Islem_OdemeResponse"][0]["TP_Islem_OdemeResult"][0];
+      const result = parsedResponse["TP_WMD_UCDResponse"][0]["TP_WMD_UCDResult"][0];
 
       // Başarısız işlem kontrolü
       if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
         throw new Error(result.Sonuc_Str ? result.Sonuc_Str[0] : "Ödeme işlemi başarısız");
       }
 
-      // 3D HTML veya URL kontrolü
-      const redirectContent = result.UCD_HTML && result.UCD_HTML[0] 
-        ? result.UCD_HTML[0] 
-        : (result.UCD_URL && result.UCD_URL[0] ? result.UCD_URL[0] : "");
+      // HTML veya URL kontrol et
+      const hasRedirectContent = 
+        (result.UCD_HTML && result.UCD_HTML[0]) || 
+        (result.UCD_URL && result.UCD_URL[0]);
 
-      if (!redirectContent) {
+      if (!hasRedirectContent) {
         throw new Error("3D doğrulama içeriği alınamadı");
       }
 
@@ -432,7 +436,7 @@ class ParamPosService {
         Sonuc: parseInt(result.Sonuc[0]),
         Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
         Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
-        isRedirect: true // 3D doğrulama için
+        isRedirect: true
       };
     } catch (error) {
       console.error("Test ödeme başlatma hatası:", error);
