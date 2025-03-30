@@ -1,4 +1,5 @@
-// @ts-nocheck - Typescript hatalarını görmezden gel
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-ignore
 import { Request, Response } from "express";
 import { validationResult } from "express-validator";
 import jwt from "jsonwebtoken";
@@ -733,7 +734,7 @@ export const createOrUpdateSubscription = async (
   res: Response
 ) => {
   try {
-    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
+    // @ts-ignore - req.user tipini IUser olarak kabul ediyoruz
     const userId = req.user?._id;
     if (!userId) {
       return res.status(401).json({
@@ -792,7 +793,7 @@ export const createOrUpdateSubscription = async (
     const now = new Date();
     let nextPaymentDate;
 
-    // Startup planı ve ilk abonelik ise 3 aylık deneme süresi ver
+    // Startup planı ve ilk abonelik ise (aylık veya yıllık) 3 aylık deneme süresi ver
     if (isFirstSubscription && plan === "startup") {
       // 3 aylık trial süresi
       const trialEndDate = new Date(now);
@@ -816,9 +817,16 @@ export const createOrUpdateSubscription = async (
         nextPaymentDate = new Date(now);
         nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
       } else {
-        // yearly
+        // Yıllık abonelik
         nextPaymentDate = new Date(now);
-        nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + 1);
+
+        // Business ve Investor planları için yıllık abonelikte 3 ay bonus (12+3=15 ay)
+        if (plan === "business" || plan === "investor") {
+          nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + 3);
+        } else {
+          // Startup planı için standart 12 ay
+          nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12);
+        }
       }
 
       user.nextPaymentDate = nextPaymentDate;

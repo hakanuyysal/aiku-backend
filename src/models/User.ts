@@ -53,6 +53,13 @@ export interface IUser extends Document {
     type?: string;
     plan?: 'startup' | 'business' | 'investor';
     period?: 'monthly' | 'yearly';
+    cardDetails?: {
+      cardType?: string;
+      cardMaskedNumber?: string;
+      cardHolderName?: string;
+      expireMonth?: string;
+      expireYear?: string;
+    }
   }>;
   billingAddress?: string;
   vatNumber?: string;
@@ -61,7 +68,7 @@ export interface IUser extends Document {
   
   matchPassword(enteredPassword: string): Promise<boolean>;
   checkAutoRenewal(): Promise<boolean>;
-  processPayment(): Promise<{success: boolean, transactionId?: string, error?: string}>;
+  processPayment(): Promise<{success: boolean, transactionId?: string, error?: string, cardDetails?: any}>;
 }
 
 interface IUserModel extends Model<IUser> {
@@ -252,6 +259,13 @@ const userSchema = new Schema<IUser>({
         period: {
           type: String,
           enum: ['monthly', 'yearly']
+        },
+        cardDetails: {
+          cardType: String,
+          cardMaskedNumber: String,
+          cardHolderName: String,
+          expireMonth: String,
+          expireYear: String
         }
       }
     ],
@@ -289,13 +303,24 @@ userSchema.pre('save', async function (this: IUser, next) {
 
 // Abonelik planı startup olarak ayarlandığında 3 aylık deneme süresi tanımlanır
 userSchema.pre('save', function(next) {
-  // Abonelik planı startup olarak değiştirilmişse ve durumu trial değilse
-  if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup' && this.subscriptionStatus !== 'trial') {
-    this.subscriptionStatus = 'trial';
-    const trialEndDate = new Date();
-    trialEndDate.setMonth(trialEndDate.getMonth() + 3);
-    this.trialEndsAt = trialEndDate;
-    this.nextPaymentDate = trialEndDate; // Deneme süresi bitiminde otomatik çekim
+  // Abonelik planı değiştiyse ve plan startup ise
+  if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup') {
+    // İlk abonelik olup olmadığını kontrol et (periyod fark etmeksizin)
+    const isFirstSubscription = !this.paymentHistory || this.paymentHistory.length === 0;
+    
+    // Sadece ilk abonelik ise trial süresi ver (aylık veya yıllık)
+    if (isFirstSubscription) {
+      this.subscriptionStatus = 'trial';
+      const trialEndDate = new Date();
+      trialEndDate.setMonth(trialEndDate.getMonth() + 3);
+      this.trialEndsAt = trialEndDate;
+      this.nextPaymentDate = trialEndDate; // Deneme süresi bitiminde otomatik çekim
+    } else if (this.subscriptionStatus !== 'active') {
+      // İlk abonelik değilse ve aktif değilse, aktif olarak işaretle
+      this.subscriptionStatus = 'active';
+      // Trial süresini kaldır
+      this.trialEndsAt = undefined;
+    }
   }
   next();
 });
@@ -371,7 +396,8 @@ userSchema.methods.checkAutoRenewal = async function() {
             description: 'Otomatik abonelik yenileme',
             type: 'subscription',
             plan: this.subscriptionPlan,
-            period: this.subscriptionPeriod
+            period: this.subscriptionPeriod,
+            cardDetails: paymentResult.cardDetails
           });
           
           this.lastPaymentDate = new Date();
@@ -427,9 +453,18 @@ userSchema.methods.processPayment = async function() {
       userId: this._id.toString()
     });
     
+    const cardDetails = {
+      cardType: savedCard.cardType,
+      cardMaskedNumber: savedCard.cardMaskedNumber,
+      cardHolderName: savedCard.cardHolderName,
+      expireMonth: savedCard.cardExpireMonth,
+      expireYear: savedCard.cardExpireYear
+    };
+    
     return {
       success: true,
-      transactionId: paymentResult.TURKPOS_RETVAL_Islem_ID || Date.now().toString()
+      transactionId: paymentResult.TURKPOS_RETVAL_Islem_ID || Date.now().toString(),
+      cardDetails
     };
   } catch (error: any) {
     console.error('Ödeme işleminde hata:', error);

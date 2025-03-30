@@ -4,13 +4,14 @@
 
 1. [Genel Bakış](#genel-bakış)
 2. [Ödeme İşlem Akışı](#ödeme-işlem-akışı)
-3. [Frontend Entegrasyonu](#frontend-entegrasyonu)
-4. [3D Secure Form Gösterimi](#3d-secure-form-gösterimi)
-5. [Callback Yönetimi](#callback-yönetimi)
-6. [Ödeme Tamamlama](#ödeme-tamamlama)
-7. [Hata Yönetimi](#hata-yönetimi)
-8. [Test Kartları](#test-kartları)
-9. [Sıkça Sorulan Sorular](#sıkça-sorulan-sorular)
+3. [API Endpoint ve Yanıt Formatı](#api-endpoint-ve-yanıt-formatı)
+4. [Frontend Entegrasyonu](#frontend-entegrasyonu)
+5. [3D Secure Form Gösterimi](#3d-secure-form-gösterimi)
+6. [Callback Yönetimi](#callback-yönetimi)
+7. [Ödeme Tamamlama](#ödeme-tamamlama)
+8. [Hata Yönetimi](#hata-yönetimi)
+9. [Test Kartları](#test-kartları)
+10. [Sıkça Sorulan Sorular](#sıkça-sorulan-sorular)
 
 ## Genel Bakış
 
@@ -24,6 +25,61 @@ AIKU ödeme sistemi, Param POS entegrasyonu üzerinden 3D Secure ödeme işlemle
 2. **İkinci Adım**: Kullanıcı 3D doğrulamayı tamamladıktan sonra, ödeme tamamlanır
 
 ![3D Secure Akış Diyagramı](https://www.aiku.com.tr/img/3d-flow.png)
+
+## API Endpoint ve Yanıt Formatı
+
+Ödeme işlemi başlatmak için aşağıdaki endpoint kullanılır:
+
+```
+POST /api/payments/process-payment
+```
+
+### İstek Gövdesi (Request Body)
+
+```json
+{
+  "cardNumber": "4022774022774026",
+  "cardHolderName": "test test",
+  "expireMonth": "12",
+  "expireYear": "2026",
+  "cvc": "000",
+  "amount": 1.00,
+  "installment": 1
+}
+```
+
+### Başarılı Yanıt Örneği
+
+```json
+{
+  "success": true,
+  "data": {
+    "TURKPOS_RETVAL_Sonuc": 1,
+    "TURKPOS_RETVAL_Sonuc_Str": "İşlem Başarılı",
+    "TURKPOS_RETVAL_GUID": "1B52D752-1980-4835-A0EC-30E3CB1077A5",
+    "TURKPOS_RETVAL_Islem_Tarih": "2025-03-30T13:25:09.742Z",
+    "TURKPOS_RETVAL_Dekont_ID": "",
+    "TURKPOS_RETVAL_Tahsilat_Tutari": "1",
+    "TURKPOS_RETVAL_Odeme_Tutari": "1",
+    "TURKPOS_RETVAL_Siparis_ID": "ORDER_1743341109065_a08607c4",
+    "TURKPOS_RETVAL_Islem_ID": "2221578869",
+    "UCD_HTML": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">...",
+    "UCD_MD": "eyJpZCI6IjAxMTE3ZGIyNDcyYi01OGFlLTQzOTMtYmYwNC0wNzRkNWFkYjM2ZWUiLCJ0aW1lIjoiMjAyNTAzMzAxNjI1MDkiLCJ2ZXJzaW9uIjoiMC4wM...",
+    "isRedirect": true,
+    "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">..."
+  }
+}
+```
+
+### Yanıtta Kullanılan Önemli Alanlar
+
+- `success`: İşlemin başarılı olup olmadığını belirtir.
+- `data.TURKPOS_RETVAL_Sonuc`: İşlem sonucu kodu (1: Başarılı)
+- `data.TURKPOS_RETVAL_Islem_ID`: Ödeme tamamlama işleminde kullanılacak işlem ID'si
+- `data.TURKPOS_RETVAL_Siparis_ID`: Ödeme tamamlama işleminde kullanılacak sipariş ID'si
+- `data.UCD_MD`: 3D Secure doğrulama sonrası işlemi tamamlamak için gerekli token
+- `data.isRedirect`: 3D Secure formuna yönlendirme yapılması gerektiğini belirtir
+- `data.html`: 3D Secure formunun HTML içeriği
 
 ## Frontend Entegrasyonu
 
@@ -80,7 +136,7 @@ paymentForm.addEventListener('submit', async (e) => {
 
 ## 3D Secure Form Gösterimi
 
-3D Secure formunu göstermek için 3 farklı yöntem kullanabilirsiniz:
+API yanıtında `isRedirect: true` değeri geldiğinde, kullanıcıyı 3D Secure doğrulama sayfasına yönlendirmeniz gerekir. 3D Secure formunu göstermek için 3 farklı yöntem kullanabilirsiniz:
 
 ### 1. İframe Yöntemi (Önerilen)
 
@@ -325,6 +381,9 @@ Backend'de tanımlanan `Basarili_URL` ve `Hata_URL` değerlerinin doğru olduğu
 ### UCD_MD parametresi bulunamadı hatası alıyorum
 Banka, callback URL'ye yönlendirme yaparken bu parametreyi göndermemiş olabilir. Bu durumda localStorage'da sakladığınız yedek değeri kullanmayı deneyin.
 
+### API'de "isRedirect" alanı var ama kullanmıyorum
+API yanıtında `isRedirect: true` değeri varsa, kullanıcının 3D Secure sayfasına yönlendirilmesi gerektiğini gösterir. Bu durumda `html` veya `UCD_HTML` alanındaki içeriği kullanıcıya göstermeniz gerekir.
+
 ---
 
-Bu dokümantasyon en son 29 Mart 2025 tarihinde güncellenmiştir. Herhangi bir sorunuz veya geri bildiriminiz varsa, lütfen `dev@aiku.com.tr` adresine e-posta gönderin. 
+Bu dokümantasyon en son 30 Mart 2025 tarihinde güncellenmiştir. Herhangi bir sorunuz veya geri bildiriminiz varsa, lütfen `dev@aiku.com.tr` adresine e-posta gönderin. 
