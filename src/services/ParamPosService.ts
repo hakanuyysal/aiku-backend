@@ -362,20 +362,42 @@ class ParamPosService {
       const result = parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"][0];
       console.log("TP_WMD_Pay Sonuç:", JSON.stringify(result, null, 2));
 
+      // Sonuç kontrolleri - undefined veya eksik alanlar için koruma
+      if (!result.Sonuc) {
+        console.error("TP_WMD_Pay hata: Sonuç alanı bulunamadı");
+        throw new Error("Ödeme sonucu alınamadı");
+      }
+
       // Başarısız işlem kontrolü
-      if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
-        console.error("TP_WMD_Pay Hata:", result.Sonuc_Str ? result.Sonuc_Str[0] : "Bilinmeyen hata");
-        throw new Error(result.Sonuc_Str[0] || "Ödeme tamamlama işlemi başarısız");
+      if (Array.isArray(result.Sonuc) && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
+        console.error("TP_WMD_Pay Hata:", 
+          Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
+            ? result.Sonuc_Str[0] 
+            : "Bilinmeyen hata"
+        );
+        throw new Error(
+          Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
+            ? result.Sonuc_Str[0] 
+            : "Ödeme tamamlama işlemi başarısız"
+        );
       }
 
       const paymentResponse = {
-        TURKPOS_RETVAL_Sonuc: parseInt(result.Sonuc[0]),
-        TURKPOS_RETVAL_Sonuc_Str: result.Sonuc_Str[0],
+        TURKPOS_RETVAL_Sonuc: Array.isArray(result.Sonuc) ? parseInt(result.Sonuc[0]) : 0,
+        TURKPOS_RETVAL_Sonuc_Str: Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
+          ? result.Sonuc_Str[0] 
+          : "Sonuç açıklaması alınamadı",
         TURKPOS_RETVAL_GUID: this.guid,
         TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
-        TURKPOS_RETVAL_Dekont_ID: result.Dekont_ID ? result.Dekont_ID[0] : "",
-        TURKPOS_RETVAL_Tahsilat_Tutari: result.Odeme_Tutari ? result.Odeme_Tutari[0] : "",
-        TURKPOS_RETVAL_Odeme_Tutari: result.Odeme_Tutari ? result.Odeme_Tutari[0] : "",
+        TURKPOS_RETVAL_Dekont_ID: Array.isArray(result.Dekont_ID) && result.Dekont_ID.length > 0 
+          ? result.Dekont_ID[0] 
+          : "",
+        TURKPOS_RETVAL_Tahsilat_Tutari: Array.isArray(result.Odeme_Tutari) && result.Odeme_Tutari.length > 0
+          ? result.Odeme_Tutari[0] 
+          : "0",
+        TURKPOS_RETVAL_Odeme_Tutari: Array.isArray(result.Odeme_Tutari) && result.Odeme_Tutari.length > 0
+          ? result.Odeme_Tutari[0] 
+          : "0",
         TURKPOS_RETVAL_Siparis_ID: siparisId,
         TURKPOS_RETVAL_Islem_ID: islemId,
       };
