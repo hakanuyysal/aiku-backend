@@ -16,6 +16,7 @@ interface PaymentResponse {
   TURKPOS_RETVAL_Odeme_Tutari: string;
   TURKPOS_RETVAL_Siparis_ID: string;
   TURKPOS_RETVAL_Islem_ID: string;
+  TURKPOS_RETVAL_Islem_GUID?: string;
   UCD_URL?: string;
   UCD_HTML?: string;
   UCD_MD?: string;
@@ -25,6 +26,7 @@ interface PaymentResponse {
 
 interface InitializePaymentResponse {
   Islem_ID: string;
+  Islem_GUID?: string;
   UCD_URL?: string;
   UCD_HTML?: string;
   UCD_MD?: string;
@@ -52,6 +54,7 @@ interface CompletePaymentParams {
   ucdMD: string;
   islemId: string;
   siparisId: string;
+  islemGuid?: string;
 }
 
 class ParamPosService {
@@ -287,6 +290,7 @@ class ParamPosService {
 
       return {
         Islem_ID: result.Islem_ID ? result.Islem_ID[0] : "",
+        Islem_GUID: result.Islem_GUID ? result.Islem_GUID[0] : "",
         UCD_URL: result.UCD_URL ? result.UCD_URL[0] : undefined,
         UCD_HTML: result.UCD_HTML ? result.UCD_HTML[0] : undefined,
         UCD_MD: result.UCD_MD ? result.UCD_MD[0] : undefined,
@@ -308,7 +312,7 @@ class ParamPosService {
   // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
   async completePayment(params: CompletePaymentParams): Promise<PaymentResponse> {
     try {
-      const { ucdMD, islemId, siparisId } = params;
+      const { ucdMD, islemId, siparisId, islemGuid } = params;
 
       console.log("TP_WMD_Pay Request Params:", JSON.stringify(params, null, 2));
 
@@ -316,7 +320,8 @@ class ParamPosService {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
       }
 
-      const transactionGuid = uuidv4();
+      // Eğer islemGuid yoksa, islemId kullan
+      const transactionId = islemGuid || islemId;
 
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
@@ -329,7 +334,7 @@ class ParamPosService {
               </G>
               <GUID>${this.guid}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
-              <Islem_GUID>${transactionGuid}</Islem_GUID>
+              <Islem_GUID>${transactionId}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
             </TP_WMD_Pay>
           </soap:Body>
@@ -370,23 +375,24 @@ class ParamPosService {
 
       // Başarısız işlem kontrolü
       if (Array.isArray(result.Sonuc) && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
-        console.error("TP_WMD_Pay Hata:", 
-          Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
+        // Daha detaylı hata mesajı oluştur (Sonuc_Ack varsa kullan)
+        const errorDetails = Array.isArray(result.Sonuc_Ack) && result.Sonuc_Ack.length > 0 
+          ? result.Sonuc_Ack[0] 
+          : (Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
             ? result.Sonuc_Str[0] 
-            : "Bilinmeyen hata"
-        );
-        throw new Error(
-          Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
-            ? result.Sonuc_Str[0] 
-            : "Ödeme tamamlama işlemi başarısız"
-        );
+            : "Bilinmeyen hata");
+            
+        console.error(`TP_WMD_Pay Hata (Kod: ${result.Sonuc[0]}): ${errorDetails}`);
+        throw new Error(`Ödeme tamamlama işlemi başarısız. ${errorDetails}`);
       }
 
       const paymentResponse = {
         TURKPOS_RETVAL_Sonuc: Array.isArray(result.Sonuc) ? parseInt(result.Sonuc[0]) : 0,
         TURKPOS_RETVAL_Sonuc_Str: Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
           ? result.Sonuc_Str[0] 
-          : "Sonuç açıklaması alınamadı",
+          : (Array.isArray(result.Sonuc_Ack) && result.Sonuc_Ack.length > 0 
+            ? result.Sonuc_Ack[0] 
+            : "Sonuç açıklaması alınamadı"),
         TURKPOS_RETVAL_GUID: this.guid,
         TURKPOS_RETVAL_Islem_Tarih: new Date().toISOString(),
         TURKPOS_RETVAL_Dekont_ID: Array.isArray(result.Dekont_ID) && result.Dekont_ID.length > 0 
@@ -436,6 +442,7 @@ class ParamPosService {
         TURKPOS_RETVAL_Odeme_Tutari: params.amount.toString(),
         TURKPOS_RETVAL_Siparis_ID: initResponse.Siparis_ID,
         TURKPOS_RETVAL_Islem_ID: initResponse.Islem_ID,
+        TURKPOS_RETVAL_Islem_GUID: initResponse.Islem_GUID,
         UCD_URL: initResponse.UCD_URL,
         UCD_HTML: initResponse.UCD_HTML,
         UCD_MD: initResponse.UCD_MD,

@@ -5,8 +5,9 @@
 TP_WMD_UCD yanıtından şu değerleri almanız ve saklamanız gerekiyor:
 
 1. `Islem_ID`: 2224064075
-2. `UCD_MD`: eyJ2ZXJzaW9uIjoiMC4wMyIsImV4cGlyeSI6IjI4MDUiLCJnb1N0YW1wIjoiZXlKaGJHY2lPaUpJVXpVeE1pSjku...
-3. `Siparis_ID`: ORDER_1743547178690_fd597647
+2. `Islem_GUID`: 9529785b-d7c5-4df7-b5a4-50d55ca19fe1 (Çok önemli!)
+3. `UCD_MD`: eyJ2ZXJzaW9uIjoiMC4wMyIsImV4cGlyeSI6IjI4MDUiLCJnb1N0YW1wIjoiZXlKaGJHY2lPaUpJVXpVeE1pSjku...
+4. `Siparis_ID`: ORDER_1743547178690_fd597647
 
 ## TP_WMD_PAY İçin Yapılması Gerekenler
 
@@ -16,6 +17,7 @@ TP_WMD_UCD yanıtından şu değerleri almanız ve saklamanız gerekiyor:
 // Backendden dönen yanıt
 localStorage.setItem('param_ucd_md', 'eyJ2ZXJzaW9uIjoiMC4wMyIsImV4cGlyeSI6IjI4MDUiLCJnb1N0YW1wIjoiZXlKaGJHY2lPaUpJVXpVeE1pSjkuZXlKemRXSWlPaUl3TURBd01EQXdNREUwTVRJMU56UWlMQ0owYVcxbGIzVjBVMlZqYjI1a2N5STZORE15TURBd01EQXNJbkp2YkdWeklqb2lJaXdpWlhod0lqb3hOemcyTnpRM01UYzVmUS5JRG1vQ2dYT2FjVEF2R1FRVjgtYjVFdVY5TUV3MDhVTmFjRm4tNzNlVGJidG9TaW41MzNVdy1XYWVMNlVyOTBlcGNEcmlsVEpRWVA2a2JRX2xScWhxQSIsInRpbWUiOiIyMDI1MDQwMjAxMzkzOSIsIm1hYyI6IlBIVWhIQktVekpqeG9scDZKSVBYUVM3NTMwZ3RoUzE3Q1NXOVFPcllQdHhlOTNDbkxTeGRVL1REblAvZEFrVlFVTENkVURKYmI0UTdVK0Q5azlpLzlHWmtyeWhtbjc5MkNRYStyUlNoT2x2eitoS1krQkZveURRSEZ4aG1VUzA5LzkyZnR0enhJd1VDdEQ0Y2oxdFhqY3RuVlFkVTlQdm5LTUVlaWlEVnRrYUpES0RNNVVMNUVJczJVaEtNY3VQWnJQU0Z4a201b0VBNTU2ZTRjV1h4cnQ5bUNPUE1kLzdCcTFaemNkWUg3Y2FvNksyWC9JUXFBbkhxVmVWbHFUdlk2QlBiZTlNTDZScmEyN1U1OFFiOU91cE5UYXlFWHBuZFlKOGlyYXVOT2xXUjlRWHVvcmFFOWlWV1d5d0d0VFNDNEtDcXlLZDNUeTIxYkxucGV4aG5TQVx1MDAzZFx1MDAzZCIsImlkIjoiMDAxMjY1NGEzNjMyLWEyODItNDNkNi04ZDg0LWZkYzVkZDEwOWMzMyJ9');
 localStorage.setItem('param_islem_id', '2224064075');
+localStorage.setItem('param_islem_guid', '9529785b-d7c5-4df7-b5a4-50d55ca19fe1');
 localStorage.setItem('param_siparis_id', 'ORDER_1743547178690_fd597647');
 ```
 
@@ -27,11 +29,12 @@ const completePayment = async () => {
   // localStorage'dan verileri al
   const ucdMD = localStorage.getItem('param_ucd_md');
   const islemId = localStorage.getItem('param_islem_id');
+  const islemGuid = localStorage.getItem('param_islem_guid');
   const siparisId = localStorage.getItem('param_siparis_id');
   
-  console.log('Ödeme tamamlama için değerler:', { ucdMD, islemId, siparisId });
+  console.log('Ödeme tamamlama için değerler:', { ucdMD, islemId, islemGuid, siparisId });
 
-  if (!ucdMD || !islemId || !siparisId) {
+  if (!ucdMD || !islemId || !siparisId || !islemGuid) {
     console.error('Eksik ödeme bilgileri!');
     return;
   }
@@ -47,6 +50,7 @@ const completePayment = async () => {
       body: JSON.stringify({
         ucdMD,
         islemId,
+        islemGuid,
         siparisId
       })
     });
@@ -70,4 +74,4 @@ const completePayment = async () => {
 completePayment();
 ```
 
-**ÖNEMLİ NOKTA:** 3D Secure doğrulaması başarılı olsa bile, bu ikinci adım (TP_WMD_PAY) yapılmazsa karttan para çekilmez! Bu nedenle callback sayfanızda bu kodu mutlaka çalıştırmanız gerekiyor.
+**ÖNEMLİ NOKTA:** Param POS sistemi, TP_WMD_Pay isteğinde `Islem_GUID` parametresini bekliyor. Bu parametre, TP_WMD_UCD yanıtından dönen `Islem_GUID` değeri olmalıdır. 3D Secure doğrulaması başarılı olsa bile, bu ikinci adım (TP_WMD_PAY) doğru parametrelerle yapılmazsa karttan para çekilmez!

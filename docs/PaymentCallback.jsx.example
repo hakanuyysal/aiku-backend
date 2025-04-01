@@ -20,9 +20,10 @@ function PaymentCallback() {
         // Get the necessary data from localStorage
         const ucdMD = localStorage.getItem('param_ucd_md');
         const islemId = localStorage.getItem('param_islem_id');
+        const islemGuid = localStorage.getItem('param_islem_guid');
         const siparisId = localStorage.getItem('param_siparis_id');
         
-        console.log("PaymentCallback: Payment completion data:", { ucdMD, islemId, siparisId });
+        console.log("PaymentCallback: Payment completion data:", { ucdMD, islemId, islemGuid, siparisId });
         console.log("PaymentCallback: Auth token:", localStorage.getItem('auth_token'));
         
         if (!ucdMD || !islemId || !siparisId) {
@@ -38,6 +39,7 @@ function PaymentCallback() {
         const result = await paymentService.completePayment({
           ucdMD,
           islemId,
+          islemGuid,
           siparisId
         });
         
@@ -53,6 +55,7 @@ function PaymentCallback() {
           // Clean up payment data
           localStorage.removeItem('param_ucd_md');
           localStorage.removeItem('param_islem_id');
+          localStorage.removeItem('param_islem_guid');
           localStorage.removeItem('param_siparis_id');
           
           // Redirect to success page after 2 seconds
@@ -97,6 +100,7 @@ function PaymentCallback() {
   async function manualPaymentCompletion() {
     const ucdMD = localStorage.getItem('param_ucd_md');
     const islemId = localStorage.getItem('param_islem_id');
+    const islemGuid = localStorage.getItem('param_islem_guid');
     const siparisId = localStorage.getItem('param_siparis_id');
     
     if (!ucdMD || !islemId || !siparisId) {
@@ -112,6 +116,7 @@ function PaymentCallback() {
       body: JSON.stringify({
         ucdMD,
         islemId,
+        islemGuid,
         siparisId
       })
     });

@@ -17,16 +17,18 @@
 function checkLocalStorage() {
   const ucdMD = localStorage.getItem('param_ucd_md');
   const islemId = localStorage.getItem('param_islem_id');
+  const islemGuid = localStorage.getItem('param_islem_guid');
   const siparisId = localStorage.getItem('param_siparis_id');
   const authToken = localStorage.getItem('auth_token');
   
   console.log('LocalStorage Values:');
   console.log('- ucdMD:', ucdMD ? 'Found ✓' : 'MISSING ✗');
   console.log('- islemId:', islemId ? 'Found ✓' : 'MISSING ✗');
+  console.log('- islemGuid:', islemGuid ? 'Found ✓' : 'MISSING ✗');
   console.log('- siparisId:', siparisId ? 'Found ✓' : 'MISSING ✗');
   console.log('- auth_token:', authToken ? 'Found ✓' : 'MISSING ✗');
   
-  return { ucdMD, islemId, siparisId, authToken };
+  return { ucdMD, islemId, islemGuid, siparisId, authToken };
 }
 
 // Function to manually complete payment
@@ -35,9 +37,9 @@ async function manualCompletePayment() {
   console.log('MANUAL PAYMENT COMPLETION TOOL');
   console.log('------------------------------------');
   
-  const { ucdMD, islemId, siparisId, authToken } = checkLocalStorage();
+  const { ucdMD, islemId, islemGuid, siparisId, authToken } = checkLocalStorage();
   
-  if (!ucdMD || !islemId || !siparisId) {
+  if (!ucdMD || !islemId || !islemGuid || !siparisId) {
     console.error('❌ ERROR: Missing required payment data in localStorage');
     console.error('The payment cannot be completed without these values.');
     return false;
@@ -60,6 +62,7 @@ async function manualCompletePayment() {
       body: JSON.stringify({
         ucdMD,
         islemId,
+        islemGuid,
         siparisId
       })
     });

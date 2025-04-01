@@ -245,11 +245,17 @@ class ParamPosService {
     completePayment(params) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { ucdMD, islemId, siparisId } = params;
+                const { ucdMD, islemId, siparisId, islemGuid } = params;
+                
+                console.log("TP_WMD_Pay Request Params:", JSON.stringify(params, null, 2));
+                
                 if (!ucdMD || !islemId || !siparisId) {
                     throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
                 }
-                const transactionGuid = (0, uuid_1.v4)();
+                
+                // Eğer islemGuid yoksa, islemId kullan
+                const transactionId = islemGuid || islemId;
+                
                 const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
           <soap:Body>
@@ -261,7 +267,7 @@ class ParamPosService {
               </G>
               <GUID>${this.guid}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
-              <Islem_GUID>${transactionGuid}</Islem_GUID>
+              <Islem_GUID>${transactionId}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
             </TP_WMD_Pay>
           </soap:Body>
