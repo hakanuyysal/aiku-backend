@@ -1,0 +1,128 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+/**
+ * This component displays the payment success screen
+ * It shows payment details and allows the user to continue
+ */
+function PaymentSuccess() {
+  const [paymentData, setPaymentData] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Get payment data either from location state or from sessionStorage
+    const statePaymentData = location.state?.paymentData;
+    const storedPaymentData = sessionStorage.getItem('payment_result');
+    
+    console.log("PaymentSuccess: Location state:", location.state);
+    console.log("PaymentSuccess: Stored payment data:", storedPaymentData);
+    
+    if (statePaymentData) {
+      console.log("PaymentSuccess: Using state payment data");
+      setPaymentData(statePaymentData);
+    } else if (storedPaymentData) {
+      console.log("PaymentSuccess: Using stored payment data");
+      try {
+        setPaymentData(JSON.parse(storedPaymentData));
+      } catch (error) {
+        console.error("PaymentSuccess: Error parsing stored payment data:", error);
+      }
+    } else {
+      console.warn("PaymentSuccess: No payment data available");
+    }
+    
+    // Clean up storage
+    return () => {
+      sessionStorage.removeItem('payment_result');
+    };
+  }, [location]);
+
+  // Format the amount with TL currency
+  const formatAmount = (amount) => {
+    if (!amount) return '$0.00';
+    
+    // If amount contains comma, replace it with dot for parseFloat
+    const numericAmount = typeof amount === 'string' 
+      ? parseFloat(amount.replace(',', '.')) 
+      : amount;
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(numericAmount);
+  };
+
+  // Format the date
+  const formatDate = (dateString) => {
+    try {
+      const date = dateString ? new Date(dateString) : new Date();
+      return date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric'
+      });
+    } catch (error) {
+      console.error("PaymentSuccess: Error formatting date:", error);
+      return new Date().toLocaleDateString('en-US');
+    }
+  };
+
+  const handleContinue = () => {
+    navigate('/dashboard');
+  };
+
+  return (
+    <div className="payment-success-container">
+      <div className="success-header">
+        <div className="success-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+        </div>
+        <h1>Payment Successful!</h1>
+        <p>Thank you for your payment. Your subscription has been activated.</p>
+      </div>
+      
+      <div className="payment-details">
+        <h2>Payment Details</h2>
+        
+        <div className="detail-row">
+          <span className="label">Transaction ID:</span>
+          <span className="value">{paymentData?.TURKPOS_RETVAL_Islem_ID || location.state?.transactionId || 'N/A'}</span>
+        </div>
+        
+        <div className="detail-row">
+          <span className="label">Amount:</span>
+          <span className="value">{formatAmount(paymentData?.TURKPOS_RETVAL_Odeme_Tutari || location.state?.amount)}</span>
+        </div>
+        
+        <div className="detail-row">
+          <span className="label">Date:</span>
+          <span className="value">{formatDate(paymentData?.TURKPOS_RETVAL_Islem_Tarih)}</span>
+        </div>
+        
+        <div className="detail-row">
+          <span className="label">Payment Method:</span>
+          <span className="value">Credit Card</span>
+        </div>
+        
+        <div className="detail-row">
+          <span className="label">Status:</span>
+          <span className="value success">Completed</span>
+        </div>
+      </div>
+      
+      <div className="action-buttons">
+        <button className="primary-button" onClick={handleContinue}>
+          Continue to Dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default PaymentSuccess; 

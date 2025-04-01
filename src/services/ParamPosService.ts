@@ -310,6 +310,8 @@ class ParamPosService {
     try {
       const { ucdMD, islemId, siparisId } = params;
 
+      console.log("TP_WMD_Pay Request Params:", JSON.stringify(params, null, 2));
+
       if (!ucdMD || !islemId || !siparisId) {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
       }
@@ -345,6 +347,7 @@ class ParamPosService {
       console.log("TP_WMD_Pay Yanıtı:", response.data);
 
       const parsedResponse = await this.parseSoapResponse(response.data);
+      console.log("TP_WMD_Pay Ayrıştırılmış Yanıt:", JSON.stringify(parsedResponse, null, 2));
 
       if (
         !parsedResponse["TP_WMD_PayResponse"] ||
@@ -357,13 +360,15 @@ class ParamPosService {
       }
 
       const result = parsedResponse["TP_WMD_PayResponse"][0]["TP_WMD_PayResult"][0];
+      console.log("TP_WMD_Pay Sonuç:", JSON.stringify(result, null, 2));
 
       // Başarısız işlem kontrolü
-      if (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) === -1) {
+      if (result.Sonuc && (result.Sonuc[0] === "-1" || parseInt(result.Sonuc[0]) < 0)) {
+        console.error("TP_WMD_Pay Hata:", result.Sonuc_Str ? result.Sonuc_Str[0] : "Bilinmeyen hata");
         throw new Error(result.Sonuc_Str[0] || "Ödeme tamamlama işlemi başarısız");
       }
 
-      return {
+      const paymentResponse = {
         TURKPOS_RETVAL_Sonuc: parseInt(result.Sonuc[0]),
         TURKPOS_RETVAL_Sonuc_Str: result.Sonuc_Str[0],
         TURKPOS_RETVAL_GUID: this.guid,
@@ -374,6 +379,9 @@ class ParamPosService {
         TURKPOS_RETVAL_Siparis_ID: siparisId,
         TURKPOS_RETVAL_Islem_ID: islemId,
       };
+
+      console.log("TP_WMD_Pay İşlem Sonucu:", JSON.stringify(paymentResponse, null, 2));
+      return paymentResponse;
     } catch (error) {
       console.error("Ödeme tamamlama hatası:", error);
       if (error instanceof AxiosError && error.response) {

@@ -127,6 +127,8 @@ router.post('/complete-payment',
       const { ucdMD, islemId, siparisId } = req.body;
       
       console.log('3D ödeme tamamlama isteği:', { ucdMD, islemId, siparisId });
+      console.log('Kullanıcı bilgisi:', req.user);
+      console.log('Auth token var mı:', !!req.headers.authorization);
       
       // TP_WMD_Pay metodunu çağır
       const result = await ParamPosService.completePayment({
@@ -140,8 +142,11 @@ router.post('/complete-payment',
       // Kullanıcıyı bul ve ödeme geçmişini güncelle
       const user = req.user as IUser | undefined;
       if (user && user._id) {
+        console.log('Kullanıcı ID ile aranıyor:', user._id);
         const updatedUser = await User.findById(user._id);
+
         if (updatedUser) {
+          console.log('Kullanıcı bulundu, abonelik durumu güncelleniyor');
           // Abonelik durumunu aktif olarak güncelle
           updatedUser.subscriptionStatus = 'active';
           updatedUser.subscriptionStartDate = new Date();
@@ -159,15 +164,25 @@ router.post('/complete-payment',
           
           // Ödeme geçmişini güncelle
           if (!updatedUser.paymentHistory) updatedUser.paymentHistory = [];
+          
+          const paymentAmount = parseFloat(result.TURKPOS_RETVAL_Odeme_Tutari.replace(',', '.')) || 0;
+          console.log('Ödeme tutarı:', paymentAmount);
+          
           updatedUser.paymentHistory.push({
-            amount: parseFloat(result.TURKPOS_RETVAL_Odeme_Tutari) || 0,
+            amount: paymentAmount,
             date: new Date(),
             status: 'success',
             transactionId: result.TURKPOS_RETVAL_Islem_ID,
-            description: `3D Ödeme başarılı: ${result.TURKPOS_RETVAL_Odeme_Tutari || 0} TL, İşlem ID: ${result.TURKPOS_RETVAL_Islem_ID}`
+            description: `3D Ödeme başarılı: ${result.TURKPOS_RETVAL_Odeme_Tutari || '0'} TL, İşlem ID: ${result.TURKPOS_RETVAL_Islem_ID}`
           });
+          
           await updatedUser.save();
+          console.log('Kullanıcı bilgileri güncellendi');
+        } else {
+          console.log('Kullanıcı bulunamadı:', user._id);
         }
+      } else {
+        console.log('Kullanıcı bilgisi yok veya ID eksik');
       }
 
       res.status(200).json({

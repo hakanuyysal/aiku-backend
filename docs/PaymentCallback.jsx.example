@@ -1,0 +1,151 @@
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import paymentService from '../services/PaymentService';
+
+/**
+ * This component handles the callback after 3D Secure authentication
+ * It completes the payment by calling the complete-payment endpoint
+ */
+function PaymentCallback() {
+  const [status, setStatus] = useState('processing');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Function to complete the payment process
+    async function completePaymentProcess() {
+      try {
+        console.log("PaymentCallback: Starting payment completion process");
+        
+        // Get the necessary data from localStorage
+        const ucdMD = localStorage.getItem('param_ucd_md');
+        const islemId = localStorage.getItem('param_islem_id');
+        const siparisId = localStorage.getItem('param_siparis_id');
+        
+        console.log("PaymentCallback: Payment completion data:", { ucdMD, islemId, siparisId });
+        console.log("PaymentCallback: Auth token:", localStorage.getItem('auth_token'));
+        
+        if (!ucdMD || !islemId || !siparisId) {
+          console.error("PaymentCallback: Missing payment data!");
+          setStatus('error');
+          setError('Missing or invalid payment information. Please try again.');
+          return;
+        }
+        
+        // IMPORTANT: This call is required to complete the payment
+        // Without this, money will not be charged even if 3D authentication was successful
+        console.log("PaymentCallback: Calling completePayment API");
+        const result = await paymentService.completePayment({
+          ucdMD,
+          islemId,
+          siparisId
+        });
+        
+        console.log("PaymentCallback: Payment completion result:", result);
+        
+        if (result.success) {
+          // Payment successful
+          setStatus('success');
+          
+          // Store payment result for success page
+          sessionStorage.setItem('payment_result', JSON.stringify(result.data));
+          
+          // Clean up payment data
+          localStorage.removeItem('param_ucd_md');
+          localStorage.removeItem('param_islem_id');
+          localStorage.removeItem('param_siparis_id');
+          
+          // Redirect to success page after 2 seconds
+          setTimeout(() => {
+            navigate('/payment/success', { 
+              state: { 
+                paymentData: result.data,
+                transactionId: result.data.TURKPOS_RETVAL_Islem_ID,
+                amount: result.data.TURKPOS_RETVAL_Odeme_Tutari
+              } 
+            });
+          }, 2000);
+        } else {
+          // Payment error
+          console.error("PaymentCallback: Payment failed:", result.message);
+          setStatus('error');
+          setError(result.message || 'Payment could not be completed.');
+        }
+      } catch (error) {
+        console.error("PaymentCallback: Payment completion error:", error);
+        setStatus('error');
+        setError(error.message || 'An error occurred while completing the payment.');
+        
+        // Try manual completion if API call fails
+        try {
+          console.log("PaymentCallback: Trying manual fetch for payment completion");
+          const manualResult = await manualPaymentCompletion();
+          if (manualResult.success) {
+            setStatus('success');
+            setTimeout(() => navigate('/payment/success', { state: { paymentData: manualResult.data } }), 2000);
+          }
+        } catch (manualError) {
+          console.error("PaymentCallback: Manual completion also failed:", manualError);
+        }
+      }
+    }
+    
+    completePaymentProcess();
+  }, [navigate]);
+  
+  // Function for manual payment completion using fetch
+  async function manualPaymentCompletion() {
+    const ucdMD = localStorage.getItem('param_ucd_md');
+    const islemId = localStorage.getItem('param_islem_id');
+    const siparisId = localStorage.getItem('param_siparis_id');
+    
+    if (!ucdMD || !islemId || !siparisId) {
+      throw new Error('Missing payment data for manual completion');
+    }
+    
+    const response = await fetch('/api/payments/complete-payment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+      },
+      body: JSON.stringify({
+        ucdMD,
+        islemId,
+        siparisId
+      })
+    });
+    
+    return await response.json();
+  }
+  
+  return (
+    <div className="payment-callback-container">
+      <h1>Payment Processing</h1>
+      
+      {status === 'processing' && (
+        <div className="processing">
+          <p>Your payment is being processed, please wait...</p>
+          <div className="spinner"></div>
+        </div>
+      )}
+      
+      {status === 'success' && (
+        <div className="success">
+          <p>Your payment has been successfully completed!</p>
+          <p>You are being redirected to the confirmation page...</p>
+        </div>
+      )}
+      
+      {status === 'error' && (
+        <div className="error">
+          <p>An error occurred during the payment process:</p>
+          <p>{error}</p>
+          <button onClick={() => navigate('/payment')}>Try Again</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default PaymentCallback; 
