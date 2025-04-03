@@ -120,13 +120,14 @@ router.post('/complete-payment',
     body('ucdMD').isString().notEmpty().withMessage('UCD_MD değeri gereklidir'),
     body('islemId').isString().notEmpty().withMessage('İşlem ID değeri gereklidir'),
     body('siparisId').isString().notEmpty().withMessage('Sipariş ID değeri gereklidir'),
+    body('islemGuid').isString().withMessage('İşlem GUID değeri eksik olabilir'),
     validateRequest
   ],
   async (req: Request, res: Response) => {
     try {
-      const { ucdMD, islemId, siparisId } = req.body;
+      const { ucdMD, islemId, siparisId, islemGuid } = req.body;
       
-      console.log('3D ödeme tamamlama isteği:', { ucdMD, islemId, siparisId });
+      console.log('3D ödeme tamamlama isteği:', { ucdMD, islemId, siparisId, islemGuid });
       console.log('Kullanıcı bilgisi:', req.user);
       console.log('Auth token var mı:', !!req.headers.authorization);
       
@@ -134,7 +135,8 @@ router.post('/complete-payment',
       const result = await ParamPosService.completePayment({
         ucdMD,
         islemId,
-        siparisId
+        siparisId,
+        islemGuid
       });
       
       console.log('3D ödeme tamamlama sonucu:', result);

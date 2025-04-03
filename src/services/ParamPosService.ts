@@ -428,6 +428,13 @@ class ParamPosService {
       // İlk adım: 3D ekranını alma
       const initResponse = await this.initializePayment(params);
       
+      // Islem_GUID kontrolü yap
+      if (!initResponse.Islem_GUID) {
+        console.warn("TP_WMD_UCD yanıtında Islem_GUID bulunamadı! Bu, ödeme tamamlama adımında sorunlara neden olabilir.");
+      } else {
+        console.log("TP_WMD_UCD Islem_GUID:", initResponse.Islem_GUID);
+      }
+      
       // Hangi içerik dönmüşse onu kullan (UCD_HTML veya UCD_URL)
       const redirectContent = initResponse.UCD_HTML || initResponse.UCD_URL || "";
       
