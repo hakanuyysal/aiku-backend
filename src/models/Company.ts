@@ -10,6 +10,7 @@ export interface ICompany extends Document {
   companySector: string;
   companySize: '1-10' | '11-50' | '51-200' | '201-500' | '501-1000' | '1001-5000' | '5001-10000' | '10001+';
   businessScale: 'Micro' | 'Small' | 'Medium' | 'Large';
+  fundSize?: string;
   companyEmail: string;
   companyPhone: string;
   companyInfo: string;
@@ -68,6 +69,10 @@ const companySchema = new Schema<ICompany>(
       required: [true, 'Company size is required'],
       enum: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001-10000', '10001+'],
     },
+    fundSize: {
+      type: String,
+      trim: true,
+    },    
     businessScale: {
       type: String,
       required: true,
@@ -86,6 +91,7 @@ const companySchema = new Schema<ICompany>(
       required: [true, 'Company phone is required'],
       trim: true,
       match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'],
+      set: (value: string) => value.replace(/\s+/g, ''),
     },
     companyInfo: {
       type: String,

@@ -274,6 +274,8 @@ export const sendMessage = async (req: Request, res: Response) => {
       'companyName companyLogo'
     );
 
+    console.log("Emitting message to room: chat-" + chatSessionId, "Message:", populatedMessage);
+
     // Socket.io ile gerçek zamanlı bildirim gönder
     // 1. Sohbet odasına mesaj gönder
     io.to(`chat-${chatSessionId}`).emit('new-message', populatedMessage);

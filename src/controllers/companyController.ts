@@ -16,6 +16,7 @@ interface CompanyResponse {
   companySector: string;
   companySize: string;
   businessScale: string;
+  fundSize?: string;
   companyEmail: string;
   companyPhone: string;
   companyInfo: string;
@@ -52,6 +53,7 @@ export const getAllCompanies = async (req: Request, res: Response) => {
       companySector: company.companySector,
       companySize: company.companySize,
       businessScale: company.businessScale,
+      fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
       companyInfo: company.companyInfo,
@@ -108,6 +110,7 @@ export const createCompany = async (req: Request, res: Response) => {
       companySector,
       companySize,
       businessScale,
+      fundSize,
       companyEmail,
       companyPhone,
       companyInfo,
@@ -130,6 +133,7 @@ export const createCompany = async (req: Request, res: Response) => {
       companySector,
       companySize,
       businessScale,
+      fundSize,
       companyEmail,
       companyPhone,
       companyInfo,
@@ -154,6 +158,7 @@ export const createCompany = async (req: Request, res: Response) => {
       companySector: company.companySector,
       companySize: company.companySize,
       businessScale: company.businessScale,
+      fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
       companyInfo: company.companyInfo,
@@ -198,6 +203,7 @@ export const getCompany = async (req: Request, res: Response) => {
       companySector: company.companySector,
       companySize: company.companySize,
       businessScale: company.businessScale,
+      fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
       companyInfo: company.companyInfo,
@@ -250,6 +256,7 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
       companySector: company.companySector,
       companySize: company.companySize,
       businessScale: company.businessScale,
+      fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
       companyInfo: company.companyInfo,
@@ -311,6 +318,7 @@ export const updateCompany = async (req: Request, res: Response) => {
       companySector,
       companySize,
       businessScale,
+      fundSize,
       companyEmail,
       companyPhone,
       companyInfo,
@@ -333,6 +341,7 @@ export const updateCompany = async (req: Request, res: Response) => {
     if (companySector) company.companySector = companySector;
     if (companySize) company.companySize = companySize;
     if (businessScale) company.businessScale = businessScale;
+    if (fundSize) company.fundSize = fundSize;
     if (companyEmail) company.companyEmail = companyEmail;
     if (companyPhone) company.companyPhone = companyPhone;
     if (companyInfo) company.companyInfo = companyInfo;
@@ -357,6 +366,7 @@ export const updateCompany = async (req: Request, res: Response) => {
       companySector: company.companySector,
       companySize: company.companySize,
       businessScale: company.businessScale,
+      fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
       companyInfo: company.companyInfo,

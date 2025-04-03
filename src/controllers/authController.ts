@@ -116,7 +116,7 @@ export const register = async (req: Request, res: Response) => {
   } catch (err) {
     res.status(500).json({
       success: false,
-      message: "Sunucu hatası",
+      message: "Server error",
     });
   }
 };
@@ -137,7 +137,7 @@ export const login = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Geçersiz email veya şifre",
+        message: "Invalid email or password.",
       });
     }
 
@@ -145,7 +145,7 @@ export const login = async (req: Request, res: Response) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: "Geçersiz email veya şifre",
+        message: "Invalid email or password.",
       });
     }
 
@@ -201,7 +201,7 @@ export const login = async (req: Request, res: Response) => {
   } catch (err) {
     res.status(500).json({
       success: false,
-      message: "Sunucu hatası",
+      message: "Server error",
     });
   }
 };
@@ -213,7 +213,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Oturum açmanız gerekiyor",
+        message: "You need to sign in",
       });
     }
 
@@ -245,7 +245,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         subscriptionStatus: user.subscriptionStatus,
         subscriptionStartDate: user.subscriptionStartDate,
         trialEndsAt: user.trialEndsAt,
-        // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
+        // ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
         subscriptionPlan: user.subscriptionPlan,
         subscriptionPeriod: user.subscriptionPeriod,
         subscriptionAmount: user.subscriptionAmount,
@@ -260,10 +260,10 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error("Kullanıcı bilgileri alınırken hata:", err);
+    console.error("Error while getting user information:", err);
     res.status(500).json({
       success: false,
-      message: "Kullanıcı bilgileri alınırken bir hata oluştu",
+      message: "An error occurred while retrieving user information.",
       error: err.message,
     });
   }
@@ -276,7 +276,7 @@ export const updateUser = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: "Oturum açmanız gerekiyor",
+        message: "You need to sign in.",
       });
     }
 
@@ -324,7 +324,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: "Kullanıcı bilgileri başarıyla güncellendi",
+      message: "User information updated successfully!",
       user: {
         id: user._id,
         firstName: user.firstName,
@@ -344,10 +344,10 @@ export const updateUser = async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error("Kullanıcı güncelleme hatası:", err);
+    console.error("User update error:", err);
     res.status(500).json({
       success: false,
-      message: "Kullanıcı bilgileri güncellenirken bir hata oluştu",
+      message: "An error occurred while updating user information.",
       error: err.message,
     });
   }
@@ -361,7 +361,7 @@ export const getUserById = async (req: Request, res: Response) => {
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, message: "Kullanıcı bulunamadı" });
+        .json({ success: false, message: "User not found" });
     }
 
     const hasActiveSubscription =
@@ -391,7 +391,6 @@ export const getUserById = async (req: Request, res: Response) => {
         subscriptionStatus: user.subscriptionStatus,
         subscriptionStartDate: user.subscriptionStartDate,
         trialEndsAt: user.trialEndsAt,
-        // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
         subscriptionPlan: user.subscriptionPlan,
         subscriptionPeriod: user.subscriptionPeriod,
         subscriptionAmount: user.subscriptionAmount,
@@ -408,7 +407,7 @@ export const getUserById = async (req: Request, res: Response) => {
   } catch (err: any) {
     res
       .status(500)
-      .json({ success: false, message: "Sunucu hatası", error: err.message });
+      .json({ success: false, message: "Server error", error: err.message });
   }
 };
 
@@ -418,7 +417,7 @@ export const addFavorite = async (req: Request, res: Response) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Yetkilendirme başarısız, token bulunamadı",
+        message: "Authorization failed, token not found.",
       });
     }
 
@@ -427,7 +426,7 @@ export const addFavorite = async (req: Request, res: Response) => {
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, message: "Kullanıcı bulunamadı" });
+        .json({ success: false, message: "User not found" });
     }
 
     const { type, itemId } = req.body;
@@ -473,7 +472,7 @@ export const addFavorite = async (req: Request, res: Response) => {
   } catch (err: any) {
     res
       .status(500)
-      .json({ success: false, message: "Sunucu hatası", error: err.message });
+      .json({ success: false, message: "Server error", error: err.message });
   }
 };
 
@@ -483,7 +482,7 @@ export const removeFavorite = async (req: Request, res: Response) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Yetkilendirme başarısız, token bulunamadı",
+        message: "Authorization failed, token not found.",
       });
     }
 
@@ -492,7 +491,7 @@ export const removeFavorite = async (req: Request, res: Response) => {
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, message: "Kullanıcı bulunamadı" });
+        .json({ success: false, message: "User not found" });
     }
 
     const { type, itemId } = req.body;
@@ -528,7 +527,7 @@ export const removeFavorite = async (req: Request, res: Response) => {
   } catch (err: any) {
     res
       .status(500)
-      .json({ success: false, message: "Sunucu hatası", error: err.message });
+      .json({ success: false, message: "Server error", error: err.message });
   }
 };
 
@@ -538,7 +537,7 @@ export const getFavorites = async (req: Request, res: Response) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Yetkilendirme başarısız, token bulunamadı",
+        message: "Authorization failed, token not found.",
       });
     }
 
@@ -551,7 +550,7 @@ export const getFavorites = async (req: Request, res: Response) => {
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, message: "Kullanıcı bulunamadı" });
+        .json({ success: false, message: "User not found" });
     }
 
     user.favoriteUsers = (user.favoriteUsers || []).filter((fav) => fav);
@@ -567,7 +566,7 @@ export const getFavorites = async (req: Request, res: Response) => {
   } catch (err: any) {
     res
       .status(500)
-      .json({ success: false, message: "Sunucu hatası", error: err.message });
+      .json({ success: false, message: "Server error", error: err.message });
   }
 };
 
@@ -576,7 +575,7 @@ export const googleCallback = async (req: Request, res: Response) => {
     console.log("[GoogleCallback] Callback başladı");
 
     if (!req.user) {
-      console.error("[GoogleCallback] Kullanıcı bulunamadı");
+      console.error("[GoogleCallback] User not found");
       return res.redirect(
         `${process.env.CLIENT_URL}/auth/login?error=google-user-not-found`
       );
@@ -628,13 +627,12 @@ export const googleCallback = async (req: Request, res: Response) => {
 
 export const fixSubscription = async (req: Request, res: Response) => {
   try {
-    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
     const userId = req.user?._id;
 
     if (!userId) {
       return res.status(401).json({
         success: false,
-        message: "Oturum açmanız gerekiyor",
+        message: "You need to sign in",
       });
     }
 
@@ -643,7 +641,7 @@ export const fixSubscription = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Kullanıcı bulunamadı",
+        message: "User not found",
       });
     }
 
@@ -674,7 +672,7 @@ export const fixSubscription = async (req: Request, res: Response) => {
       // Güncellemeler varsa kaydet
       if (updated) {
         await user.save();
-        console.log("Kullanıcı abonelik durumu güncellendi:", {
+        console.log("User subscription status updated:", {
           userId: user._id,
           status: user.subscriptionStatus,
           isActive: user.isSubscriptionActive,
@@ -723,7 +721,7 @@ export const fixSubscription = async (req: Request, res: Response) => {
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: "Abonelik durumu kontrol edilirken bir hata oluştu",
+      message: "An error occurred while checking subscription status",
       error: error.message,
     });
   }
@@ -739,7 +737,7 @@ export const createOrUpdateSubscription = async (
     if (!userId) {
       return res.status(401).json({
         success: false,
-        message: "Oturum açmanız gerekiyor",
+        message: "You need to sign in",
       });
     }
 
@@ -747,7 +745,7 @@ export const createOrUpdateSubscription = async (
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Kullanıcı bulunamadı",
+        message: "User not found",
       });
     }
 
@@ -756,7 +754,7 @@ export const createOrUpdateSubscription = async (
     if (!plan || !period || !paymentMethod) {
       return res.status(400).json({
         success: false,
-        message: "Plan, dönem ve ödeme yöntemi gereklidir",
+        message: "Plan, term and payment method required.",
       });
     }
 
@@ -764,7 +762,7 @@ export const createOrUpdateSubscription = async (
     if (paymentMethod === "creditCard" && !cardId) {
       return res.status(400).json({
         success: false,
-        message: "Kredi kartı ödemesi için kart bilgisi gereklidir",
+        message: "Card information is required for credit card payment.",
       });
     }
 
@@ -772,7 +770,7 @@ export const createOrUpdateSubscription = async (
     if (!["startup", "business", "investor"].includes(plan)) {
       return res.status(400).json({
         success: false,
-        message: "Geçersiz plan türü",
+        message: "Invalid plan type",
       });
     }
 
@@ -780,7 +778,7 @@ export const createOrUpdateSubscription = async (
     if (!["monthly", "yearly"].includes(period)) {
       return res.status(400).json({
         success: false,
-        message: "Geçersiz dönem türü",
+        message: "Invalid period type",
       });
     }
 
@@ -896,7 +894,7 @@ export const createOrUpdateSubscription = async (
   } catch (err: any) {
     res.status(500).json({
       success: false,
-      message: "Abonelik işlemi sırasında bir hata oluştu",
+      message: "An error occurred during the subscription process",
       error: err.message,
     });
   }
@@ -910,7 +908,7 @@ export const checkAndRenewTrialSubscriptions = async (
 ) => {
   try {
     // Sadece admin kullanıcısına izin ver
-    // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
+    // ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
     const userId = req.user?._id;
     const user = await User.findById(userId);
     if (!user || user.role !== "admin") {
@@ -1066,7 +1064,7 @@ export const googleLogin = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: error.message,
-      details: "Sunucu hatası",
+      details: "Server error",
       errorCode: 500,
     });
   }
