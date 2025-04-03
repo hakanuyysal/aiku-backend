@@ -133,7 +133,7 @@ const billingInfoSchema = new Schema<IBillingInfo>({
     required: [true, 'Email alanı zorunludur'],
     trim: true,
     lowercase: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Lütfen geçerli bir email adresi giriniz']
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.[A-Za-z]{2,})+$/, 'Lütfen geçerli bir email adresi giriniz']
   },
   
   // Fatura tercihleri
