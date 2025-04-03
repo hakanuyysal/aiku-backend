@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { processPayment, getPaymentHistory, recordFreePayment } from "../controllers/paymentController";
+import { processPayment, getPaymentHistory, recordFreePayment, addPaymentMethod, getPaymentMethods, deletePaymentMethod, updateDefaultPaymentMethod } from "../controllers/paymentController";
 import { body } from 'express-validator';
 import { protect } from '../middleware/auth';
 import { validateRequest } from '../middleware/validateRequest';
@@ -248,5 +248,45 @@ router.post('/record-free-payment',
  * @access  Private
  */
 router.get("/history", protect, getPaymentHistory);
+
+/**
+ * @route   POST /api/payments/methods
+ * @desc    Yeni ödeme yöntemi (kart) ekler
+ * @access  Private
+ */
+router.post("/methods", 
+  protect,
+  [
+    body('cardHolderName').isString().notEmpty().withMessage('Kart sahibi adı gereklidir'),
+    body('cardNumber').isString().isLength({ min: 16, max: 16 }).withMessage('Geçerli bir kart numarası giriniz'),
+    body('expireMonth').isString().isLength({ min: 2, max: 2 }).withMessage('Geçerli bir son kullanma ayı giriniz'),
+    body('expireYear').isString().isLength({ min: 4, max: 4 }).withMessage('Geçerli bir son kullanma yılı giriniz (YYYY)'),
+    body('cvc').isString().isLength({ min: 3, max: 3 }).withMessage('Geçerli bir CVC giriniz'),
+    body('isDefault').isBoolean().optional().withMessage('isDefault değeri boolean olmalıdır'),
+    validateRequest
+  ],
+  addPaymentMethod
+);
+
+/**
+ * @route   GET /api/payments/methods
+ * @desc    Kullanıcının kayıtlı ödeme yöntemlerini getirir
+ * @access  Private
+ */
+router.get("/methods", protect, getPaymentMethods);
+
+/**
+ * @route   DELETE /api/payments/methods/:cardId
+ * @desc    Kullanıcının kayıtlı ödeme yöntemini siler
+ * @access  Private
+ */
+router.delete("/methods/:cardId", protect, deletePaymentMethod);
+
+/**
+ * @route   PUT /api/payments/methods/:cardId/default
+ * @desc    Kullanıcının varsayılan ödeme yöntemini günceller
+ * @access  Private
+ */
+router.put("/methods/:cardId/default", protect, updateDefaultPaymentMethod);
 
 export default router;
