@@ -211,3 +211,42 @@ export const processPayment = async (
     });
   }
 };
+
+/**
+ * Kullanıcının ödeme geçmişini getirir
+ */
+export const getPaymentHistory = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor",
+      });
+    }
+
+    const user = await User.findById(userId).select("paymentHistory");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user.paymentHistory || [],
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Ödeme geçmişi alınırken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};

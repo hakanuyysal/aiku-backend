@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { processPayment } from "../controllers/paymentController";
+import { processPayment, getPaymentHistory } from "../controllers/paymentController";
 import { body } from 'express-validator';
 import { protect } from '../middleware/auth';
 import { validateRequest } from '../middleware/validateRequest';
@@ -221,5 +221,12 @@ router.post('/complete-payment',
     }
   }
 );
+
+/**
+ * @route   GET /api/payments/history
+ * @desc    Kullanıcının ödeme geçmişini getirir
+ * @access  Private
+ */
+router.get("/history", protect, getPaymentHistory);
 
 export default router;
