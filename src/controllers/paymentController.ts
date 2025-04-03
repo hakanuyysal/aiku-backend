@@ -213,6 +213,132 @@ export const processPayment = async (
 };
 
 /**
+ * Ücretsiz abonelik için ödeme bilgisini kaydeder
+ */
+export const recordFreePayment = async (
+  req: express.Request,
+  res: express.Response
+) => {
+  try {
+    const userId = req.user?._id;
+    
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Oturum açmanız gerekiyor"
+      });
+    }
+    
+    const { 
+      amount, 
+      description, 
+      planName, 
+      billingCycle, 
+      originalPrice, 
+      billingInfo,
+      isFirstPayment,
+      paymentDate
+    } = req.body;
+
+    // Kullanıcıyı bul
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı"
+      });
+    }
+    
+    // Plan tipini belirle
+    let subscriptionPlan: 'startup' | 'business' | 'investor' | null = null;
+    if (planName.toLowerCase().includes('startup')) {
+      subscriptionPlan = 'startup';
+    } else if (planName.toLowerCase().includes('business')) {
+      subscriptionPlan = 'business';
+    } else if (planName.toLowerCase().includes('investor')) {
+      subscriptionPlan = 'investor';
+    }
+    
+    // Abonelik periyodunu belirle
+    const subscriptionPeriod = billingCycle === 'monthly' ? 'monthly' : 'yearly';
+    
+    // Abonelik durumunu güncelle
+    user.subscriptionPlan = subscriptionPlan;
+    user.subscriptionPeriod = subscriptionPeriod;
+    user.subscriptionStatus = 'active';
+    user.subscriptionStartDate = new Date(paymentDate) || new Date();
+    user.isSubscriptionActive = true;
+    user.lastPaymentDate = new Date(paymentDate) || new Date();
+    
+    // Bir sonraki ödeme tarihini belirle
+    const nextPaymentDate = new Date(paymentDate) || new Date();
+    if (subscriptionPeriod === 'monthly') {
+      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+    } else {
+      nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + 1);
+    }
+    user.nextPaymentDate = nextPaymentDate;
+    
+    // İlk abonelik ise ve startup planı ise trial durumunu ayarla
+    if (isFirstPayment && subscriptionPlan === 'startup') {
+      const subscriptionPlans = SubscriptionService.getSubscriptionPlans();
+      const planPricing = subscriptionPeriod ? 
+        subscriptionPlans.startup.pricing[subscriptionPeriod] : 
+        null;
+      
+      const hasTrial = planPricing && "isFirstTimeOnly" in planPricing && planPricing.isFirstTimeOnly;
+      const trialPeriod = planPricing && "trialPeriod" in planPricing ? planPricing.trialPeriod : 3;
+      
+      if (hasTrial) {
+        user.subscriptionStatus = "trial";
+        const trialEndDate = new Date(paymentDate) || new Date();
+        trialEndDate.setMonth(trialEndDate.getMonth() + trialPeriod);
+        user.trialEndsAt = trialEndDate;
+        user.nextPaymentDate = trialEndDate;
+      }
+    }
+    
+    // Ödeme geçmişine ekle
+    if (!user.paymentHistory) user.paymentHistory = [];
+    user.paymentHistory.push({
+      amount: amount || 0,
+      date: new Date(paymentDate) || new Date(),
+      status: 'success',
+      transactionId: `free-${Date.now()}`,
+      description: description || `Ücretsiz abonelik: ${planName}`,
+      plan: subscriptionPlan || undefined,
+      period: subscriptionPeriod
+    });
+    
+    // Değişiklikleri kaydet
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        subscription: {
+          plan: user.subscriptionPlan,
+          period: user.subscriptionPeriod,
+          status: user.subscriptionStatus,
+          startDate: user.subscriptionStartDate,
+          trialEndsAt: user.trialEndsAt,
+          nextPaymentDate: user.nextPaymentDate,
+          isSubscriptionActive: user.isSubscriptionActive
+        },
+        paymentHistory: user.paymentHistory[user.paymentHistory.length - 1]
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Ücretsiz abonelik kaydı sırasında bir hata oluştu",
+      error: (error as Error).message,
+    });
+  }
+};
+
+/**
  * Kullanıcının ödeme geçmişini getirir
  */
 export const getPaymentHistory = async (

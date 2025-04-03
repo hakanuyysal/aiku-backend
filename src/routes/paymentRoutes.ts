@@ -1,5 +1,5 @@
 import express, { Request, Response } from "express";
-import { processPayment, getPaymentHistory } from "../controllers/paymentController";
+import { processPayment, getPaymentHistory, recordFreePayment } from "../controllers/paymentController";
 import { body } from 'express-validator';
 import { protect } from '../middleware/auth';
 import { validateRequest } from '../middleware/validateRequest';
@@ -220,6 +220,26 @@ router.post('/complete-payment',
       });
     }
   }
+);
+
+/**
+ * @route   POST /api/payments/record-free-payment
+ * @desc    Ücretsiz abonelik için ödeme kaydı oluşturur
+ * @access  Private
+ */
+router.post('/record-free-payment', 
+  protect,
+  [
+    body('amount').isNumeric().withMessage('Geçerli bir tutar giriniz'),
+    body('description').isString().notEmpty().withMessage('Açıklama gereklidir'),
+    body('planName').isString().notEmpty().withMessage('Plan adı gereklidir'),
+    body('billingCycle').isIn(['monthly', 'yearly']).withMessage('Geçerli bir fatura dönemi giriniz'),
+    body('originalPrice').optional().isNumeric().withMessage('Geçerli bir orijinal fiyat giriniz'),
+    body('isFirstPayment').optional().isBoolean().withMessage('İlk ödeme bilgisi geçerli değil'),
+    body('paymentDate').optional().isISO8601().toDate().withMessage('Geçerli bir tarih formatı giriniz'),
+    validateRequest
+  ],
+  recordFreePayment
 );
 
 /**
