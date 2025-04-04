@@ -314,7 +314,15 @@ class ParamPosService {
     try {
       const { ucdMD, islemId, siparisId, islemGuid } = params;
 
-      console.log("TP_WMD_Pay Request Params:", JSON.stringify(params, null, 2));
+      console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
+        ucdMD,
+        islemId,
+        siparisId,
+        islemGuid,
+        clientCode: this.clientCode,
+        clientUsername: this.clientUsername,
+        guid: process.env.PARAM_GUID
+      });
 
       if (!ucdMD || !islemId || !siparisId) {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
