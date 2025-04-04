@@ -322,15 +322,12 @@ class ParamPosService {
         islemGuid,
         clientCode: this.clientCode,
         clientUsername: this.clientUsername,
-        guid: accountGuid || process.env.PARAM_GUID
+        guid: accountGuid
       });
 
-      if (!ucdMD || !islemId || !siparisId) {
+      if (!ucdMD || !islemId || !siparisId || !islemGuid || !accountGuid) {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
       }
-
-      // Eğer islemGuid yoksa, islemId kullan
-      const transactionId = islemGuid || islemId;
 
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -341,9 +338,9 @@ class ParamPosService {
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <GUID>${accountGuid || process.env.PARAM_GUID}</GUID>
+              <GUID>${accountGuid}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
-              <Islem_GUID>${transactionId}</Islem_GUID>
+              <Islem_GUID>${islemGuid}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
             </TP_WMD_Pay>
           </soap:Body>
