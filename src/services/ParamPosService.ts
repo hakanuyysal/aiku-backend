@@ -316,8 +316,37 @@ class ParamPosService {
       const { ucdMD, islemId, siparisId, islemGuid } = params;
       const STATIC_GUID = "1B52D752-1980-4835-A0EC-30E3CB1077A5";
 
+      console.log("Callback'ten gelen parametreler:", {
+        raw_ucdMD: ucdMD,
+        ucdMD_length: ucdMD.length,
+        ucdMD_prefix: ucdMD.substring(0, 10),
+        islemId,
+        siparisId,
+        islemGuid
+      });
+
+      // UCD_MD formatını kontrol et ve düzelt
+      let formattedUcdMD = ucdMD;
+      if (!ucdMD.startsWith('5209')) {
+        // Base64 decode edip tekrar kontrol et
+        try {
+          const decodedMD = Buffer.from(ucdMD, 'base64').toString('utf-8');
+          console.log("Base64 decode edilmiş UCD_MD:", decodedMD);
+          if (decodedMD.startsWith('5209')) {
+            formattedUcdMD = decodedMD;
+          }
+        } catch (error) {
+          console.error("UCD_MD decode hatası:", error);
+        }
+
+        if (!formattedUcdMD.startsWith('5209')) {
+          console.error("Hatalı UCD_MD formatı:", ucdMD);
+          throw new Error("Geçersiz UCD_MD formatı. 5209 ile başlamalıdır.");
+        }
+      }
+
       console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
-        ucdMD,
+        ucdMD: formattedUcdMD,
         islemId,
         siparisId,
         islemGuid,
@@ -326,7 +355,7 @@ class ParamPosService {
         guid: STATIC_GUID
       });
 
-      if (!ucdMD || !islemId || !siparisId || !islemGuid) {
+      if (!formattedUcdMD || !islemId || !siparisId || !islemGuid) {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
       }
 
@@ -340,7 +369,7 @@ class ParamPosService {
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
               <GUID>${STATIC_GUID}</GUID>
-              <UCD_MD>${ucdMD}</UCD_MD>
+              <UCD_MD>${formattedUcdMD}</UCD_MD>
               <Islem_GUID>${islemGuid}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
             </TP_WMD_Pay>
