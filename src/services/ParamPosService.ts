@@ -324,7 +324,7 @@ class ParamPosService {
       const transactionId = islemGuid || islemId;
 
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+        <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Body>
             <TP_WMD_Pay xmlns="https://turkpos.com.tr/">
               <G>
@@ -332,7 +332,7 @@ class ParamPosService {
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <GUID>${this.guid}</GUID>
+              <GUID>${process.env.PARAM_GUID}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
               <Islem_GUID>${transactionId}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
