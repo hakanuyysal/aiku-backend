@@ -114,7 +114,7 @@ export class LinkedInService {
       email: userInfo.email,
       picture: userInfo.picture,
       locale: userInfo.locale,
-      emailVerified: userInfo.email_verified,
+      emailVerified: true,
       linkedinUrl: `https://www.linkedin.com/in/${userInfo.sub}/`,
     };
   }

@@ -25,7 +25,7 @@ export class GoogleService {
           googleUserInfo.given_name || googleUserInfo.email?.split("@")[0],
         lastName: googleUserInfo.family_name || "",
         email: googleUserInfo.email,
-        emailVerified: googleUserInfo.email_verified,
+        emailVerified: true,
         authProvider: "google",
         lastLogin: new Date(),
         googleId: googleUserInfo.sub,
