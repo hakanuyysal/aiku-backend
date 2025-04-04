@@ -110,7 +110,7 @@ export const register = async (req: Request, res: Response) => {
       subscriptionStatus: user.subscriptionStatus,
       subscriptionStartDate: user.subscriptionStartDate,
       trialEndsAt: user.trialEndsAt,
-      subscriptionPlan: user.subscriptionPlan,
+      subscriptionPlan: user.subscriptionPlan || undefined,
       subscriptionPeriod: user.subscriptionPeriod,
       subscriptionAmount: user.subscriptionAmount,
       autoRenewal: user.autoRenewal,
@@ -277,8 +277,7 @@ export const login = async (req: Request, res: Response) => {
       subscriptionStatus: user.subscriptionStatus,
       subscriptionStartDate: user.subscriptionStartDate,
       trialEndsAt: user.trialEndsAt,
-      // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
-      subscriptionPlan: user.subscriptionPlan,
+      subscriptionPlan: user.subscriptionPlan || undefined,
       subscriptionPeriod: user.subscriptionPeriod,
       subscriptionAmount: user.subscriptionAmount,
       autoRenewal: user.autoRenewal,
@@ -343,8 +342,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         subscriptionStatus: user.subscriptionStatus,
         subscriptionStartDate: user.subscriptionStartDate,
         trialEndsAt: user.trialEndsAt,
-        // ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
-        subscriptionPlan: user.subscriptionPlan,
+        subscriptionPlan: user.subscriptionPlan || undefined,
         subscriptionPeriod: user.subscriptionPeriod,
         subscriptionAmount: user.subscriptionAmount,
         autoRenewal: user.autoRenewal,
