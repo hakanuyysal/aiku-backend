@@ -10,7 +10,7 @@ class MailgunService {
     const apiKey = process.env.MAILGUN_API_KEY || "";
     console.log("API Key:", apiKey);
     console.log("Domain:", process.env.MAILGUN_DOMAIN);
-    
+
     const mailgun = new Mailgun(formData);
     this.mailgun = mailgun.client({
       username: "api",
@@ -25,18 +25,18 @@ class MailgunService {
     email: string,
     verificationToken: string
   ): Promise<void> {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    const verificationUrl = `${process.env.FRONTEND_URL}/api/auth/verify-email/${verificationToken}`;
     console.log("Preparing to send verification email to:", email);
     console.log("Verification URL:", verificationUrl);
 
     const messageData = {
-      from: `AIKU <postmaster@${this.domain}>`,
+      from: `AIKU AI Platform <postmaster@${this.domain}>`,
       to: email,
-      subject: "AIKU AI Platform - Email Verification",
+      subject: "Email Verification",
       template: "email-verification",
-      't:variables': JSON.stringify({
-        verification_url: verificationUrl
-      })
+      "t:variables": JSON.stringify({
+        verification_url: verificationUrl,
+      }),
     };
 
     console.log("Email message data:", messageData);
@@ -44,7 +44,10 @@ class MailgunService {
     try {
       console.log("Attempting to send email via Mailgun...");
       console.log("Using domain:", this.domain);
-      console.log("Using API key:", this.mailgun.apiKey ? "Present" : "Missing");
+      console.log(
+        "Using API key:",
+        this.mailgun.apiKey ? "Present" : "Missing"
+      );
       const result = await this.mailgun.messages.create(
         this.domain,
         messageData
