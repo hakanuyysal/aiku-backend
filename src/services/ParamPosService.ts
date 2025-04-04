@@ -55,6 +55,7 @@ interface CompletePaymentParams {
   islemId: string;
   siparisId: string;
   islemGuid?: string;
+  accountGuid?: string;
 }
 
 class ParamPosService {
@@ -312,7 +313,7 @@ class ParamPosService {
   // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
   async completePayment(params: CompletePaymentParams): Promise<PaymentResponse> {
     try {
-      const { ucdMD, islemId, siparisId, islemGuid } = params;
+      const { ucdMD, islemId, siparisId, islemGuid, accountGuid } = params;
 
       console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
         ucdMD,
@@ -321,7 +322,7 @@ class ParamPosService {
         islemGuid,
         clientCode: this.clientCode,
         clientUsername: this.clientUsername,
-        guid: process.env.PARAM_GUID
+        guid: accountGuid || process.env.PARAM_GUID
       });
 
       if (!ucdMD || !islemId || !siparisId) {
@@ -340,7 +341,7 @@ class ParamPosService {
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <GUID>${process.env.PARAM_GUID}</GUID>
+              <GUID>${accountGuid || process.env.PARAM_GUID}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
               <Islem_GUID>${transactionId}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
