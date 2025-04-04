@@ -239,6 +239,14 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
+    // Email doğrulaması kontrolü
+    if (!user.emailVerified) {
+      return res.status(401).json({
+        success: false,
+        message: "This email is not verified. Please verify your email before login.",
+      });
+    }
+
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({
