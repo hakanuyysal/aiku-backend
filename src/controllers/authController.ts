@@ -153,7 +153,9 @@ export const verifyEmail = async (req: Request, res: Response) => {
     }
 
     user.emailVerified = true;
+    // @ts-ignore
     user.emailVerificationToken = undefined;
+    // @ts-ignore
     user.emailVerificationExpires = undefined;
     await user.save();
 

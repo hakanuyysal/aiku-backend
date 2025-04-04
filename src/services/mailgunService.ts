@@ -1,4 +1,5 @@
 import formData from "form-data";
+// @ts-expect-error - mailgun.js modülü için tip tanımlamaları eksik
 import Mailgun from "mailgun.js";
 
 class MailgunService {
