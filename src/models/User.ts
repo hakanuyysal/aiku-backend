@@ -21,6 +21,8 @@ export interface IUser extends Document {
   supabaseId?: string; // Supabase ID
   supabaseMetadata?: any; // Supabase meta verileri
   emailVerified: boolean;
+  emailVerificationToken: string;
+  emailVerificationExpires: Date;
   locale?: {
     country: string;
     language: string;
@@ -165,6 +167,14 @@ const userSchema = new Schema<IUser>({
   emailVerified: {
     type: Boolean,
     default: false
+  },
+  emailVerificationToken: {
+    type: String,
+    select: false
+  },
+  emailVerificationExpires: {
+    type: Date,
+    select: false
   },
   locale: {
     country: { type: String },

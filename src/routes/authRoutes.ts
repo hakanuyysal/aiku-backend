@@ -15,6 +15,8 @@ import {
   checkAndRenewTrialSubscriptions,
   googleLogin,
   logout,
+  verifyEmail,
+  resendVerificationEmail,
 } from "../controllers/authController";
 import { protect, optionalSupabaseToken } from "../middleware/auth";
 import { verifySupabaseToken } from "../middleware/supabaseAuth";
@@ -227,5 +229,11 @@ router.post("/linkedin", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// E-posta doğrulama rotaları
+router.get("/verify-email/:token", verifyEmail);
+router.post("/resend-verification", [
+  check("email", "Lütfen geçerli bir email adresi giriniz").isEmail(),
+], resendVerificationEmail);
 
 export default router;

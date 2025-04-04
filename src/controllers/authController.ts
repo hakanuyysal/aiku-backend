@@ -8,6 +8,8 @@ import { IUser, User } from "../models/User";
 import { UserResponse } from "../types/UserResponse";
 import { authService } from "../services/authService";
 import { GoogleService } from "../services/googleService";
+import crypto from "crypto";
+import { mailgunService } from "../services/mailgunService";
 
 const createToken = (id: string): string => {
   // @ts-expect-error - JWT sign işlemi için expiresIn tipi uyumsuzluğunu görmezden geliyoruz
@@ -50,6 +52,10 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
+    // E-posta doğrulama tokeni oluştur
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+
     user = await User.create({
       firstName,
       lastName,
@@ -65,7 +71,17 @@ export const register = async (req: Request, res: Response) => {
       facebook,
       twitter,
       authProvider: "email",
+      emailVerificationToken: verificationToken,
+      emailVerificationExpires: verificationExpires,
     });
+
+    // Doğrulama e-postası gönder
+    try {
+      await mailgunService.sendVerificationEmail(email, verificationToken);
+    } catch (error) {
+      console.error("Doğrulama e-postası gönderilemedi:", error);
+      // E-posta gönderilemese bile kullanıcı kaydını tamamla
+    }
 
     const token = createToken(user._id);
 
@@ -94,7 +110,6 @@ export const register = async (req: Request, res: Response) => {
       subscriptionStatus: user.subscriptionStatus,
       subscriptionStartDate: user.subscriptionStartDate,
       trialEndsAt: user.trialEndsAt,
-      // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
       subscriptionPlan: user.subscriptionPlan,
       subscriptionPeriod: user.subscriptionPeriod,
       subscriptionAmount: user.subscriptionAmount,
@@ -113,6 +128,87 @@ export const register = async (req: Request, res: Response) => {
       token,
       user: userResponse,
     });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz veya süresi dolmuş doğrulama bağlantısı",
+      });
+    }
+
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "E-posta adresiniz başarıyla doğrulandı",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+export const resendVerificationEmail = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı",
+      });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Bu e-posta adresi zaten doğrulanmış",
+      });
+    }
+
+    // Yeni doğrulama tokeni oluştur
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+
+    user.emailVerificationToken = verificationToken;
+    user.emailVerificationExpires = verificationExpires;
+    await user.save();
+
+    // Yeni doğrulama e-postası gönder
+    try {
+      await mailgunService.sendVerificationEmail(email, verificationToken);
+      res.json({
+        success: true,
+        message: "Doğrulama e-postası tekrar gönderildi",
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: "Doğrulama e-postası gönderilemedi",
+      });
+    }
   } catch (err) {
     res.status(500).json({
       success: false,
