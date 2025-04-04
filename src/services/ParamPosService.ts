@@ -313,7 +313,8 @@ class ParamPosService {
   // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
   async completePayment(params: CompletePaymentParams): Promise<PaymentResponse> {
     try {
-      const { ucdMD, islemId, siparisId, islemGuid, accountGuid } = params;
+      const { ucdMD, islemId, siparisId, islemGuid } = params;
+      const STATIC_GUID = "1B52D752-1980-4835-A0EC-30E3CB1077A5";
 
       console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
         ucdMD,
@@ -322,10 +323,10 @@ class ParamPosService {
         islemGuid,
         clientCode: this.clientCode,
         clientUsername: this.clientUsername,
-        guid: accountGuid
+        guid: STATIC_GUID
       });
 
-      if (!ucdMD || !islemId || !siparisId || !islemGuid || !accountGuid) {
+      if (!ucdMD || !islemId || !siparisId || !islemGuid) {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
       }
 
@@ -338,7 +339,7 @@ class ParamPosService {
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <GUID>${accountGuid}</GUID>
+              <GUID>${STATIC_GUID}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
               <Islem_GUID>${islemGuid}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
