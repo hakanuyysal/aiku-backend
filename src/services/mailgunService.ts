@@ -1,9 +1,22 @@
 import formData from "form-data";
-// @ts-expect-error - mailgun.js modülü için tip tanımlamaları eksik
 import Mailgun from "mailgun.js";
 
+// Global tip tanımlaması
+declare global {
+  interface MailgunClient {
+    messages: {
+      create(domain: string, data: any): Promise<any>;
+    };
+    apiKey?: string;
+  }
+
+  interface MailgunConstructor {
+    client(config: { username: string; key: string; url: string }): MailgunClient;
+  }
+}
+
 class MailgunService {
-  private mailgun: any;
+  private mailgun: MailgunClient;
   private domain: string;
 
   constructor() {
