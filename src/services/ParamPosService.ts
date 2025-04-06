@@ -52,7 +52,7 @@ interface PaymentParams {
 
 interface CompletePaymentParams {
   ucdMD: string;
-  islemId: string;
+  islemId?: string;
   siparisId: string;
   islemGuid?: string;
   accountGuid?: string;
@@ -321,31 +321,32 @@ class ParamPosService {
   // İkinci adım: 3D doğrulama sonrası TP_WMD_Pay isteği yapma
   async completePayment(params: CompletePaymentParams): Promise<PaymentResponse> {
     try {
-      const { ucdMD, islemId, siparisId, islemGuid } = params;
-      const STATIC_GUID = "1B52D752-1980-4835-A0EC-30E3CB1077A5";
-
-      // MD değerini detaylı logla - Bu değer genellikle kartın ilk 6 hanesi ile başlar
-      console.log("3D Doğrulama Sonrası MD Değeri:", ucdMD);
+      const { ucdMD, siparisId, islemGuid } = params;
       
-      // Eğer MD değeri varsa ve bir string ise, ilk 6 karakterini ayrıca loglayalım
-      if (ucdMD && typeof ucdMD === 'string' && ucdMD.length >= 6) {
-        console.log("Kart İlk 6 Hane:", ucdMD.substring(0, 6));
-      }
-
       console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
         ucdMD,
-        islemId,
+        islemId: params.islemId, // Loglama için gösteriyoruz ancak kullanmıyoruz
         siparisId,
         islemGuid,
         clientCode: this.clientCode,
         clientUsername: this.clientUsername,
-        guid: STATIC_GUID
+        guid: this.guid
       });
-
-      if (!ucdMD || !islemId || !siparisId || !islemGuid) {
+      
+      if (!ucdMD || !siparisId) {
         throw new Error("Ödeme tamamlama için gerekli parametreler eksik");
       }
-
+      
+      // islemGuid yoksa boş string kullan
+      const transactionId = islemGuid || "";
+      
+      console.log("3D Doğrulama Sonrası MD Değeri:", ucdMD);
+      
+      // MD değerinin ilk 6 hanesi genellikle kart numarasının başlangıcı olabilir
+      if (typeof ucdMD === 'string' && ucdMD.length >= 6) {
+        console.log("Kart İlk 6 Hane:", ucdMD.substring(0, 6));
+      }
+      
       const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
         <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Body>
@@ -355,14 +356,14 @@ class ParamPosService {
                 <CLIENT_USERNAME>${this.clientUsername}</CLIENT_USERNAME>
                 <CLIENT_PASSWORD>${this.clientPassword}</CLIENT_PASSWORD>
               </G>
-              <GUID>${STATIC_GUID}</GUID>
+              <GUID>${this.guid}</GUID>
               <UCD_MD>${ucdMD}</UCD_MD>
-              <Islem_GUID>${islemGuid}</Islem_GUID>
+              <Islem_GUID>${transactionId}</Islem_GUID>
               <Siparis_ID>${siparisId}</Siparis_ID>
             </TP_WMD_Pay>
           </soap:Body>
         </soap:Envelope>`;
-
+      
       console.log("TP_WMD_Pay İsteği:", soapEnvelope);
 
       const response = await axios.post(this.baseUrl, soapEnvelope, {
@@ -428,7 +429,7 @@ class ParamPosService {
           ? result.Odeme_Tutari[0] 
           : "0",
         TURKPOS_RETVAL_Siparis_ID: siparisId,
-        TURKPOS_RETVAL_Islem_ID: islemId,
+        TURKPOS_RETVAL_Islem_ID: params.islemId || "", // Response için islemId'yi tutuyoruz
       };
 
       console.log("TP_WMD_Pay İşlem Sonucu:", JSON.stringify(paymentResponse, null, 2));
