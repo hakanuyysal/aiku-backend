@@ -10,66 +10,6 @@ const router = express.Router();
 
 router.post("/pay", processPayment);
 
-// Banka 3D doğrulama sonrası callback endpoint'i
-router.post("/callback", async (req: Request, res: Response) => {
-  try {
-    console.log("3D Secure Callback'ten gelen veriler:", req.body);
-    
-    // Callback'ten gelen md değerini al
-    const { md, orderId, islemGUID } = req.body;
-    
-    if (!md || !orderId) {
-      console.error("Eksik callback parametreleri:", req.body);
-      return res.status(400).send("Eksik parametreler");
-    }
-    
-    // Callback sonrası kullanıcının göreceği HTML sayfasını döndür
-    // Bu sayfada otomatik olarak tamamlama API'si çağrılacak
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Ödeme İşleniyor</title>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-          .loading { display: inline-block; width: 50px; height: 50px; border: 3px solid rgba(0,0,0,.3);
-                    border-radius: 50%; border-top-color: #333; animation: spin 1s ease-in-out infinite; }
-          @keyframes spin { to { transform: rotate(360deg); } }
-        </style>
-      </head>
-      <body>
-        <h2>Ödeme İşleniyor</h2>
-        <p>Lütfen bekleyin, işleminiz tamamlanıyor...</p>
-        <div class="loading"></div>
-        
-        <script>
-          // Callback sayfası yüklendiğinde otomatik olarak tamamlama işlemini yap
-          window.onload = function() {
-            // Callback'ten gelen md değerini localStorage'a kaydet
-            localStorage.setItem('param_callback_md', '${md}');
-            localStorage.setItem('param_siparis_id', '${orderId}');
-            
-            // islemGUID varsa, onu da kaydet
-            ${islemGUID ? `localStorage.setItem('param_islem_guid', '${islemGUID}');` : ''}
-            
-            // 1 saniye bekleyip sayfayı payment/callback frontend adresine yönlendir
-            setTimeout(function() {
-              window.location.href = '/payment/callback';
-            }, 1000);
-          };
-        </script>
-      </body>
-      </html>
-    `);
-    
-  } catch (error) {
-    console.error("3D Secure Callback hatası:", error);
-    res.status(500).send("Ödeme işlenirken bir hata oluştu");
-  }
-});
-
 router.post('/process-payment',
   protect,
   [
@@ -187,17 +127,13 @@ router.post('/complete-payment',
     try {
       const { ucdMD, islemId, siparisId, islemGuid } = req.body;
       
-      // Callback'ten gelen md değerini kontrol et ve kullan
-      // localStorage'daki callback_md değeri varsa, onu kullan (öncelikli)
-      const callbackMD = req.body.callbackMD || ucdMD;
-      
-      console.log('3D ödeme tamamlama isteği:', { callbackMD, ucdMD, islemId, siparisId, islemGuid });
+      console.log('3D ödeme tamamlama isteği:', { ucdMD, islemId, siparisId, islemGuid });
       console.log('Kullanıcı bilgisi:', req.user);
       console.log('Auth token var mı:', !!req.headers.authorization);
       
       // TP_WMD_Pay metodunu çağır
       const result = await ParamPosService.completePayment({
-        ucdMD: callbackMD, // Callback'ten gelen md değerini kullan
+        ucdMD,
         islemId,
         siparisId,
         islemGuid
