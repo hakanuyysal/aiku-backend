@@ -204,6 +204,14 @@ class ParamPosService {
         ipAddress = "127.0.0.1",
       } = params;
 
+      // Kart numarasının ilk 6 hanesini güvenli şekilde logla
+      if (cardNumber && cardNumber.length >= 6) {
+        console.log("Kart BIN Numarası (İlk 6 Hane):", cardNumber.substring(0, 6));
+      }
+
+      // Başarılı URL'ini logla
+      console.log("3D İşlemi için Başarılı URL:", this.successUrl);
+
       const orderId = `ORDER_${Date.now()}_${uuidv4().substring(0, 8)}`;
       const totalAmount = await this.calculateCommission(amount, installment);
       const hash = this.calculateHash({
@@ -315,6 +323,14 @@ class ParamPosService {
     try {
       const { ucdMD, islemId, siparisId, islemGuid } = params;
       const STATIC_GUID = "1B52D752-1980-4835-A0EC-30E3CB1077A5";
+
+      // MD değerini detaylı logla - Bu değer genellikle kartın ilk 6 hanesi ile başlar
+      console.log("3D Doğrulama Sonrası MD Değeri:", ucdMD);
+      
+      // Eğer MD değeri varsa ve bir string ise, ilk 6 karakterini ayrıca loglayalım
+      if (ucdMD && typeof ucdMD === 'string' && ucdMD.length >= 6) {
+        console.log("Kart İlk 6 Hane:", ucdMD.substring(0, 6));
+      }
 
       console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
         ucdMD,
@@ -441,6 +457,20 @@ class ParamPosService {
       } else {
         console.log("TP_WMD_UCD Islem_GUID:", initResponse.Islem_GUID);
       }
+      
+      // UCD_MD değerini logla - Bu, 3D yönlendirmeyle ilgili önemli bir bilgidir
+      if (initResponse.UCD_MD) {
+        console.log("3D Yönlendirme MD Değeri:", initResponse.UCD_MD);
+        // MD değeri genelde kart numarasının ilk 6 hanesiyle başlar
+        if (typeof initResponse.UCD_MD === 'string' && initResponse.UCD_MD.length >= 6) {
+          console.log("3D MD değerindeki kart bilgisi (ilk 6):", initResponse.UCD_MD.substring(0, 6));
+        }
+      }
+      
+      // 3D yönlendirme URL'ini veya HTML'ini logla
+      console.log("3D Yönlendirme içeriği tipi:", 
+        initResponse.UCD_HTML ? "HTML" : 
+        initResponse.UCD_URL ? "URL" : "Bilinmiyor");
       
       // Hangi içerik dönmüşse onu kullan (UCD_HTML veya UCD_URL)
       const redirectContent = initResponse.UCD_HTML || initResponse.UCD_URL || "";
