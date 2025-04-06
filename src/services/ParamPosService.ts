@@ -52,7 +52,6 @@ interface PaymentParams {
 
 interface CompletePaymentParams {
   ucdMD: string;
-  islemId?: string;
   siparisId: string;
   islemGuid?: string;
   accountGuid?: string;
@@ -325,7 +324,6 @@ class ParamPosService {
       
       console.log("TP_WMD_Pay Başlangıç - Tüm Parametreler:", {
         ucdMD,
-        islemId: params.islemId, // Loglama için gösteriyoruz ancak kullanmıyoruz
         siparisId,
         islemGuid,
         clientCode: this.clientCode,
@@ -429,7 +427,7 @@ class ParamPosService {
           ? result.Odeme_Tutari[0] 
           : "0",
         TURKPOS_RETVAL_Siparis_ID: siparisId,
-        TURKPOS_RETVAL_Islem_ID: params.islemId || "", // Response için islemId'yi tutuyoruz
+        TURKPOS_RETVAL_Islem_ID: "" // Boş string döndür
       };
 
       console.log("TP_WMD_Pay İşlem Sonucu:", JSON.stringify(paymentResponse, null, 2));
