@@ -22,6 +22,9 @@ interface PaymentResponse {
   UCD_MD?: string;
   isRedirect?: boolean;
   html?: string;
+  status?: string;
+  success?: boolean;
+  message?: string;
 }
 
 interface InitializePaymentResponse {
@@ -35,6 +38,9 @@ interface InitializePaymentResponse {
   Sonuc_Str: string;
   Banka_Sonuc_Kod?: string;
   isRedirect: boolean;
+  status?: string;
+  success?: boolean;
+  message?: string;
 }
 
 interface PaymentParams {
@@ -306,7 +312,10 @@ class ParamPosService {
         Sonuc: parseInt(result.Sonuc[0]),
         Sonuc_Str: result.Sonuc_Str ? result.Sonuc_Str[0] : "",
         Banka_Sonuc_Kod: result.Banka_Sonuc_Kod ? result.Banka_Sonuc_Kod[0] : undefined,
-        isRedirect: true // Her zaman 3D olduğu için her zaman yönlendirme yapılacak
+        isRedirect: true,
+        status: parseInt(result.Sonuc[0]) > 0 ? "pending_3d" : "failure",
+        success: parseInt(result.Sonuc[0]) > 0,
+        message: parseInt(result.Sonuc[0]) > 0 ? "3D doğrulama bekliyor" : (result.Sonuc_Str ? result.Sonuc_Str[0] : "")
       };
     } catch (error) {
       console.error("Ödeme başlatma hatası:", error);
@@ -338,7 +347,7 @@ class ParamPosService {
       // islemGuid yoksa boş string kullan
       const transactionId = islemGuid || "";
       
-      console.log("3D Doğrulama Sonrası MD Değeri:", ucdMD);
+      //console.log("3D Doğrulama Sonrası MD Değeri:", ucdMD);
       
       // MD değerinin ilk 6 hanesi genellikle kart numarasının başlangıcı olabilir
       if (typeof ucdMD === 'string' && ucdMD.length >= 6) {
@@ -427,7 +436,15 @@ class ParamPosService {
           ? result.Odeme_Tutari[0] 
           : "0",
         TURKPOS_RETVAL_Siparis_ID: siparisId,
-        TURKPOS_RETVAL_Islem_ID: "" // Boş string döndür
+        TURKPOS_RETVAL_Islem_ID: "", // Boş string döndür
+        // Frontend için açık durum bilgisi ekle
+        status: Array.isArray(result.Sonuc) && parseInt(result.Sonuc[0]) > 0 ? "success" : "failure",
+        success: Array.isArray(result.Sonuc) && parseInt(result.Sonuc[0]) > 0 ? true : false,
+        message: Array.isArray(result.Sonuc_Str) && result.Sonuc_Str.length > 0 
+          ? result.Sonuc_Str[0] 
+          : (Array.isArray(result.Sonuc_Ack) && result.Sonuc_Ack.length > 0 
+            ? result.Sonuc_Ack[0] 
+            : "")
       };
 
       console.log("TP_WMD_Pay İşlem Sonucu:", JSON.stringify(paymentResponse, null, 2));
@@ -490,7 +507,13 @@ class ParamPosService {
         UCD_HTML: initResponse.UCD_HTML,
         UCD_MD: initResponse.UCD_MD,
         isRedirect: true,
-        html: redirectContent
+        html: redirectContent,
+        // Frontend için durum bilgisi ekle - İlk aşama 0'dan büyük ise başarılı
+        status: initResponse.Sonuc > 0 ? "pending_3d" : "failure",
+        success: initResponse.Sonuc > 0,
+        message: initResponse.Sonuc > 0 
+          ? "3D doğrulama bekliyor" 
+          : initResponse.Sonuc_Str
       };
       
       // Not: Burada ikinci adım olan completePayment() metodu kullanıcı 3D sayfasını 
