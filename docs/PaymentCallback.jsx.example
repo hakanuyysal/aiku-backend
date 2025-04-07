@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import paymentService from '../services/PaymentService';
 
 /**
@@ -10,143 +10,76 @@ function PaymentCallback() {
   const [status, setStatus] = useState('processing');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    // Function to complete the payment process
-    async function completePaymentProcess() {
+    // URL'den parametreleri al
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status');
+    const data = params.get('data');
+    const message = params.get('message');
+
+    if (status === 'success' && data) {
       try {
-        console.log("PaymentCallback: Starting payment completion process");
+        // JSON verisini parse et
+        const paymentData = JSON.parse(decodeURIComponent(data));
+        console.log('Ödeme başarılı:', paymentData);
         
-        // Get the necessary data from localStorage
-        const ucdMD = localStorage.getItem('param_ucd_md');
-        const islemId = localStorage.getItem('param_islem_id');
-        const islemGuid = localStorage.getItem('param_islem_guid');
-        const siparisId = localStorage.getItem('param_siparis_id');
+        // Başarılı durumu göster
+        setStatus('success');
         
-        console.log("PaymentCallback: Payment completion data:", { ucdMD, islemId, islemGuid, siparisId });
-        console.log("PaymentCallback: Auth token:", localStorage.getItem('auth_token'));
+        // Ödeme verilerini sessionStorage'a kaydet
+        sessionStorage.setItem('payment_result', JSON.stringify(paymentData));
         
-        if (!ucdMD || !islemId || !siparisId) {
-          console.error("PaymentCallback: Missing payment data!");
-          setStatus('error');
-          setError('Missing or invalid payment information. Please try again.');
-          return;
-        }
-        
-        // IMPORTANT: This call is required to complete the payment
-        // Without this, money will not be charged even if 3D authentication was successful
-        console.log("PaymentCallback: Calling completePayment API");
-        const result = await paymentService.completePayment({
-          ucdMD,
-          islemId,
-          islemGuid,
-          siparisId
-        });
-        
-        console.log("PaymentCallback: Payment completion result:", result);
-        
-        if (result.success) {
-          // Payment successful
-          setStatus('success');
-          
-          // Store payment result for success page
-          sessionStorage.setItem('payment_result', JSON.stringify(result.data));
-          
-          // Clean up payment data
-          localStorage.removeItem('param_ucd_md');
-          localStorage.removeItem('param_islem_id');
-          localStorage.removeItem('param_islem_guid');
-          localStorage.removeItem('param_siparis_id');
-          
-          // Redirect to success page after 2 seconds
-          setTimeout(() => {
-            navigate('/payment/success', { 
-              state: { 
-                paymentData: result.data,
-                transactionId: result.data.TURKPOS_RETVAL_Islem_ID,
-                amount: result.data.TURKPOS_RETVAL_Odeme_Tutari
-              } 
-            });
-          }, 2000);
-        } else {
-          // Payment error
-          console.error("PaymentCallback: Payment failed:", result.message);
-          setStatus('error');
-          setError(result.message || 'Payment could not be completed.');
-        }
+        // 2 saniye sonra başarılı sayfasına yönlendir
+        setTimeout(() => {
+          navigate('/payment/success', { 
+            state: { 
+              paymentData,
+              transactionId: paymentData.TURKPOS_RETVAL_Islem_ID,
+              amount: paymentData.TURKPOS_RETVAL_Odeme_Tutari
+            } 
+          });
+        }, 2000);
       } catch (error) {
-        console.error("PaymentCallback: Payment completion error:", error);
+        console.error('Veri işleme hatası:', error);
         setStatus('error');
-        setError(error.message || 'An error occurred while completing the payment.');
-        
-        // Try manual completion if API call fails
-        try {
-          console.log("PaymentCallback: Trying manual fetch for payment completion");
-          const manualResult = await manualPaymentCompletion();
-          if (manualResult.success) {
-            setStatus('success');
-            setTimeout(() => navigate('/payment/success', { state: { paymentData: manualResult.data } }), 2000);
-          }
-        } catch (manualError) {
-          console.error("PaymentCallback: Manual completion also failed:", manualError);
-        }
+        setError('Ödeme verileri işlenirken bir hata oluştu.');
       }
+    } else if (status === 'error') {
+      console.error('Ödeme hatası:', message);
+      setStatus('error');
+      setError(message || 'Ödeme işlemi sırasında bir hata oluştu.');
+    } else {
+      // Eğer status ve data yoksa, backend'e yönlendir
+      const apiUrl = 'https://api.aikuaiplatform.com/api/payments/callback';
+      window.location.href = apiUrl;
     }
-    
-    completePaymentProcess();
-  }, [navigate]);
-  
-  // Function for manual payment completion using fetch
-  async function manualPaymentCompletion() {
-    const ucdMD = localStorage.getItem('param_ucd_md');
-    const islemId = localStorage.getItem('param_islem_id');
-    const islemGuid = localStorage.getItem('param_islem_guid');
-    const siparisId = localStorage.getItem('param_siparis_id');
-    
-    if (!ucdMD || !islemId || !siparisId) {
-      throw new Error('Missing payment data for manual completion');
-    }
-    
-    const response = await fetch('/api/payments/complete-payment', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-      },
-      body: JSON.stringify({
-        ucdMD,
-        islemId,
-        islemGuid,
-        siparisId
-      })
-    });
-    
-    return await response.json();
-  }
-  
+  }, [location, navigate]);
+
   return (
     <div className="payment-callback-container">
-      <h1>Payment Processing</h1>
+      <h1>Ödeme İşlemi</h1>
       
       {status === 'processing' && (
         <div className="processing">
-          <p>Your payment is being processed, please wait...</p>
+          <p>Ödeme işleminiz tamamlanıyor, lütfen bekleyin...</p>
           <div className="spinner"></div>
         </div>
       )}
       
       {status === 'success' && (
         <div className="success">
-          <p>Your payment has been successfully completed!</p>
-          <p>You are being redirected to the confirmation page...</p>
+          <p>Ödeme işleminiz başarıyla tamamlandı!</p>
+          <p>Yönlendiriliyorsunuz...</p>
         </div>
       )}
       
       {status === 'error' && (
         <div className="error">
-          <p>An error occurred during the payment process:</p>
+          <p>Ödeme işlemi sırasında bir hata oluştu:</p>
           <p>{error}</p>
-          <button onClick={() => navigate('/payment')}>Try Again</button>
+          <button onClick={() => navigate('/payment')}>Tekrar Deneyin</button>
         </div>
       )}
     </div>

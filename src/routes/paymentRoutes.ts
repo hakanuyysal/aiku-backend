@@ -224,6 +224,45 @@ router.post('/complete-payment',
   }
 );
 
+// 3D Secure callback endpoint'i
+router.post('/callback', async (req: Request, res: Response) => {
+  try {
+    console.log('3D Secure callback verileri (body):', req.body);
+    console.log('3D Secure callback verileri (query):', req.query);
+    
+    // Banka tarafından gönderilen verileri al
+    const { md, mdStatus, orderId, transactionAmount, islemGUID, islemHash, bankResult } = req.body;
+    
+    // mdStatus kontrolü
+    if (mdStatus !== '1') {
+      console.error('3D Secure doğrulaması başarısız:', { mdStatus, bankResult });
+      throw new Error(`3D Secure doğrulaması başarısız: ${bankResult || 'Bilinmeyen hata'}`);
+    }
+    
+    // Ödemeyi tamamla
+    const result = await ParamPosService.completePayment({
+      ucdMD: md, // Bankadan gelen md değeri
+      siparisId: orderId, // Bankadan gelen orderId değeri
+      islemGuid: islemGUID // Bankadan gelen islemGUID değeri
+    });
+    
+    console.log('Ödeme tamamlama sonucu:', result);
+    
+    // Sonuca göre frontend'e yönlendir
+    const frontendUrl = process.env.FRONTEND_URL || 'https://aikuaiplatform.com';
+    const redirectUrl = `${frontendUrl}/payment/callback?status=${result.TURKPOS_RETVAL_Sonuc === 1 ? 'success' : 'error'}&data=${encodeURIComponent(JSON.stringify(result))}`;
+    
+    // Başarılı yanıt döndür ve frontend'e yönlendir
+    res.redirect(redirectUrl);
+  } catch (error) {
+    console.error('Callback hatası:', error);
+    
+    // Hata durumunda frontend'e yönlendir
+    const frontendUrl = process.env.FRONTEND_URL || 'https://aikuaiplatform.com';
+    res.redirect(`${frontendUrl}/payment/callback?status=error&message=${encodeURIComponent((error as Error).message)}`);
+  }
+});
+
 /**
  * @route   POST /api/payments/record-free-payment
  * @desc    Ücretsiz abonelik için ödeme kaydı oluşturur
