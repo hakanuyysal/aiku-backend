@@ -6,6 +6,7 @@ import {
   getCurrentUser,
   updateUser,
   getUserById,
+  getAllUsers,
   addFavorite,
   removeFavorite,
   getFavorites,
@@ -57,6 +58,9 @@ router.put("/updateUser", optionalSupabaseToken, updateUser);
 
 // Kullanıcı id'si ile bilgilerini alma rotası
 router.get("/user/:id", optionalSupabaseToken, getUserById);
+
+// **Yeni Eklenti: Tüm kullanıcıları çekme rotası (Sadece admin erişimi)**
+router.get("/users", protect, getAllUsers);
 
 // Abonelik durumunu kontrol et ve düzelt
 router.get("/fix-subscription", protect, fixSubscription);

@@ -33,4 +33,5 @@ export interface UserResponse {
   billingAddress?: string;
   vatNumber?: string;
   isSubscriptionActive?: boolean;
+  isAngelInvestor?: boolean;
 } 

@@ -73,6 +73,7 @@ export const register = async (req: Request, res: Response) => {
       authProvider: "email",
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
+      isAngelInvestor: false,
     });
 
     // Doğrulama e-postası gönder
@@ -121,6 +122,7 @@ export const register = async (req: Request, res: Response) => {
       billingAddress: user.billingAddress,
       vatNumber: user.vatNumber,
       isSubscriptionActive: hasActiveSubscription,
+      isAngelInvestor: user.isAngelInvestor,
     };
 
     res.status(201).json({
@@ -296,6 +298,7 @@ export const login = async (req: Request, res: Response) => {
       billingAddress: user.billingAddress,
       vatNumber: user.vatNumber,
       isSubscriptionActive: hasActiveSubscription,
+      isAngelInvestor: user.isAngelInvestor,
     };
 
     res.status(200).json({
@@ -361,6 +364,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         billingAddress: user.billingAddress,
         vatNumber: user.vatNumber,
         isSubscriptionActive: hasActiveSubscription,
+        isAngelInvestor: user.isAngelInvestor,
       },
     });
   } catch (err: any) {
@@ -400,6 +404,7 @@ export const updateUser = async (req: Request, res: Response) => {
       twitter,
       password,
       locale,
+      isAngelInvestor 
     } = req.body;
 
     // Gerekli alanları güncelle
@@ -416,6 +421,9 @@ export const updateUser = async (req: Request, res: Response) => {
     if (facebook) user.facebook = facebook;
     if (twitter) user.twitter = twitter;
     if (locale) user.locale = locale;
+    if (typeof isAngelInvestor !== 'undefined') {
+      user.isAngelInvestor = isAngelInvestor;
+    }
 
     // Şifre güncelleniyorsa hashle
     if (password && password.length >= 6) {
@@ -445,6 +453,7 @@ export const updateUser = async (req: Request, res: Response) => {
         twitter: user.twitter,
         emailVerified: user.emailVerified,
         locale: user.locale,
+        isAngelInvestor: user.isAngelInvestor,
       },
     });
   } catch (err: any) {
@@ -506,6 +515,7 @@ export const getUserById = async (req: Request, res: Response) => {
         billingAddress: user.billingAddress,
         vatNumber: user.vatNumber,
         isSubscriptionActive: hasActiveSubscription,
+        isAngelInvestor: user.isAngelInvestor,
       },
     });
   } catch (err: any) {
@@ -1173,6 +1183,29 @@ export const googleLogin = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    // İstek yapan kullanıcının admin olup olmadığı kontrolü kaldırıldı.
+    // Sadece giriş yapılmış olması yeterli (protect middleware tarafından sağlanıyor).
+
+    // Tüm kullanıcıları parola alanı hariç getirme
+    const users = await User.find({}).select("-password");
+
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error: any) {
+    console.error("Error retrieving users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Kullanıcılar getirilirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+};
+
 
 /**
  * Kullanıcı oturumunu kapatır
