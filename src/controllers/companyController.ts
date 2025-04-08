@@ -13,7 +13,7 @@ interface CompanyResponse {
   companyType: string;
   openForInvestments?: boolean;
   businessModel: string;
-  companySector: string;
+  companySector: string[];
   companySize: string;
   businessScale: string;
   fundSize?: string;

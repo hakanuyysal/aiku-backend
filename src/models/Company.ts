@@ -7,7 +7,7 @@ export interface ICompany extends Document {
   companyType: 'Business' | 'Investor' | 'Startup';
   openForInvestments?: boolean;
   businessModel: 'B2B' | 'B2C' | 'B2G' | 'C2C' | 'C2B' | 'D2C' | 'B2B2C';
-  companySector: string;
+  companySector: string[];
   companySize: '1-10' | '11-50' | '51-200' | '201-500' | '501-1000' | '1001-5000' | '5001-10000' | '10001+';
   businessScale: 'Micro' | 'Small' | 'Medium' | 'Large';
   fundSize?: string;
@@ -61,8 +61,8 @@ const companySchema = new Schema<ICompany>(
       enum: ['B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', 'B2B2C'],
     },
     companySector: {
-      type: String,
-      required: [true, 'Company sector is required'],
+      type: [String],
+      default: [],
     },
     companySize: {
       type: String,
