@@ -161,6 +161,12 @@ export const verifyEmail = async (req: Request, res: Response) => {
     user.emailVerificationExpires = undefined;
     await user.save();
 
+    // Başarılı doğrulama sonrası frontend'e yönlendir
+    if (process.env.FRONTEND_URL) {
+      return res.redirect(`${process.env.FRONTEND_URL}/auth/login?verified=true`);
+    }
+
+    // Eğer FRONTEND_URL tanımlı değilse JSON yanıtı döndür
     res.json({
       success: true,
       message: "E-posta adresiniz başarıyla doğrulandı",

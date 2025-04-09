@@ -39,7 +39,7 @@ class MailgunService {
     email: string,
     verificationToken: string
   ): Promise<void> {
-    const verificationUrl = `${process.env.FRONTEND_URL}/api/auth/verify-email/${verificationToken}`;
+    const verificationUrl = `${process.env.API_URL}/api/auth/verify-email/${verificationToken}`;
     console.log("Preparing to send verification email to:", email);
     console.log("Verification URL:", verificationUrl);
 
