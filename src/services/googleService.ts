@@ -46,9 +46,10 @@ export class GoogleService {
           mevcutProfilFoto: currentProfilePhoto,
         });
 
-        // Önce diğer bilgileri güncelle
-        user.firstName = userData.firstName;
-        user.lastName = userData.lastName;
+        // Bilgileri güncelle
+        // Eğer mevcut ad ve soyad bilgileri varsa, onları koru
+        user.firstName = user.firstName || userData.firstName;
+        user.lastName = user.lastName || userData.lastName;
         user.emailVerified = userData.emailVerified;
         user.authProvider = userData.authProvider;
         user.lastLogin = userData.lastLogin;
