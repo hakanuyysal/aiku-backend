@@ -10,6 +10,7 @@ import { promisify } from "util";
 import { Document } from "docx";
 import * as XLSX from "xlsx";
 import { exec } from "child_process";
+import { RobotsDisallowedError } from "../services/geminiService";
 
 const router = express.Router();
 const geminiService = new GeminiService();
@@ -254,6 +255,16 @@ router.post("/analyze-website", async (req, res) => {
     res.json(formData);
   } catch (error) {
     console.error("Website analysis error:", error);
+    
+    // Robots.txt tarafından engellendiyse 403 hatası dön
+    if (error instanceof RobotsDisallowedError) {
+      return res.status(403).json({ 
+        error: (error as RobotsDisallowedError).message,
+        type: "robots_disallowed" 
+      });
+    }
+    
+    // Diğer hatalar için 500 hatası dön
     res.status(500).json({ error: "Error during website analysis" });
   }
 });

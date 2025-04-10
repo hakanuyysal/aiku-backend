@@ -11,6 +11,14 @@ if (!process.env.GEMINI_API_KEY) {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Özel hata sınıfları
+export class RobotsDisallowedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RobotsDisallowedError";
+  }
+}
+
 interface FormData {
   companyName: string;
   companyLogo?: string;
@@ -161,7 +169,7 @@ export class GeminiService {
 
       const isAllowed = await this.checkRobotsRules(url);
       if (!isAllowed) {
-        throw new Error("Bu site robots.txt tarafından engellenmiş");
+        throw new RobotsDisallowedError("Bu site robots.txt tarafından engellenmiş");
       }
 
       const browser = await puppeteer.launch({
@@ -224,6 +232,10 @@ export class GeminiService {
       };
     } catch (error) {
       console.error("Web scraping error:", error);
+      // Robots.txt hatasını yeniden fırlat, diğer hataları genel hata olarak fırlat
+      if (error instanceof RobotsDisallowedError) {
+        throw error;
+      }
       throw new Error(
         "Web sitesi içeriği alınamadı: " + (error as Error).message
       );
@@ -712,6 +724,10 @@ ${websiteContent}`;
       }
     } catch (error) {
       console.error("Website analysis error:", error);
+      // Özel hata türlerini kontrol et ve doğrudan ilet
+      if (error instanceof RobotsDisallowedError) {
+        throw error;
+      }
       throw error;
     }
   }
