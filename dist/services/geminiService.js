@@ -1,16 +1,42 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+var __awaiter =
+  (this && this.__awaiter) ||
+  function (thisArg, _arguments, P, generator) {
+    function adopt(value) {
+      return value instanceof P
+        ? value
+        : new P(function (resolve) {
+            resolve(value);
+          });
+    }
     return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
+      function fulfilled(value) {
+        try {
+          step(generator.next(value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function rejected(value) {
+        try {
+          step(generator["throw"](value));
+        } catch (e) {
+          reject(e);
+        }
+      }
+      function step(result) {
+        result.done
+          ? resolve(result.value)
+          : adopt(result.value).then(fulfilled, rejected);
+      }
+      step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
-};
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
+  };
+var __importDefault =
+  (this && this.__importDefault) ||
+  function (mod) {
+    return mod && mod.__esModule ? mod : { default: mod };
+  };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GeminiService = void 0;
 // @ts-nocheck - Typescript hatalarını görmezden gel
@@ -19,368 +45,418 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 dotenv_1.default.config();
 if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not defined in environment variables");
+  throw new Error("GEMINI_API_KEY is not defined in environment variables");
 }
-const genAI = new generative_ai_1.GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const genAI = new generative_ai_1.GoogleGenerativeAI(
+  process.env.GEMINI_API_KEY
+);
 class GeminiService {
-    constructor() {
-        this.model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  constructor() {
+    this.model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  }
+  cleanJsonString(text) {
+    text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+    text = text.trim();
+    return text;
+  }
+  validateUrl(url) {
+    if (!url.startsWith("http")) {
+      url = "https://" + url;
     }
-    cleanJsonString(text) {
-        text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
-        text = text.trim();
-        return text;
+    try {
+      const parsedUrl = new URL(url);
+      if (!parsedUrl.hostname.includes(".")) {
+        throw new Error("Geçersiz domain");
+      }
+      return url;
+    } catch (error) {
+      throw new Error("Geçersiz URL formatı");
     }
-    validateUrl(url) {
-        if (!url.startsWith("http")) {
-            url = "https://" + url;
+  }
+  delay(ms) {
+    return __awaiter(this, void 0, void 0, function* () {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    });
+  }
+  checkRobotsRules(url) {
+    return __awaiter(this, void 0, void 0, function* () {
+      try {
+        const parsedUrl = new URL(url);
+        const robotsUrl = `${parsedUrl.protocol}//${parsedUrl.hostname}/robots.txt`;
+        const response = yield fetch(robotsUrl);
+        const robotsText = yield response.text();
+        const userAgentRules = robotsText
+          .toLowerCase()
+          .includes("user-agent: *");
+        const disallowed = robotsText.toLowerCase().includes("disallow: /");
+        return !userAgentRules || !disallowed;
+      } catch (error) {
+        console.warn("robots.txt kontrol edilemedi:", error);
+        return true;
+      }
+    });
+  }
+  findSubPages(page) {
+    return __awaiter(this, void 0, void 0, function* () {
+      return yield page.evaluate(() => {
+        const subPages = [];
+        const relevantKeywords = [
+          "about",
+          "contact",
+          "hakkinda",
+          "hakkımızda",
+          "iletisim",
+          "iletişim",
+          "biz-kimiz",
+          "kurumsal",
+          "corporate",
+          "company",
+        ];
+        document.querySelectorAll("a").forEach((link) => {
+          var _a;
+          const href = link.getAttribute("href");
+          const text =
+            ((_a = link.textContent) === null || _a === void 0
+              ? void 0
+              : _a.toLowerCase()) || "";
+          if (
+            href &&
+            !href.startsWith("#") &&
+            !href.startsWith("tel:") &&
+            !href.startsWith("mailto:")
+          ) {
+            if (
+              relevantKeywords.some(
+                (keyword) =>
+                  href.toLowerCase().includes(keyword) || text.includes(keyword)
+              )
+            ) {
+              subPages.push(href);
+            }
+          }
+        });
+        return [...new Set(subPages)];
+      });
+    });
+  }
+  scrapeWebsite(url) {
+    return __awaiter(this, void 0, void 0, function* () {
+      try {
+        url = this.validateUrl(url);
+        const baseUrl = new URL(url).origin;
+        let allContent = "";
+        const visitedUrls = new Set();
+        const foundUrls = [];
+        const isAllowed = yield this.checkRobotsRules(url);
+        if (!isAllowed) {
+          throw new Error("Bu site robots.txt tarafından engellenmiş");
         }
+        const browser = yield puppeteer_1.default.launch({
+          headless: true,
+          args: [
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+          ],
+        });
+        console.log("Browser launched");
         try {
-            const parsedUrl = new URL(url);
-            if (!parsedUrl.hostname.includes(".")) {
-                throw new Error("Geçersiz domain");
-            }
-            return url;
-        }
-        catch (error) {
-            throw new Error("Geçersiz URL formatı");
-        }
-    }
-    delay(ms) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return new Promise((resolve) => setTimeout(resolve, ms));
-        });
-    }
-    checkRobotsRules(url) {
-        return __awaiter(this, void 0, void 0, function* () {
+          const page = yield browser.newPage();
+          yield page.setUserAgent(
+            "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
+          );
+          // Ana sayfayı tara
+          yield this.scrapePage(page, url, visitedUrls);
+          allContent += yield this.extractPageContent(page);
+          // Alt sayfaları bul
+          const subPages = yield this.findSubPages(page);
+          // Her alt sayfayı tara
+          for (const subPath of subPages) {
             try {
-                const parsedUrl = new URL(url);
-                const robotsUrl = `${parsedUrl.protocol}//${parsedUrl.hostname}/robots.txt`;
-                const response = yield fetch(robotsUrl);
-                const robotsText = yield response.text();
-                const userAgentRules = robotsText.toLowerCase().includes("user-agent: *");
-                const disallowed = robotsText.toLowerCase().includes("disallow: /");
-                return !userAgentRules || !disallowed;
+              const fullUrl = subPath.startsWith("http")
+                ? subPath
+                : new URL(subPath, baseUrl).href;
+              // Aynı domain'de olduğundan emin ol
+              if (!fullUrl.startsWith(baseUrl)) continue;
+              // Daha önce ziyaret edilmediyse tara
+              if (!visitedUrls.has(fullUrl)) {
+                yield this.delay(2000); // Rate limiting
+                yield this.scrapePage(page, fullUrl, visitedUrls);
+                allContent += "\n\n--- " + fullUrl + " ---\n";
+                allContent += yield this.extractPageContent(page);
+                foundUrls.push(fullUrl);
+              }
+            } catch (error) {
+              console.warn("Sub-page scraping error:", error);
+              continue;
             }
-            catch (error) {
-                console.warn("robots.txt kontrol edilemedi:", error);
-                return true;
+          }
+          yield page.close();
+        } finally {
+          yield browser.close();
+        }
+        return {
+          content: this.sanitizeText(allContent),
+          foundUrls,
+        };
+      } catch (error) {
+        console.error("Web scraping error:", error);
+        throw new Error("Web sitesi içeriği alınamadı: " + error.message);
+      }
+    });
+  }
+  scrapePage(page, url, visitedUrls) {
+    return __awaiter(this, void 0, void 0, function* () {
+      if (visitedUrls.has(url)) return;
+      let retryCount = 0;
+      const maxRetries = 3;
+      while (retryCount < maxRetries) {
+        try {
+          yield page.goto(url, {
+            waitUntil: "networkidle0",
+            timeout: 30000,
+          });
+          visitedUrls.add(url);
+          break;
+        } catch (error) {
+          retryCount++;
+          if (retryCount === maxRetries) throw error;
+          yield this.delay(2000 * retryCount);
+        }
+      }
+      const hasCaptcha = yield page.evaluate(() => {
+        var _a;
+        return (
+          ((_a = document.body.textContent) === null || _a === void 0
+            ? void 0
+            : _a.toLowerCase().includes("captcha")) ||
+          document.body.innerHTML.toLowerCase().includes("recaptcha")
+        );
+      });
+      if (hasCaptcha) {
+        throw new Error("Captcha tespit edildi, scraping yapılamıyor");
+      }
+    });
+  }
+  extractPageContent(page) {
+    return __awaiter(this, void 0, void 0, function* () {
+      const metadata = yield page.evaluate(() => {
+        const getMetaContent = (selector) => {
+          var _a;
+          return (
+            ((_a = document.querySelector(selector)) === null || _a === void 0
+              ? void 0
+              : _a.getAttribute("content")) || ""
+          );
+        };
+        const filterSensitiveData = (text) => {
+          return text.replace(/[^\w\s@.-]/g, "").trim();
+        };
+        return {
+          title: filterSensitiveData(document.title),
+          metaDescription: filterSensitiveData(
+            getMetaContent('meta[name="description"]')
+          ),
+          metaKeywords: filterSensitiveData(
+            getMetaContent('meta[name="keywords"]')
+          ),
+          ogTitle: filterSensitiveData(
+            getMetaContent('meta[property="og:title"]')
+          ),
+          ogDescription: filterSensitiveData(
+            getMetaContent('meta[property="og:description"]')
+          ),
+        };
+      });
+      const logoUrl = yield page.evaluate(() => {
+        // Logo bulmak için tüm olası seçicileri kontrol et
+        const logoSelectors = [
+          // Alt veya src içinde "logo" geçen resimler
+          'img[alt*="logo" i]',
+          'img[src*="logo" i]',
+          // Header, navbar veya footer içindeki resimler (genelde logo olur)
+          "header img",
+          "nav img",
+          ".navbar img",
+          ".header img",
+          ".logo img",
+          ".site-logo img",
+          ".brand img",
+          ".brand-logo img",
+          "a.logo img",
+          "a.brand img",
+          ".footer .logo img",
+          // Logo sınıfı olan elemanlar
+          ".logo img",
+          ".site-logo",
+          ".company-logo",
+          ".brand-logo",
+          // Link içindeki logoları da bul
+          'a[href="/"] img',
+          'a[href="./"] img',
+          'a[href="../"] img',
+          // Ana sayfaya link veren logoyu bul
+          'a[href="#home"] img',
+          // SVG logoları
+          "svg.logo",
+          // Genel olarak ilk img tag'i
+          "header a img",
+          // Son çare olarak sayfadaki ilk resim
+          "a img",
+        ];
+        // Tüm seçicileri dene
+        for (const selector of logoSelectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            // Eğer HTMLImageElement ise src değerini al
+            if ("src" in element && element.src) {
+              return element.src;
             }
+            // SVG olabilir, o zaman outerHTML'i dön
+            else if (element instanceof SVGElement) {
+              return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
+            }
+          }
+        }
+        return "";
+      });
+      const contactInfo = yield page.evaluate(() => {
+        const text = document.body.innerText;
+        const emailPattern =
+          /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+        const phonePattern =
+          /(?:(?:\+|00)?[0-9]{1,3}[-. ]?)?\(?[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{2,4}/g;
+        const emails = [...new Set(text.match(emailPattern) || [])];
+        const phones = [...new Set(text.match(phonePattern) || [])];
+        document.querySelectorAll('a[href^="mailto:"]').forEach((el) => {
+          var _a;
+          const email =
+            (_a = el.getAttribute("href")) === null || _a === void 0
+              ? void 0
+              : _a.replace("mailto:", "");
+          if (email) emails.push(email);
         });
-    }
-    findSubPages(page) {
-        return __awaiter(this, void 0, void 0, function* () {
-            return yield page.evaluate(() => {
-                const subPages = [];
-                const relevantKeywords = [
-                    "about",
-                    "contact",
-                    "hakkinda",
-                    "hakkımızda",
-                    "iletisim",
-                    "iletişim",
-                    "biz-kimiz",
-                    "kurumsal",
-                    "corporate",
-                    "company",
-                ];
-                document.querySelectorAll("a").forEach((link) => {
-                    var _a;
-                    const href = link.getAttribute("href");
-                    const text = ((_a = link.textContent) === null || _a === void 0 ? void 0 : _a.toLowerCase()) || "";
-                    if (href &&
-                        !href.startsWith("#") &&
-                        !href.startsWith("tel:") &&
-                        !href.startsWith("mailto:")) {
-                        if (relevantKeywords.some((keyword) => href.toLowerCase().includes(keyword) || text.includes(keyword))) {
-                            subPages.push(href);
-                        }
-                    }
-                });
-                return [...new Set(subPages)];
-            });
+        document.querySelectorAll('a[href^="tel:"]').forEach((el) => {
+          var _a;
+          const phone =
+            (_a = el.getAttribute("href")) === null || _a === void 0
+              ? void 0
+              : _a.replace("tel:", "");
+          if (phone) phones.push(phone);
         });
-    }
-    scrapeWebsite(url) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                url = this.validateUrl(url);
-                const baseUrl = new URL(url).origin;
-                let allContent = "";
-                const visitedUrls = new Set();
-                const foundUrls = [];
-                const isAllowed = yield this.checkRobotsRules(url);
-                if (!isAllowed) {
-                    throw new Error("Bu site robots.txt tarafından engellenmiş");
-                }
-                const browser = yield puppeteer_1.default.launch({
-                    headless: true,
-                    args: [
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                    ],
-                });
-                console.log("Browser launched");
-                try {
-                    const page = yield browser.newPage();
-                    yield page.setUserAgent("Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)");
-                    // Ana sayfayı tara
-                    yield this.scrapePage(page, url, visitedUrls);
-                    allContent += yield this.extractPageContent(page);
-                    // Alt sayfaları bul
-                    const subPages = yield this.findSubPages(page);
-                    // Her alt sayfayı tara
-                    for (const subPath of subPages) {
-                        try {
-                            const fullUrl = subPath.startsWith("http")
-                                ? subPath
-                                : new URL(subPath, baseUrl).href;
-                            // Aynı domain'de olduğundan emin ol
-                            if (!fullUrl.startsWith(baseUrl))
-                                continue;
-                            // Daha önce ziyaret edilmediyse tara
-                            if (!visitedUrls.has(fullUrl)) {
-                                yield this.delay(2000); // Rate limiting
-                                yield this.scrapePage(page, fullUrl, visitedUrls);
-                                allContent += "\n\n--- " + fullUrl + " ---\n";
-                                allContent += yield this.extractPageContent(page);
-                                foundUrls.push(fullUrl);
-                            }
-                        }
-                        catch (error) {
-                            console.warn("Sub-page scraping error:", error);
-                            continue;
-                        }
-                    }
-                    yield page.close();
-                }
-                finally {
-                    yield browser.close();
-                }
-                return {
-                    content: this.sanitizeText(allContent),
-                    foundUrls,
-                };
+        return {
+          emails: [...new Set(emails)],
+          phones: [...new Set(phones)],
+        };
+      });
+      const socialLinks = yield page.evaluate(() => {
+        const links = [];
+        document
+          .querySelectorAll(
+            'a[href*="facebook.com"], a[href*="twitter.com"], a[href*="instagram.com"], a[href*="linkedin.com"], a[href*="youtube.com"]'
+          )
+          .forEach((el) => {
+            const href = el.getAttribute("href");
+            if (href) links.push(href);
+          });
+        return [...new Set(links)];
+      });
+      const addressInfo = yield page.evaluate(() => {
+        const addresses = [];
+        const mapsElements = document.querySelectorAll(
+          'iframe[src*="google.com/maps"], iframe[src*="maps.google.com"], a[href*="maps.google.com"], a[href*="google.com/maps"]'
+        );
+        mapsElements.forEach((el) => {
+          var _a;
+          const src = el.getAttribute("src") || el.getAttribute("href") || "";
+          const placeMatch = src.match(/(?:place|q|query)=([^&]+)/);
+          const coordsMatch = src.match(/(?:@|ll=)([-\d.]+),([-\d.]+)/);
+          if (placeMatch) {
+            const place = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
+            addresses.push(place);
+          }
+          let parent = el.parentElement;
+          for (let i = 0; i < 5 && parent; i++) {
+            const text =
+              (_a = parent.textContent) === null || _a === void 0
+                ? void 0
+                : _a.trim();
+            if (text && text.length > 10 && text.length < 200) {
+              addresses.push(text);
             }
-            catch (error) {
-                console.error("Web scraping error:", error);
-                throw new Error("Web sitesi içeriği alınamadı: " + error.message);
-            }
+            parent = parent.parentElement;
+          }
         });
-    }
-    scrapePage(page, url, visitedUrls) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (visitedUrls.has(url))
-                return;
-            let retryCount = 0;
-            const maxRetries = 3;
-            while (retryCount < maxRetries) {
-                try {
-                    yield page.goto(url, {
-                        waitUntil: "networkidle0",
-                        timeout: 30000,
-                    });
-                    visitedUrls.add(url);
-                    break;
-                }
-                catch (error) {
-                    retryCount++;
-                    if (retryCount === maxRetries)
-                        throw error;
-                    yield this.delay(2000 * retryCount);
-                }
+        const contactSelectors = [
+          ".contact-info",
+          ".contact-details",
+          ".address",
+          ".location",
+          "#contact-address",
+          "[data-address]",
+          ".footer-address",
+          ".office-address",
+          "address",
+          ".contact-section address",
+          ".contact-section .address",
+          ".contact-box",
+          ".contact-info-box",
+        ];
+        contactSelectors.forEach((selector) => {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach((el) => {
+            var _a;
+            const text =
+              (_a = el.textContent) === null || _a === void 0
+                ? void 0
+                : _a.trim();
+            if (text && text.length > 10 && text.length < 200) {
+              addresses.push(text);
             }
-            const hasCaptcha = yield page.evaluate(() => {
-                var _a;
-                return (((_a = document.body.textContent) === null || _a === void 0 ? void 0 : _a.toLowerCase().includes("captcha")) ||
-                    document.body.innerHTML.toLowerCase().includes("recaptcha"));
-            });
-            if (hasCaptcha) {
-                throw new Error("Captcha tespit edildi, scraping yapılamıyor");
-            }
+          });
         });
-    }
-    extractPageContent(page) {
-        return __awaiter(this, void 0, void 0, function* () {
-            const metadata = yield page.evaluate(() => {
-                const getMetaContent = (selector) => { var _a; return ((_a = document.querySelector(selector)) === null || _a === void 0 ? void 0 : _a.getAttribute("content")) || ""; };
-                const filterSensitiveData = (text) => {
-                    return text.replace(/[^\w\s@.-]/g, "").trim();
-                };
-                return {
-                    title: filterSensitiveData(document.title),
-                    metaDescription: filterSensitiveData(getMetaContent('meta[name="description"]')),
-                    metaKeywords: filterSensitiveData(getMetaContent('meta[name="keywords"]')),
-                    ogTitle: filterSensitiveData(getMetaContent('meta[property="og:title"]')),
-                    ogDescription: filterSensitiveData(getMetaContent('meta[property="og:description"]')),
-                };
-            });
-            const logoUrl = yield page.evaluate(() => {
-                // Logo bulmak için tüm olası seçicileri kontrol et
-                const logoSelectors = [
-                    // Alt veya src içinde "logo" geçen resimler
-                    'img[alt*="logo" i]',
-                    'img[src*="logo" i]',
-                    // Header, navbar veya footer içindeki resimler (genelde logo olur)
-                    'header img',
-                    'nav img',
-                    '.navbar img',
-                    '.header img',
-                    '.logo img',
-                    '.site-logo img',
-                    '.brand img',
-                    '.brand-logo img',
-                    'a.logo img',
-                    'a.brand img',
-                    '.footer .logo img',
-                    // Logo sınıfı olan elemanlar
-                    '.logo img',
-                    '.site-logo',
-                    '.company-logo',
-                    '.brand-logo',
-                    // Link içindeki logoları da bul
-                    'a[href="/"] img',
-                    'a[href="./"] img',
-                    'a[href="../"] img',
-                    // Ana sayfaya link veren logoyu bul
-                    'a[href="#home"] img',
-                    // SVG logoları
-                    'svg.logo',
-                    // Genel olarak ilk img tag'i
-                    'header a img',
-                    // Son çare olarak sayfadaki ilk resim
-                    'a img'
-                ];
-                // Tüm seçicileri dene
-                for (const selector of logoSelectors) {
-                    const element = document.querySelector(selector);
-                    if (element) {
-                        // Eğer HTMLImageElement ise src değerini al
-                        if ('src' in element && element.src) {
-                            return element.src;
-                        }
-                        // SVG olabilir, o zaman outerHTML'i dön
-                        else if (element instanceof SVGElement) {
-                            return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
-                        }
-                    }
-                }
-                return "";
-            });
-            const contactInfo = yield page.evaluate(() => {
-                const text = document.body.innerText;
-                const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-                const phonePattern = /(?:(?:\+|00)?[0-9]{1,3}[-. ]?)?\(?[0-9]{3}\)?[-. ]?[0-9]{3}[-. ]?[0-9]{2,4}/g;
-                const emails = [...new Set(text.match(emailPattern) || [])];
-                const phones = [...new Set(text.match(phonePattern) || [])];
-                document.querySelectorAll('a[href^="mailto:"]').forEach((el) => {
-                    var _a;
-                    const email = (_a = el.getAttribute("href")) === null || _a === void 0 ? void 0 : _a.replace("mailto:", "");
-                    if (email)
-                        emails.push(email);
-                });
-                document.querySelectorAll('a[href^="tel:"]').forEach((el) => {
-                    var _a;
-                    const phone = (_a = el.getAttribute("href")) === null || _a === void 0 ? void 0 : _a.replace("tel:", "");
-                    if (phone)
-                        phones.push(phone);
-                });
-                return {
-                    emails: [...new Set(emails)],
-                    phones: [...new Set(phones)],
-                };
-            });
-            const socialLinks = yield page.evaluate(() => {
-                const links = [];
-                document
-                    .querySelectorAll('a[href*="facebook.com"], a[href*="twitter.com"], a[href*="instagram.com"], a[href*="linkedin.com"], a[href*="youtube.com"]')
-                    .forEach((el) => {
-                    const href = el.getAttribute("href");
-                    if (href)
-                        links.push(href);
-                });
-                return [...new Set(links)];
-            });
-            const addressInfo = yield page.evaluate(() => {
-                const addresses = [];
-                const mapsElements = document.querySelectorAll('iframe[src*="google.com/maps"], iframe[src*="maps.google.com"], a[href*="maps.google.com"], a[href*="google.com/maps"]');
-                mapsElements.forEach((el) => {
-                    var _a;
-                    const src = el.getAttribute("src") || el.getAttribute("href") || "";
-                    const placeMatch = src.match(/(?:place|q|query)=([^&]+)/);
-                    const coordsMatch = src.match(/(?:@|ll=)([-\d.]+),([-\d.]+)/);
-                    if (placeMatch) {
-                        const place = decodeURIComponent(placeMatch[1].replace(/\+/g, " "));
-                        addresses.push(place);
-                    }
-                    let parent = el.parentElement;
-                    for (let i = 0; i < 5 && parent; i++) {
-                        const text = (_a = parent.textContent) === null || _a === void 0 ? void 0 : _a.trim();
-                        if (text && text.length > 10 && text.length < 200) {
-                            addresses.push(text);
-                        }
-                        parent = parent.parentElement;
-                    }
-                });
-                const contactSelectors = [
-                    ".contact-info",
-                    ".contact-details",
-                    ".address",
-                    ".location",
-                    "#contact-address",
-                    "[data-address]",
-                    ".footer-address",
-                    ".office-address",
-                    "address",
-                    ".contact-section address",
-                    ".contact-section .address",
-                    ".contact-box",
-                    ".contact-info-box",
-                ];
-                contactSelectors.forEach((selector) => {
-                    const elements = document.querySelectorAll(selector);
-                    elements.forEach((el) => {
-                        var _a;
-                        const text = (_a = el.textContent) === null || _a === void 0 ? void 0 : _a.trim();
-                        if (text && text.length > 10 && text.length < 200) {
-                            addresses.push(text);
-                        }
-                    });
-                });
-                const addressKeywords = [
-                    "adres",
-                    "address",
-                    "location",
-                    "konum",
-                    "ofis",
-                    "office",
-                    "merkez",
-                    "headquarters",
-                ];
-                document.querySelectorAll("p, div, span").forEach((el) => {
-                    var _a;
-                    const text = ((_a = el.textContent) === null || _a === void 0 ? void 0 : _a.trim()) || "";
-                    if (text.length > 10 &&
-                        text.length < 200 &&
-                        addressKeywords.some((keyword) => text.toLowerCase().includes(keyword))) {
-                        addresses.push(text);
-                    }
-                });
-                document
-                    .querySelectorAll("[data-address], [data-location], [data-venue], [data-office]")
-                    .forEach((el) => {
-                    const addr = el.getAttribute("data-address") ||
-                        el.getAttribute("data-location") ||
-                        el.getAttribute("data-venue") ||
-                        el.getAttribute("data-office");
-                    if (addr)
-                        addresses.push(addr);
-                });
-                return [...new Set(addresses)];
-            });
-            return `
+        const addressKeywords = [
+          "adres",
+          "address",
+          "location",
+          "konum",
+          "ofis",
+          "office",
+          "merkez",
+          "headquarters",
+        ];
+        document.querySelectorAll("p, div, span").forEach((el) => {
+          var _a;
+          const text =
+            ((_a = el.textContent) === null || _a === void 0
+              ? void 0
+              : _a.trim()) || "";
+          if (
+            text.length > 10 &&
+            text.length < 200 &&
+            addressKeywords.some((keyword) =>
+              text.toLowerCase().includes(keyword)
+            )
+          ) {
+            addresses.push(text);
+          }
+        });
+        document
+          .querySelectorAll(
+            "[data-address], [data-location], [data-venue], [data-office]"
+          )
+          .forEach((el) => {
+            const addr =
+              el.getAttribute("data-address") ||
+              el.getAttribute("data-location") ||
+              el.getAttribute("data-venue") ||
+              el.getAttribute("data-office");
+            if (addr) addresses.push(addr);
+          });
+        return [...new Set(addresses)];
+      });
+      return `
 Page Title: ${metadata.title}
 OG Title: ${metadata.ogTitle}
 Meta Description: ${metadata.metaDescription}
@@ -398,107 +474,106 @@ ${socialLinks.join("\n")}
 Found Addresses:
 ${addressInfo.join("\n")}
     `.trim();
-        });
-    }
-    sanitizeText(text) {
-        text = text.replace(/\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, "[FILTERED]");
-        text = text.replace(/\b\d{11}\b/g, "[FILTERED]");
-        text = text.replace(/\b(password|şifre|tc|tckn)\b[:=]\s*\S+/gi, "[FILTERED]");
-        return text;
-    }
-    calculateAddressScore(text) {
-        let score = 0;
-        if (/kolektif\s+house/i.test(text))
-            score += 5;
-        if (/ataşehir/i.test(text))
-            score += 4;
-        if (/\b\d{5}\b/.test(text))
-            score += 3;
-        if (/mahalle|sokak|cadde|plaza|kule/i.test(text))
-            score += 2;
-        if (/no|kat|daire|blok/i.test(text))
-            score += 2;
-        if (/istanbul|ankara|izmir|bursa|antalya/i.test(text))
-            score += 2;
-        if (/[,.:]/g.test(text))
-            score += 1;
-        if (/\d+/g.test(text))
-            score += 1;
-        return score;
-    }
-    analyzeWebsite(url) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e, _f;
-            try {
-                const { content: websiteContent, foundUrls } = yield this.scrapeWebsite(url);
-                let socialLinks = [];
-                let logoUrl = ""; // Logo URL'sini saklamak için değişken
-                try {
-                    const browser = yield puppeteer_1.default.launch({
-                        headless: true,
-                        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-                    });
-                    const page = yield browser.newPage();
-                    yield page.goto(url, { waitUntil: "networkidle0" });
-                    // Logo URL'sini çek
-                    logoUrl = yield page.evaluate(() => {
-                        // Logo bulmak için tüm olası seçicileri kontrol et
-                        const logoSelectors = [
-                            'img[alt*="logo" i]',
-                            'img[src*="logo" i]',
-                            'header img',
-                            'nav img',
-                            '.navbar img',
-                            '.header img',
-                            '.logo img',
-                            '.site-logo img',
-                            '.brand img',
-                            '.brand-logo img',
-                            'a.logo img',
-                            'a.brand img',
-                            '.footer .logo img',
-                            '.logo img',
-                            '.site-logo',
-                            '.company-logo',
-                            '.brand-logo',
-                            'a[href="/"] img',
-                            'a[href="./"] img',
-                            'a[href="../"] img',
-                            'a[href="#home"] img',
-                            'svg.logo',
-                            'header a img',
-                            'a img'
-                        ];
-                        for (const selector of logoSelectors) {
-                            const element = document.querySelector(selector);
-                            if (element) {
-                                if ('src' in element && element.src) {
-                                    return element.src;
-                                }
-                                else if (element instanceof SVGElement) {
-                                    return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
-                                }
-                            }
-                        }
-                        return "";
-                    });
-                    socialLinks = yield page.evaluate(() => {
-                        const links = [];
-                        document
-                            .querySelectorAll('a[href*="facebook.com"], a[href*="twitter.com"], a[href*="instagram.com"], a[href*="linkedin.com"], a[href*="youtube.com"]')
-                            .forEach((el) => {
-                            const href = el.getAttribute("href");
-                            if (href)
-                                links.push(href);
-                        });
-                        return [...new Set(links)];
-                    });
-                    yield browser.close();
+    });
+  }
+  sanitizeText(text) {
+    text = text.replace(
+      /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
+      "[FILTERED]"
+    );
+    text = text.replace(/\b\d{11}\b/g, "[FILTERED]");
+    text = text.replace(
+      /\b(password|şifre|tc|tckn)\b[:=]\s*\S+/gi,
+      "[FILTERED]"
+    );
+    return text;
+  }
+  calculateAddressScore(text) {
+    let score = 0;
+    if (/kolektif\s+house/i.test(text)) score += 5;
+    if (/ataşehir/i.test(text)) score += 4;
+    if (/\b\d{5}\b/.test(text)) score += 3;
+    if (/mahalle|sokak|cadde|plaza|kule/i.test(text)) score += 2;
+    if (/no|kat|daire|blok/i.test(text)) score += 2;
+    if (/istanbul|ankara|izmir|bursa|antalya/i.test(text)) score += 2;
+    if (/[,.:]/g.test(text)) score += 1;
+    if (/\d+/g.test(text)) score += 1;
+    return score;
+  }
+  analyzeWebsite(url) {
+    return __awaiter(this, void 0, void 0, function* () {
+      var _a, _b, _c, _d, _e, _f;
+      try {
+        const { content: websiteContent, foundUrls } = yield this.scrapeWebsite(
+          url
+        );
+        let socialLinks = [];
+        let logoUrl = ""; // Logo URL'sini saklamak için değişken
+        try {
+          const browser = yield puppeteer_1.default.launch({
+            headless: true,
+            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+          });
+          const page = yield browser.newPage();
+          yield page.goto(url, { waitUntil: "networkidle0" });
+          // Logo URL'sini çek
+          logoUrl = yield page.evaluate(() => {
+            // Logo bulmak için tüm olası seçicileri kontrol et
+            const logoSelectors = [
+              'img[alt*="logo" i]',
+              'img[src*="logo" i]',
+              "header img",
+              "nav img",
+              ".navbar img",
+              ".header img",
+              ".logo img",
+              ".site-logo img",
+              ".brand img",
+              ".brand-logo img",
+              "a.logo img",
+              "a.brand img",
+              ".footer .logo img",
+              ".logo img",
+              ".site-logo",
+              ".company-logo",
+              ".brand-logo",
+              'a[href="/"] img',
+              'a[href="./"] img',
+              'a[href="../"] img',
+              'a[href="#home"] img',
+              "svg.logo",
+              "header a img",
+              "a img",
+            ];
+            for (const selector of logoSelectors) {
+              const element = document.querySelector(selector);
+              if (element) {
+                if ("src" in element && element.src) {
+                  return element.src;
+                } else if (element instanceof SVGElement) {
+                  return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
                 }
-                catch (error) {
-                    console.error("Social media scraping error:", error);
-                }
-                const prompt = `You are an AI assistant specialized in analyzing website content. Analyze the following website content and extract company information.
+              }
+            }
+            return "";
+          });
+          socialLinks = yield page.evaluate(() => {
+            const links = [];
+            document
+              .querySelectorAll(
+                'a[href*="facebook.com"], a[href*="twitter.com"], a[href*="instagram.com"], a[href*="linkedin.com"], a[href*="youtube.com"]'
+              )
+              .forEach((el) => {
+                const href = el.getAttribute("href");
+                if (href) links.push(href);
+              });
+            return [...new Set(links)];
+          });
+          yield browser.close();
+        } catch (error) {
+          console.error("Social media scraping error:", error);
+        }
+        const prompt = `You are an AI assistant specialized in analyzing website content. Analyze the following website content and extract company information.
 
 Instructions:
 1. Carefully examine the provided website content, especially the 'Found Addresses' section and contact information
@@ -552,62 +627,81 @@ Instructions:
 
 Website Content:
 ${websiteContent}`;
-                const result = yield this.model.generateContent(prompt);
-                const response = yield result.response;
-                const text = this.cleanJsonString(response.text());
-                try {
-                    const parsed = JSON.parse(text);
-                    const websiteUrl = new URL(url).origin;
-                    return {
-                        companyName: ((_a = parsed.companyName) === null || _a === void 0 ? void 0 : _a.trim()) || "",
-                        companyLogo: logoUrl, // Çekilen logo URL'sini ekle
-                        companyEmail: ((_b = parsed.companyEmail) === null || _b === void 0 ? void 0 : _b.trim()) || "",
-                        companyPhone: ((_c = parsed.companyPhone) === null || _c === void 0 ? void 0 : _c.trim()) || "",
-                        companyWebsite: parsed.companyWebsite || websiteUrl,
-                        companyAddress: ((_d = parsed.companyAddress) === null || _d === void 0 ? void 0 : _d.trim()) || "",
-                        companyInfo: ((_e = parsed.companyInfo) === null || _e === void 0 ? void 0 : _e.trim()) || "",
-                        detailedDescription: ((_f = parsed.detailedDescription) === null || _f === void 0 ? void 0 : _f.trim()) || "",
-                        companyType: parsed.companyType || "",
-                        businessModel: parsed.businessModel || "",
-                        companySector: parsed.companySector || "",
-                        companySize: parsed.companySize || "",
-                        companyLinkedIn: socialLinks.find((link) => link.includes("linkedin.com")) || "",
-                        companyTwitter: socialLinks.find((link) => link.includes("twitter.com")) || "",
-                        companyInstagram: socialLinks.find((link) => link.includes("instagram.com")) || "",
-                        productName: parsed.productName || "",
-                        productLogo: parsed.productLogo || "",
-                        productCategory: parsed.productCategory || "",
-                        productDescription: parsed.productDescription || "",
-                        tags: parsed.tags || [],
-                        problems: parsed.problems || [],
-                        solutions: parsed.solutions || [],
-                        improvements: parsed.improvements || [],
-                        keyFeatures: parsed.keyFeatures || [],
-                        pricingModel: parsed.pricingModel || "",
-                        releaseDate: parsed.releaseDate || "",
-                        productPrice: parsed.productPrice || 0,
-                        productWebsite: parsed.productWebsite || url,
-                        productLinkedIn: parsed.productLinkedIn || "",
-                        productTwitter: parsed.productTwitter || "",
-                    };
-                }
-                catch (parseError) {
-                    console.error("JSON parse error:", parseError);
-                    console.error("Received text:", text);
-                    throw new Error("AI response is not in JSON format");
-                }
-            }
-            catch (error) {
-                console.error("Website analysis error:", error);
-                throw error;
-            }
-        });
-    }
-    analyzeDocument(documentText) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e, _f, _g, _h;
-            try {
-                const prompt = `You are an AI assistant specialized in extracting company information from documents. Your task is to thoroughly analyze the given text and extract all relevant company details according to these specific fields:
+        const result = yield this.model.generateContent(prompt);
+        const response = yield result.response;
+        const text = this.cleanJsonString(response.text());
+        try {
+          const parsed = JSON.parse(text);
+          const websiteUrl = new URL(url).origin;
+          return {
+            companyName:
+              ((_a = parsed.companyName) === null || _a === void 0
+                ? void 0
+                : _a.trim()) || "",
+            companyLogo: logoUrl, // Çekilen logo URL'sini ekle
+            companyEmail:
+              ((_b = parsed.companyEmail) === null || _b === void 0
+                ? void 0
+                : _b.trim()) || "",
+            companyPhone:
+              ((_c = parsed.companyPhone) === null || _c === void 0
+                ? void 0
+                : _c.trim()) || "",
+            companyWebsite: parsed.companyWebsite || websiteUrl,
+            companyAddress:
+              ((_d = parsed.companyAddress) === null || _d === void 0
+                ? void 0
+                : _d.trim()) || "",
+            companyInfo:
+              ((_e = parsed.companyInfo) === null || _e === void 0
+                ? void 0
+                : _e.trim()) || "",
+            detailedDescription:
+              ((_f = parsed.detailedDescription) === null || _f === void 0
+                ? void 0
+                : _f.trim()) || "",
+            companyType: parsed.companyType || "",
+            businessModel: parsed.businessModel || "",
+            companySector: parsed.companySector || "",
+            companySize: parsed.companySize || "",
+            companyLinkedIn:
+              socialLinks.find((link) => link.includes("linkedin.com")) || "",
+            companyTwitter:
+              socialLinks.find((link) => link.includes("twitter.com")) || "",
+            companyInstagram:
+              socialLinks.find((link) => link.includes("instagram.com")) || "",
+            productName: parsed.productName || "",
+            productLogo: parsed.productLogo || "",
+            productCategory: parsed.productCategory || "",
+            productDescription: parsed.productDescription || "",
+            tags: parsed.tags || [],
+            problems: parsed.problems || [],
+            solutions: parsed.solutions || [],
+            improvements: parsed.improvements || [],
+            keyFeatures: parsed.keyFeatures || [],
+            pricingModel: parsed.pricingModel || "",
+            releaseDate: parsed.releaseDate || "",
+            productPrice: parsed.productPrice || 0,
+            productWebsite: parsed.productWebsite || url,
+            productLinkedIn: parsed.productLinkedIn || "",
+            productTwitter: parsed.productTwitter || "",
+          };
+        } catch (parseError) {
+          console.error("JSON parse error:", parseError);
+          console.error("Received text:", text);
+          throw new Error("AI response is not in JSON format");
+        }
+      } catch (error) {
+        console.error("Website analysis error:", error);
+        throw error;
+      }
+    });
+  }
+  analyzeDocument(documentText) {
+    return __awaiter(this, void 0, void 0, function* () {
+      var _a, _b, _c, _d, _e, _f, _g, _h;
+      try {
+        const prompt = `You are an AI assistant specialized in extracting company information from documents. Your task is to thoroughly analyze the given text and extract all relevant company details according to these specific fields:
 
 Instructions:
 1. Carefully examine the entire text, including contact sections and social media references
@@ -643,70 +737,110 @@ Instructions:
 
 Text to analyze:
 ${documentText}`;
-                const result = yield this.model.generateContent(prompt);
-                const response = yield result.response;
-                const text = this.cleanJsonString(response.text());
-                try {
-                    const parsed = JSON.parse(text);
-                    // Extract domain from email if website is empty
-                    let website = ((_a = parsed.companyWebsite) === null || _a === void 0 ? void 0 : _a.trim()) || "";
-                    if (!website && parsed.companyEmail) {
-                        const emailDomain = (_b = parsed.companyEmail.split('@')[1]) === null || _b === void 0 ? void 0 : _b.split(',')[0];
-                        if (emailDomain) {
-                            website = `https://${emailDomain}`;
-                        }
-                    }
-                    // Extract social media URLs from text
-                    const linkedInMatch = documentText.match(/linkedin\.com\/[^\s,\n]+/);
-                    const twitterMatch = documentText.match(/twitter\.com\/[^\s,\n]+/);
-                    const instagramMatch = documentText.match(/instagram\.com\/[^\s,\n]+/);
-                    // @ts-expect-error - FormData tipinde tüm gerekli alanlar karşılanmamaktadır
-                    return {
-                        companyName: ((_c = parsed.companyName) === null || _c === void 0 ? void 0 : _c.trim()) || "",
-                        companyEmail: ((_d = parsed.companyEmail) === null || _d === void 0 ? void 0 : _d.trim()) || "",
-                        companyPhone: ((_e = parsed.companyPhone) === null || _e === void 0 ? void 0 : _e.trim()) || "",
-                        companyWebsite: website,
-                        companyAddress: ((_f = parsed.companyAddress) === null || _f === void 0 ? void 0 : _f.trim()) || "",
-                        companyInfo: ((_g = parsed.companyInfo) === null || _g === void 0 ? void 0 : _g.trim()) || "",
-                        detailedDescription: ((_h = parsed.detailedDescription) === null || _h === void 0 ? void 0 : _h.trim()) || "",
-                        companyType: parsed.companyType || "",
-                        businessModel: parsed.businessModel || "",
-                        companySector: parsed.companySector || "",
-                        companySize: parsed.companySize || "",
-                        companyLogo: "", // Dokümandan logo çekilemeyeceği için boş
-                        companyLinkedIn: linkedInMatch ? `https://www.${linkedInMatch[0]}` : "",
-                        companyTwitter: twitterMatch ? `https://www.${twitterMatch[0]}` : "",
-                        companyInstagram: instagramMatch ? `https://www.${instagramMatch[0]}` : "",
-                    };
-                }
-                catch (parseError) {
-                    console.error("JSON parse error:", parseError);
-                    console.error("Received text:", text);
-                    throw new Error("AI response is not in JSON format");
-                }
+        const result = yield this.model.generateContent(prompt);
+        const response = yield result.response;
+        const text = this.cleanJsonString(response.text());
+        try {
+          const parsed = JSON.parse(text);
+          // Extract domain from email if website is empty
+          let website =
+            ((_a = parsed.companyWebsite) === null || _a === void 0
+              ? void 0
+              : _a.trim()) || "";
+          if (!website && parsed.companyEmail) {
+            const emailDomain =
+              (_b = parsed.companyEmail.split("@")[1]) === null || _b === void 0
+                ? void 0
+                : _b.split(",")[0];
+            if (emailDomain) {
+              website = `https://${emailDomain}`;
             }
-            catch (error) {
-                console.error("Gemini API error:", error);
-                throw error;
-            }
-        });
-    }
-    analyzeLinkedIn(linkedInData) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
-            try {
-                // LinkedIn verilerini daha okunabilir bir formata dönüştürme
-                const userData = (_a = linkedInData === null || linkedInData === void 0 ? void 0 : linkedInData.data) === null || _a === void 0 ? void 0 : _a.user;
-                if (!userData) {
-                    throw new Error("LinkedIn kullanıcı verisi bulunamadı");
-                }
-                const prompt = `Analyze this LinkedIn user data and create a professional company profile:
+          }
+          // Extract social media URLs from text
+          const linkedInMatch = documentText.match(/linkedin\.com\/[^\s,\n]+/);
+          const twitterMatch = documentText.match(/twitter\.com\/[^\s,\n]+/);
+          const instagramMatch = documentText.match(
+            /instagram\.com\/[^\s,\n]+/
+          );
+          // @ts-expect-error - FormData tipinde tüm gerekli alanlar karşılanmamaktadır
+          return {
+            companyName:
+              ((_c = parsed.companyName) === null || _c === void 0
+                ? void 0
+                : _c.trim()) || "",
+            companyEmail:
+              ((_d = parsed.companyEmail) === null || _d === void 0
+                ? void 0
+                : _d.trim()) || "",
+            companyPhone:
+              ((_e = parsed.companyPhone) === null || _e === void 0
+                ? void 0
+                : _e.trim()) || "",
+            companyWebsite: website,
+            companyAddress:
+              ((_f = parsed.companyAddress) === null || _f === void 0
+                ? void 0
+                : _f.trim()) || "",
+            companyInfo:
+              ((_g = parsed.companyInfo) === null || _g === void 0
+                ? void 0
+                : _g.trim()) || "",
+            detailedDescription:
+              ((_h = parsed.detailedDescription) === null || _h === void 0
+                ? void 0
+                : _h.trim()) || "",
+            companyType: parsed.companyType || "",
+            businessModel: parsed.businessModel || "",
+            companySector: parsed.companySector || "",
+            companySize: parsed.companySize || "",
+            companyLogo: "", // Dokümandan logo çekilemeyeceği için boş
+            companyLinkedIn: linkedInMatch
+              ? `https://www.${linkedInMatch[0]}`
+              : "",
+            companyTwitter: twitterMatch
+              ? `https://www.${twitterMatch[0]}`
+              : "",
+            companyInstagram: instagramMatch
+              ? `https://www.${instagramMatch[0]}`
+              : "",
+          };
+        } catch (parseError) {
+          console.error("JSON parse error:", parseError);
+          console.error("Received text:", text);
+          throw new Error("AI response is not in JSON format");
+        }
+      } catch (error) {
+        console.error("Gemini API error:", error);
+        throw error;
+      }
+    });
+  }
+  analyzeLinkedIn(linkedInData) {
+    return __awaiter(this, void 0, void 0, function* () {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+      try {
+        // LinkedIn verilerini daha okunabilir bir formata dönüştürme
+        const userData =
+          (_a =
+            linkedInData === null || linkedInData === void 0
+              ? void 0
+              : linkedInData.data) === null || _a === void 0
+            ? void 0
+            : _a.user;
+        if (!userData) {
+          throw new Error("LinkedIn kullanıcı verisi bulunamadı");
+        }
+        const prompt = `Analyze this LinkedIn user data and create a professional company profile:
 
 User Information:
 - Full Name: ${userData.firstName} ${userData.lastName}
 - Email: ${userData.email}
 - LinkedIn Profile: ${userData.linkedin}
-- Location: ${((_b = userData.locale) === null || _b === void 0 ? void 0 : _b.country) || 'Not specified'}
+- Location: ${
+          ((_b = userData.locale) === null || _b === void 0
+            ? void 0
+            : _b.country) || "Not specified"
+        }
 
 Instructions:
 1. Create a professional company profile based on this individual's information
@@ -727,24 +861,66 @@ Instructions:
 
 4. Return ONLY a JSON object with these exact field names
 5. If information is not found, use empty string ("")`;
-                const result = yield this.model.generateContent(prompt);
-                const response = yield result.response;
-                const text = this.cleanJsonString(response.text());
-                try {
-                    const parsed = JSON.parse(text);
-                    return Object.assign(Object.assign({}, parsed), { companyLogo: userData.profilePictureUrl || "", companyLinkedIn: userData.linkedin || "", companyEmail: userData.email || "", companyName: ((_c = parsed.companyName) === null || _c === void 0 ? void 0 : _c.trim()) || `${userData.firstName} ${userData.lastName}`, companyPhone: ((_d = parsed.companyPhone) === null || _d === void 0 ? void 0 : _d.trim()) || "", companyWebsite: ((_e = parsed.companyWebsite) === null || _e === void 0 ? void 0 : _e.trim()) || "", companyAddress: ((_f = parsed.companyAddress) === null || _f === void 0 ? void 0 : _f.trim()) || ((_g = userData.locale) === null || _g === void 0 ? void 0 : _g.country) || "", companyInfo: ((_h = parsed.companyInfo) === null || _h === void 0 ? void 0 : _h.trim()) || "", detailedDescription: ((_j = parsed.detailedDescription) === null || _j === void 0 ? void 0 : _j.trim()) || "", companyType: parsed.companyType || "Entrepreneur", businessModel: parsed.businessModel || "", companySector: parsed.companySector || "", companySize: parsed.companySize || "1-10", companyTwitter: ((_k = parsed.companyTwitter) === null || _k === void 0 ? void 0 : _k.trim()) || "", companyInstagram: ((_l = parsed.companyInstagram) === null || _l === void 0 ? void 0 : _l.trim()) || "" });
-                }
-                catch (parseError) {
-                    console.error("JSON ayrıştırma hatası:", parseError);
-                    console.error("Alınan metin:", text);
-                    throw new Error("AI yanıtı JSON formatında değil");
-                }
-            }
-            catch (error) {
-                console.error("Gemini API hatası:", error);
-                throw error;
-            }
-        });
-    }
+        const result = yield this.model.generateContent(prompt);
+        const response = yield result.response;
+        const text = this.cleanJsonString(response.text());
+        try {
+          const parsed = JSON.parse(text);
+          return Object.assign(Object.assign({}, parsed), {
+            companyLogo: userData.profilePictureUrl || "",
+            companyLinkedIn: userData.linkedin || "",
+            companyEmail: userData.email || "",
+            companyName:
+              ((_c = parsed.companyName) === null || _c === void 0
+                ? void 0
+                : _c.trim()) || `${userData.firstName} ${userData.lastName}`,
+            companyPhone:
+              ((_d = parsed.companyPhone) === null || _d === void 0
+                ? void 0
+                : _d.trim()) || "",
+            companyWebsite:
+              ((_e = parsed.companyWebsite) === null || _e === void 0
+                ? void 0
+                : _e.trim()) || "",
+            companyAddress:
+              ((_f = parsed.companyAddress) === null || _f === void 0
+                ? void 0
+                : _f.trim()) ||
+              ((_g = userData.locale) === null || _g === void 0
+                ? void 0
+                : _g.country) ||
+              "",
+            companyInfo:
+              ((_h = parsed.companyInfo) === null || _h === void 0
+                ? void 0
+                : _h.trim()) || "",
+            detailedDescription:
+              ((_j = parsed.detailedDescription) === null || _j === void 0
+                ? void 0
+                : _j.trim()) || "",
+            companyType: parsed.companyType || "Entrepreneur",
+            businessModel: parsed.businessModel || "",
+            companySector: parsed.companySector || "",
+            companySize: parsed.companySize || "1-10",
+            companyTwitter:
+              ((_k = parsed.companyTwitter) === null || _k === void 0
+                ? void 0
+                : _k.trim()) || "",
+            companyInstagram:
+              ((_l = parsed.companyInstagram) === null || _l === void 0
+                ? void 0
+                : _l.trim()) || "",
+          });
+        } catch (parseError) {
+          console.error("JSON ayrıştırma hatası:", parseError);
+          console.error("Alınan metin:", text);
+          throw new Error("AI yanıtı JSON formatında değil");
+        }
+      } catch (error) {
+        console.error("Gemini API hatası:", error);
+        throw error;
+      }
+    });
+  }
 }
 exports.GeminiService = GeminiService;

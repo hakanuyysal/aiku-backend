@@ -22,11 +22,19 @@ export class RobotsDisallowedError extends Error {
 interface FormData {
   companyName: string;
   companyLogo?: string;
-  companyType?: 'Business' | 'Investor' | 'Startup';
+  companyType?: "Business" | "Investor" | "Startup";
   openForInvestments?: boolean;
-  businessModel?: 'B2B' | 'B2C' | 'B2G' | 'C2C' | 'C2B' | 'D2C' | 'B2B2C';
+  businessModel?: "B2B" | "B2C" | "B2G" | "C2C" | "C2B" | "D2C" | "B2B2C";
   companySector?: string;
-  companySize?: '1-10' | '11-50' | '51-200' | '201-500' | '501-1000' | '1001-5000' | '5001-10000' | '10001+';
+  companySize?:
+    | "1-10"
+    | "11-50"
+    | "51-200"
+    | "201-500"
+    | "501-1000"
+    | "1001-5000"
+    | "5001-10000"
+    | "10001+";
   companyEmail: string;
   companyPhone: string;
   companyInfo?: string;
@@ -74,6 +82,7 @@ interface ScrapeResult {
 
 export class GeminiService {
   private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  private chatModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   private cleanJsonString(text: string): string {
     text = text.replace(/```json\n?/g, "").replace(/```\n?/g, "");
@@ -169,7 +178,9 @@ export class GeminiService {
 
       const isAllowed = await this.checkRobotsRules(url);
       if (!isAllowed) {
-        throw new RobotsDisallowedError("Bu site robots.txt tarafından engellenmiş");
+        throw new RobotsDisallowedError(
+          "Bu site robots.txt tarafından engellenmiş"
+        );
       }
 
       const browser = await puppeteer.launch({
@@ -311,22 +322,22 @@ export class GeminiService {
         'img[alt*="logo" i]',
         'img[src*="logo" i]',
         // Header, navbar veya footer içindeki resimler (genelde logo olur)
-        'header img',
-        'nav img',
-        '.navbar img',
-        '.header img',
-        '.logo img',
-        '.site-logo img',
-        '.brand img',
-        '.brand-logo img',
-        'a.logo img',
-        'a.brand img',
-        '.footer .logo img',
+        "header img",
+        "nav img",
+        ".navbar img",
+        ".header img",
+        ".logo img",
+        ".site-logo img",
+        ".brand img",
+        ".brand-logo img",
+        "a.logo img",
+        "a.brand img",
+        ".footer .logo img",
         // Logo sınıfı olan elemanlar
-        '.logo img',
-        '.site-logo',
-        '.company-logo',
-        '.brand-logo',
+        ".logo img",
+        ".site-logo",
+        ".company-logo",
+        ".brand-logo",
         // Link içindeki logoları da bul
         'a[href="/"] img',
         'a[href="./"] img',
@@ -334,19 +345,21 @@ export class GeminiService {
         // Ana sayfaya link veren logoyu bul
         'a[href="#home"] img',
         // SVG logoları
-        'svg.logo',
+        "svg.logo",
         // Genel olarak ilk img tag'i
-        'header a img',
+        "header a img",
         // Son çare olarak sayfadaki ilk resim
-        'a img'
+        "a img",
       ];
 
       // Tüm seçicileri dene
       for (const selector of logoSelectors) {
-        const element = document.querySelector(selector) as HTMLImageElement | SVGElement;
+        const element = document.querySelector(selector) as
+          | HTMLImageElement
+          | SVGElement;
         if (element) {
           // Eğer HTMLImageElement ise src değerini al
-          if ('src' in element && element.src) {
+          if ("src" in element && element.src) {
             return element.src;
           }
           // SVG olabilir, o zaman outerHTML'i dön
@@ -566,34 +579,36 @@ ${addressInfo.join("\n")}
           const logoSelectors = [
             'img[alt*="logo" i]',
             'img[src*="logo" i]',
-            'header img',
-            'nav img',
-            '.navbar img',
-            '.header img',
-            '.logo img',
-            '.site-logo img',
-            '.brand img',
-            '.brand-logo img',
-            'a.logo img',
-            'a.brand img',
-            '.footer .logo img',
-            '.logo img',
-            '.site-logo',
-            '.company-logo',
-            '.brand-logo',
+            "header img",
+            "nav img",
+            ".navbar img",
+            ".header img",
+            ".logo img",
+            ".site-logo img",
+            ".brand img",
+            ".brand-logo img",
+            "a.logo img",
+            "a.brand img",
+            ".footer .logo img",
+            ".logo img",
+            ".site-logo",
+            ".company-logo",
+            ".brand-logo",
             'a[href="/"] img',
             'a[href="./"] img',
             'a[href="../"] img',
             'a[href="#home"] img',
-            'svg.logo',
-            'header a img',
-            'a img'
+            "svg.logo",
+            "header a img",
+            "a img",
           ];
 
           for (const selector of logoSelectors) {
-            const element = document.querySelector(selector) as HTMLImageElement | SVGElement;
+            const element = document.querySelector(selector) as
+              | HTMLImageElement
+              | SVGElement;
             if (element) {
-              if ('src' in element && element.src) {
+              if ("src" in element && element.src) {
                 return element.src;
               } else if (element instanceof SVGElement) {
                 return `data:image/svg+xml;base64,${btoa(element.outerHTML)}`;
@@ -698,9 +713,16 @@ ${websiteContent}`;
           businessModel: parsed.businessModel || "",
           companySector: parsed.companySector || "",
           companySize: parsed.companySize || "",
-          companyLinkedIn: socialLinks.find((link: string) => link.includes("linkedin.com")) || "",
-          companyTwitter: socialLinks.find((link: string) => link.includes("twitter.com")) || "",
-          companyInstagram: socialLinks.find((link: string) => link.includes("instagram.com")) || "",
+          companyLinkedIn:
+            socialLinks.find((link: string) => link.includes("linkedin.com")) ||
+            "",
+          companyTwitter:
+            socialLinks.find((link: string) => link.includes("twitter.com")) ||
+            "",
+          companyInstagram:
+            socialLinks.find((link: string) =>
+              link.includes("instagram.com")
+            ) || "",
           productName: parsed.productName || "",
           productLogo: parsed.productLogo || "",
           productCategory: parsed.productCategory || "",
@@ -781,7 +803,7 @@ ${documentText}`;
         // Extract domain from email if website is empty
         let website = parsed.companyWebsite?.trim() || "";
         if (!website && parsed.companyEmail) {
-          const emailDomain = parsed.companyEmail.split('@')[1]?.split(',')[0];
+          const emailDomain = parsed.companyEmail.split("@")[1]?.split(",")[0];
           if (emailDomain) {
             website = `https://${emailDomain}`;
           }
@@ -806,9 +828,13 @@ ${documentText}`;
           companySector: parsed.companySector || "",
           companySize: parsed.companySize || "",
           companyLogo: "", // Dokümandan logo çekilemeyeceği için boş
-          companyLinkedIn: linkedInMatch ? `https://www.${linkedInMatch[0]}` : "",
+          companyLinkedIn: linkedInMatch
+            ? `https://www.${linkedInMatch[0]}`
+            : "",
           companyTwitter: twitterMatch ? `https://www.${twitterMatch[0]}` : "",
-          companyInstagram: instagramMatch ? `https://www.${instagramMatch[0]}` : "",
+          companyInstagram: instagramMatch
+            ? `https://www.${instagramMatch[0]}`
+            : "",
         };
       } catch (parseError) {
         console.error("JSON parse error:", parseError);
@@ -835,7 +861,7 @@ User Information:
 - Full Name: ${userData.firstName} ${userData.lastName}
 - Email: ${userData.email}
 - LinkedIn Profile: ${userData.linkedin}
-- Location: ${userData.locale?.country || 'Not specified'}
+- Location: ${userData.locale?.country || "Not specified"}
 
 Instructions:
 1. Create a professional company profile based on this individual's information
@@ -868,10 +894,13 @@ Instructions:
           companyLogo: userData.profilePictureUrl || "", // Kullanıcı profil resmini logo olarak kullan
           companyLinkedIn: userData.linkedin || "",
           companyEmail: userData.email || "",
-          companyName: parsed.companyName?.trim() || `${userData.firstName} ${userData.lastName}`,
+          companyName:
+            parsed.companyName?.trim() ||
+            `${userData.firstName} ${userData.lastName}`,
           companyPhone: parsed.companyPhone?.trim() || "",
           companyWebsite: parsed.companyWebsite?.trim() || "",
-          companyAddress: parsed.companyAddress?.trim() || userData.locale?.country || "",
+          companyAddress:
+            parsed.companyAddress?.trim() || userData.locale?.country || "",
           companyInfo: parsed.companyInfo?.trim() || "",
           detailedDescription: parsed.detailedDescription?.trim() || "",
           companyType: parsed.companyType || "Entrepreneur",
@@ -889,6 +918,309 @@ Instructions:
     } catch (error) {
       console.error("Gemini API hatası:", error);
       throw error;
+    }
+  }
+
+  // Verilen URL'den slayt oluşturmak için yeni metot
+  async createPresentationFromWebsite(url: string): Promise<any> {
+    try {
+      // Önce web sitesini scrape et
+      const scrapeResult = await this.scrapeWebsite(url);
+
+      // Web sitesinden önce genel bilgileri analiz edelim
+      const companyData = await this.analyzeWebsite(url);
+
+      // Web sitesinin domain adını al
+      const parsedUrl = new URL(url);
+      const domain = parsedUrl.hostname;
+
+      // Web sitesinden logo URL'sini almaya çalış
+      const logoUrl = await this.extractLogoFromWebsite(url);
+
+      // CompanyData'dan önemli bilgileri string olarak formatlı hale getir
+      const companyInfoDetails = `
+Company Name: ${companyData.companyName}
+Company Type: ${companyData.companyType}
+Business Model: ${companyData.businessModel}
+Company Sector: ${companyData.companySector}
+Company Size: ${companyData.companySize}
+Company Info: ${companyData.companyInfo}
+Company Email: ${companyData.companyEmail}
+Company Phone: ${companyData.companyPhone}
+Company Website: ${companyData.companyWebsite}
+Company Address: ${companyData.companyAddress}
+
+Product Name: ${companyData.productName}
+Product Category: ${companyData.productCategory}
+Product Description: ${companyData.productDescription}
+Pricing Model: ${companyData.pricingModel}
+
+Tags: ${companyData.tags ? companyData.tags.join(', ') : ''}
+
+Problems the product solves: 
+${companyData.problems ? companyData.problems.map(p => `- ${p}`).join('\n') : ''}
+
+Solutions offered:
+${companyData.solutions ? companyData.solutions.map(s => `- ${s}`).join('\n') : ''}
+
+Key Features:
+${companyData.keyFeatures ? companyData.keyFeatures.map(f => `- ${f}`).join('\n') : ''}
+
+Potential Improvements:
+${companyData.improvements ? companyData.improvements.map(i => `- ${i}`).join('\n') : ''}
+
+Detailed Description:
+${companyData.detailedDescription}
+
+Social Media:
+LinkedIn: ${companyData.companyLinkedIn}
+Twitter: ${companyData.companyTwitter}
+Instagram: ${companyData.companyInstagram}
+      `;
+
+      // Gemini model ile slayt içeriği oluştur
+      const prompt = `
+      I need you to create a professional presentation/slide content in ENGLISH based on this EXACT company information. 
+      This information comes from analyzing the website, so it's highly accurate and should be prioritized over any other content.
+
+      Website: ${domain}
+      Logo URL: ${logoUrl || companyData.companyLogo || ""}
+      
+      DETAILED COMPANY INFORMATION: 
+      ${companyInfoDetails}
+      
+      Please create a comprehensive presentation that includes ALL this information, structured as follows:
+      1. Create a total of 7-8 slides in JSON format
+      2. First slide: Cover page with company name, logo, and brief tagline
+      3. Second slide: Company Overview (using companyInfo and detailedDescription)
+      4. Third slide: Products and Services (focusing on productName, productCategory, productDescription)
+      5. Fourth slide: Problems & Solutions (using the problems and solutions data)
+      6. Fifth slide: Key Features (highlighting the key features)
+      7. Sixth slide: Business Model & Market Position (using companyType, businessModel, companySector)
+      8. Final slide: Contact Information (email, phone, website, social media links)
+      
+      IMPORTANT:
+      - Use ALL the provided company information - this is real data from the company's analysis, not placeholder text
+      - Write the content in a professional, concise, and engaging manner
+      - Format each slide with a clear title and bulleted content where appropriate
+      - Make sure ALL key information from the input data is represented in the slides
+      - Each slide should be thorough but not overcrowded
+      
+      Output format (as a JSON array):
+      [
+        {
+          "slide_number": 1,
+          "title": "Cover Title",
+          "content": "Cover content with company name and brief tagline",
+          "logo": "${logoUrl || companyData.companyLogo || ""}"
+        },
+        {
+          "slide_number": 2,
+          "title": "Company Overview",
+          "content": "Detailed but concise overview..."
+        },
+        ... (other slides as described)
+      ]
+      
+      Remember, this presentation will be generated as a PowerPoint file, so format accordingly.
+      `;
+
+      const result = await this.model.generateContent(prompt);
+      const responseText = result.response.text();
+
+      // JSON yanıtını temizle ve ayrıştır
+      const cleanedJson = this.cleanJsonString(responseText);
+      try {
+        const slides = JSON.parse(cleanedJson);
+        return {
+          success: true,
+          websiteUrl: url,
+          domain: domain,
+          logoUrl: logoUrl || companyData.companyLogo || null,
+          slides: slides,
+          // Şirket bilgilerini de ekleyelim
+          companyDetails: {
+            companyName: companyData.companyName || "",
+            companyInfo: companyData.companyInfo || "",
+            companyType: companyData.companyType || "",
+            businessModel: companyData.businessModel || "",
+            companySector: companyData.companySector || "",
+            companyEmail: companyData.companyEmail || "",
+            companyPhone: companyData.companyPhone || "",
+            companyAddress: companyData.companyAddress || "",
+            companySize: companyData.companySize || "",
+            companyWebsite: companyData.companyWebsite || "",
+            socialMedia: {
+              linkedin: companyData.companyLinkedIn || "",
+              twitter: companyData.companyTwitter || "",
+              instagram: companyData.companyInstagram || "",
+            },
+            productInfo: {
+              productName: companyData.productName || "",
+              productDescription: companyData.productDescription || "",
+              productCategory: companyData.productCategory || "",
+              tags: companyData.tags || [],
+              problems: companyData.problems || [],
+              solutions: companyData.solutions || [],
+              keyFeatures: companyData.keyFeatures || [],
+              pricingModel: companyData.pricingModel || "",
+            },
+          },
+        };
+      } catch (error) {
+        console.error("JSON parsing error:", error);
+        throw new Error("Slayt içeriği oluşturulamadı: Geçersiz JSON formatı");
+      }
+    } catch (error) {
+      console.error("Presentation creation error:", error);
+      if (error instanceof RobotsDisallowedError) {
+        throw error;
+      }
+      throw new Error("Slayt oluşturulamadı: " + (error as Error).message);
+    }
+  }
+
+  // Web sitesinden logo URL'sini çıkarmak için yardımcı metot
+  private async extractLogoFromWebsite(url: string): Promise<string | null> {
+    try {
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+        ],
+      });
+
+      try {
+        const page = await browser.newPage();
+        await page.setUserAgent(
+          "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
+        );
+
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+        
+        // waitForTimeout yerine Promise ile setTimeout kullanma
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Logo seçicileri - genellikle kullanılan yaygın class ve ID'ler
+        const logoSelectors = [
+          'img[id*="logo"]',
+          'img[class*="logo"]',
+          'img[alt*="logo"]',
+          'img[src*="logo"]',
+          'svg[id*="logo"]',
+          'svg[class*="logo"]',
+          ".logo img",
+          "#logo img",
+          "header img",
+          ".header img",
+          ".navbar-brand img",
+          ".brand img",
+          'a[class*="logo"] img',
+        ];
+
+        // Tüm seçicileri dene
+        for (const selector of logoSelectors) {
+          const logoElement = await page.$(selector);
+          if (logoElement) {
+            // Eğer img etiketi ise
+            if (selector.includes("img")) {
+              const src = await page.evaluate(
+                (el) => el.getAttribute("src"),
+                logoElement
+              );
+              if (src) {
+                // Göreceli URL ise mutlak URL'ye çevir
+                const absoluteUrl = new URL(src, url).href;
+                return absoluteUrl;
+              }
+            }
+            // Eğer SVG etiketi ise
+            else if (selector.includes("svg")) {
+              // SVG'nin outerHTML'ini al
+              const svgHtml = await page.evaluate(
+                (el) => el.outerHTML,
+                logoElement
+              );
+              // Base64 olarak kodla
+              return `data:image/svg+xml;base64,${Buffer.from(svgHtml).toString(
+                "base64"
+              )}`;
+            }
+          }
+        }
+
+        return null;
+      } finally {
+        await browser.close();
+      }
+    } catch (error) {
+      console.error("Logo extraction error:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Gemini modeli ile chat yaparak sohbet fonksiyonu
+   * @param message Kullanıcının mesajı
+   * @param conversationHistory Önceki konuşma geçmişi (opsiyonel)
+   * @returns AI'den gelen yanıt ve güncellenmiş konuşma geçmişi
+   */
+  async chat(message: string, conversationHistory: any[] = []): Promise<{ response: string; conversationHistory: any[] }> {
+    try {
+      // Model için chat oluştur
+      const chat = this.chatModel.startChat({
+        history: conversationHistory.map(item => ({
+          role: item.role,
+          parts: [{ text: item.content }]
+        })),
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
+      });
+
+      // Mesajı gönder ve yanıt al
+      const result = await chat.sendMessage(message);
+      const responseText = await result.response;
+      const responseContent = responseText.text();
+
+      // Konuşma geçmişine ekle
+      const updatedHistory = [
+        ...conversationHistory,
+        { role: "user", content: message },
+        { role: "model", content: responseContent }
+      ];
+
+      return {
+        response: responseContent,
+        conversationHistory: updatedHistory
+      };
+    } catch (error) {
+      console.error("Chat error:", error);
+      throw new Error(`Sohbet sırasında bir hata oluştu: ${(error as Error).message}`);
     }
   }
 }
