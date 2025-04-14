@@ -648,13 +648,13 @@ Instructions:
    - companyPhone: IMPORTANT - Look for ALL phone numbers in contact section, footer, and throughout the content. Format them properly and include ALL found numbers separated by commas
    - companyWebsite: Use the provided URL (base domain without path)
    - companyAddress: CRITICAL - Look in 'Found Addresses' section first, then contact section and footer. If multiple addresses found, use the most complete and relevant one
-   - companyInfo: Write a PROFESSIONAL and FORMAL 2-3 sentence company description focusing on their core business, main offerings, and market position. Write in third person, present tense, and avoid phrases like "appears to be" or "seems to". Example: "[Company] is a leading provider of [services/products] specializing in [focus area]. The company delivers [key offerings] to [target market]."
+   - companyInfo: Write a PROFESSIONAL and FORMAL 2-3 sentence company description focusing on their core business, main offerings, and market position. Write in third person, present tense, and avoid phrases like "appears to be" or "seems to". Example: "[Company] is a leading provider of [services/products] specializing in [focus area]. The company delivers [key offerings] to [target market]." Limit your answer to a maximum of 500 characters.
    - detailedDescription: Write a COMPREHENSIVE and FORMAL 4-5 paragraph company description that includes:
      * Paragraph 1: Company overview and core business
      * Paragraph 2: Products and services in detail
      * Paragraph 3: Market focus and target audience
      * Paragraph 4: Company strengths and unique value propositions
-     Write in third person, present tense, using professional business language. DO NOT use uncertain language like "appears to be" or "seems to". DO NOT mention the source of information or make observations about missing information.
+     Write in third person, present tense, using professional business language. DO NOT use uncertain language like "appears to be" or "seems to". DO NOT mention the source of information or make observations about missing information. Limit your answer to a maximum of 3000 characters.
    - companyType: Based on the content, determine if it's 'Business', 'Investor', or 'Startup'
    - businessModel: Based on their customer focus, determine if it's 'B2B', 'B2C', 'B2G', 'C2C', 'C2B', 'D2C', or 'B2B2C'
    - companySector: Determine their main industry sector
@@ -662,8 +662,8 @@ Instructions:
    - productName: The name of the product.
    - productLogo: The URL of the product logo.
    - productCategory: The category of the product.
-   - productDescription: A short description of the product.
-   - detailedDescription: A detailed, multi-paragraph description of the product.
+   - productDescription: A short description of the product. Limit your answer to a maximum of 500 characters.
+   - detailedDescription: A detailed, multi-paragraph description of the product. Limit your answer to a maximum of 3000 characters.
    - tags: This field should contain short, descriptive keywords or labels that summarize the product. **Return as a JSON array. If no tags are found, return an empty array []**
    - problems: This field should list the issues or challenges that the product aims to solve. For example, include problems like "high energy consumption", "inefficient workflow", "lack of user engagement", etc. **Return as a JSON array. If no problems are found, return an empty array []**
    - solutions: This field should detail the solutions or approaches the product offers to address the identified problems. For example, include solutions like "automated process optimization", "real-time analytics", "cloud-based data management", etc. **Return as a JSON array. If no solutions are found, return an empty array []**
