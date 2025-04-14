@@ -262,17 +262,34 @@ export class GeminiService {
     let retryCount = 0;
     const maxRetries = 3;
 
+    // JavaScript ve görüntüleri devre dışı bırakma seçeneği (ihtiyaç duyulursa aktifleştirin)
+    // await page.setRequestInterception(true);
+    // page.on('request', (req) => {
+    //   if (req.resourceType() === 'image' || req.resourceType() === 'script') {
+    //     req.abort();
+    //   } else {
+    //     req.continue();
+    //   }
+    // });
+
     while (retryCount < maxRetries) {
       try {
+        // Timeout süresini 60 saniyeye çıkar ve domcontentloaded kullan (daha hızlı)
         await page.goto(url, {
-          waitUntil: "networkidle0",
-          timeout: 30000,
+          waitUntil: "domcontentloaded", // networkidle0 yerine daha hızlı olan domcontentloaded
+          timeout: 60000, // 30 saniye yerine 60 saniye
         });
+        
+        // İçerik yüklenmesi için biraz daha bekleyebiliriz
+        await this.delay(2000);
+        
         visitedUrls.add(url);
         break;
       } catch (error) {
+        console.log(`Retry ${retryCount + 1}/${maxRetries} for ${url}: ${error.message}`);
         retryCount++;
         if (retryCount === maxRetries) throw error;
+        // Her denemede artan bekleme süresi
         await this.delay(2000 * retryCount);
       }
     }
