@@ -304,9 +304,20 @@ class GeminiService {
           }
         }
         
-        // İstek dinlemeyi temizle
-        page.removeListener('request', requestHandler);
-        yield page.setRequestInterception(false).catch(() => {}); // Hata olursa görmezden gel
+        // İstek dinlemeyi temizle - removeListener yerine off kullanıyoruz
+        try {
+          // Bazı Puppeteer sürümleri removeListener, bazıları off kullanır
+          if (typeof page.off === 'function') {
+            page.off('request', requestHandler);
+          } else if (typeof page.removeListener === 'function') {
+            page.removeListener('request', requestHandler);
+          }
+          // Her durumda request interception'ı kapatmayı dene
+          yield page.setRequestInterception(false).catch(() => {});
+        } catch (cleanupError) {
+          console.warn("Olay dinleyici temizleme hatası:", cleanupError);
+          // Yine de devam et - kritik bir hata değil
+        }
         
         // CAPTCHA tespiti
         try {
