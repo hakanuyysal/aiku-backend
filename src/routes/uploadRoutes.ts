@@ -7,6 +7,7 @@ import { Product } from '../models/Product';
 import { TeamMember } from '../models/TeamMember';
 import { Investment } from '../models/Investment';
 import { deleteFile } from '../utils/fileUtils';
+import logger from '../config/logger';
 
 const router = Router();
 
@@ -51,6 +52,9 @@ router.post('/team-member-profile-photo/:teamMemberId', protect, upload.single('
       message: 'Dosya yükleme hatası',
       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
     });
+    logger.error('Dosya yükleme hatası', {
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
   }
 });
 
@@ -79,6 +83,9 @@ router.delete('/team-member-profile-photo/:teamMemberId', protect, async (req: R
     res.status(500).json({
       success: false,
       message: 'Dosya silme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+    logger.error('Dosya silme hatası', {
       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
     });
   }
@@ -121,6 +128,9 @@ router.post('/profile-photo', protect, upload.single('photo'), async (req: Reque
       message: 'Dosya yükleme hatası',
       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
     });
+    logger.error('Dosya yükleme hatası', {
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
   }
 });
 
@@ -141,6 +151,9 @@ router.delete('/profile-photo', protect, async (req: Request, res: Response) => 
     res.status(500).json({
       success: false,
       message: 'Dosya silme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+    logger.error('Dosya silme hatası', {
       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
     });
   }
@@ -187,6 +200,9 @@ router.post('/company-logo/:companyId', protect, upload.single('logo'), async (r
     res.status(500).json({
       success: false,
       message: 'Dosya yükleme hatası',
+      error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+    });
+    logger.error('Dosya yükleme hatası', {
       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
     });
   }

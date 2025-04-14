@@ -6,6 +6,8 @@ import { Server } from "socket.io";
 import http from "http";
 import passport from "./config/passport";
 import cors from "cors";
+import logger from "./config/logger";
+import httpLogger from "./middleware/httpLogger";
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -61,33 +63,39 @@ const io = new Server(server, {
 // Socket.io bağlantılarını yönet
 io.on('connection', (socket) => {
   console.log('👋 Yeni bir kullanıcı bağlandı:', socket.id);
+  logger.debug('Yeni Socket.IO bağlantısı kuruldu', { socketId: socket.id });
 
   // Şirket id'sine göre chat odası katılımı
   socket.on('join-company-chat', (companyId) => {
     socket.join(`company-${companyId}`);
     console.log(`🏢 ${socket.id} kullanıcısı ${companyId} şirket odasına katıldı`);
+    logger.debug('Kullanıcı şirket chat odasına katıldı', { socketId: socket.id, companyId });
   });
 
   // Sohbet oturum id'sine göre chat odası katılımı
   socket.on('join-chat-session', (chatSessionId) => {
     socket.join(`chat-${chatSessionId}`);
     console.log(`💬 ${socket.id} kullanıcısı ${chatSessionId} sohbet odasına katıldı`);
+    logger.debug('Kullanıcı sohbet odasına katıldı', { socketId: socket.id, chatSessionId });
   });
 
   // Özel chat odalarından ayrılma
   socket.on('leave-company-chat', (companyId) => {
     socket.leave(`company-${companyId}`);
     console.log(`🚪 ${socket.id} kullanıcısı ${companyId} şirket odasından ayrıldı`);
+    logger.debug('Kullanıcı şirket chat odasından ayrıldı', { socketId: socket.id, companyId });
   });
 
   socket.on('leave-chat-session', (chatSessionId) => {
     socket.leave(`chat-${chatSessionId}`);
     console.log(`🚪 ${socket.id} kullanıcısı ${chatSessionId} sohbet odasından ayrıldı`);
+    logger.debug('Kullanıcı sohbet odasından ayrıldı', { socketId: socket.id, chatSessionId });
   });
 
   // Bağlantı kesildiğinde
   socket.on('disconnect', () => {
     console.log('👋 Bir kullanıcı ayrıldı:', socket.id);
+    logger.debug('Socket.IO bağlantısı kesildi', { socketId: socket.id });
   });
 });
 
@@ -134,6 +142,7 @@ const corsOriginCheck = (origin: string | undefined, callback: (err: Error | nul
   
   // Diğer tüm istekleri reddet
   console.log(`⛔ CORS engellendi: ${origin}`);
+  logger.warn('CORS politikası tarafından engellenen istek', { origin });
   callback(new Error('CORS politikası tarafından engellendi'));
 };
 
@@ -160,6 +169,7 @@ app.use(cors(corsOptions));
 app.use((err: any, req: Request, res: Response, next: any) => {
   if (err.name === 'CORSError') {
     console.error('❌ CORS Hatası:', err.message);
+    logger.error('CORS Hatası', { error: err.message, url: req.url, origin: req.headers.origin });
     return res.status(403).json({
       success: false,
       message: 'CORS hatası: İstek engellendi',
@@ -171,6 +181,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
 
 // OPTIONS istekleri için özel işleyici
 app.options('*', cors(corsOptions));
+
+// HTTP Logger middleware'ini ekle
+app.use(httpLogger);
 
 // İstek loglaması için middleware
 app.use((req, res, next) => {
@@ -347,6 +360,14 @@ app.get("/test-google-auth", (req, res) => {
 // Hata yakalama middleware'i
 app.use((err: any, req: Request, res: Response, next: any) => {
   console.error("❌ Sunucu Hatası:", err);
+  logger.error("Sunucu Hatası", { 
+    error: err.message, 
+    stack: err.stack,
+    url: req.url,
+    method: req.method,
+    userId: req.user?.id
+  });
+  
   res.status(err.status || 500).json({
     message: err.message || "Sunucu hatası",
     error: process.env.NODE_ENV === "development" ? err : {},
@@ -370,8 +391,14 @@ app.get("/socket-test", (_req: Request, res: Response) => {
 // MongoDB bağlantısı
 mongoose
   .connect(process.env.MONGODB_URI!)
-  .then(() => console.log("✅ MongoDB bağlantısı başarılı"))
-  .catch((err) => console.log("❌ MongoDB bağlantı hatası:", err));
+  .then(() => {
+    console.log("✅ MongoDB bağlantısı başarılı");
+    logger.info("MongoDB bağlantısı başarılı");
+  })
+  .catch((err) => {
+    console.log("❌ MongoDB bağlantı hatası:", err);
+    logger.error("MongoDB bağlantı hatası", { error: err.message });
+  });
 
 // Route'ları ekle
 app.use("/api/auth", authRoutes);
@@ -405,4 +432,5 @@ const PORT = process.env.PORT || 3004;
 server.listen(PORT, () => {
   console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
   console.log("✅ Socket.IO sistemi aktif");
+  logger.info(`Sunucu başlatıldı`, { port: PORT, env: process.env.NODE_ENV });
 });

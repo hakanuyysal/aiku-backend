@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ExchangeRateCache } from '../utils/cacheUtils';
+import logger from '../config/logger';
 
 // Döviz kuru API yanıt tipi
 export interface ExchangeRateResponse {
@@ -53,27 +54,42 @@ export class ExchangeRateService {
       // Eğer cache'de veri varsa ve süresi dolmamışsa, cache'den döndür
       if (cachedData.data && !cachedData.expired) {
         console.log('💰 Döviz kurları cache\'den alındı');
+        logger.debug('Döviz kurları cache\'den alındı', { cacheKey: this.CACHE_KEY });
         this.lastFetchFromApi = false; // Cache'den veri alındı
         return cachedData.data;
       }
 
       // Cache'de veri yoksa veya süresi dolduysa, API'den yeni veri al
       console.log('🔄 Döviz kurları API\'den güncelleniyor...');
+      logger.info('Döviz kurları API\'den güncelleniyor', { url: this.API_URL });
       const response = await axios.get<ExchangeRateResponse>(this.API_URL);
       
       // API yanıtını cache'e kaydet
       await this.cache.set(this.CACHE_KEY, response.data, this.CACHE_DURATION_MS);
       
       console.log('✅ Döviz kurları başarıyla güncellendi');
+      logger.info('Döviz kurları başarıyla güncellendi', { 
+        lastUpdateUTC: response.data.time_last_update_utc,
+        nextUpdateUTC: response.data.time_next_update_utc
+      });
       this.lastFetchFromApi = true; // API'den veri alındı
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Döviz kurları alınırken hata:', error);
+      logger.error('Döviz kurları alınırken hata', { 
+        error: error.message, 
+        stack: error.stack,
+        url: this.API_URL
+      });
       
       // Hata durumunda, eğer cache'de eski veri varsa onu döndür
       const cachedData = this.cache.get<ExchangeRateResponse>(this.CACHE_KEY);
       if (cachedData.data) {
         console.log('⚠️ API hatası nedeniyle eski cache verisi kullanılıyor');
+        logger.warn('API hatası nedeniyle eski cache verisi kullanılıyor', { 
+          cacheKey: this.CACHE_KEY,
+          cacheAge: cachedData.data.time_last_update_utc
+        });
         this.lastFetchFromApi = false; // Cache'den veri alındı
         return cachedData.data;
       }
@@ -94,8 +110,13 @@ export class ExchangeRateService {
       }
       
       return null; // Para birimi bulunamadı
-    } catch (error) {
+    } catch (error: any) {
       console.error(`❌ ${currencyCode} kuru alınırken hata:`, error);
+      logger.error(`${currencyCode} kuru alınırken hata`, {
+        error: error.message,
+        stack: error.stack,
+        currencyCode
+      });
       throw error;
     }
   }
@@ -105,16 +126,26 @@ export class ExchangeRateService {
     try {
       // API'den yeni veri al
       console.log('🔄 Döviz kurları zorla güncelleniyor...');
+      logger.info('Döviz kurları zorla güncelleniyor', { url: this.API_URL });
       const response = await axios.get<ExchangeRateResponse>(this.API_URL);
       
       // API yanıtını cache'e kaydet
       await this.cache.set(this.CACHE_KEY, response.data, this.CACHE_DURATION_MS);
       
       console.log('✅ Döviz kurları başarıyla güncellendi');
+      logger.info('Döviz kurları başarıyla güncellendi', { 
+        lastUpdateUTC: response.data.time_last_update_utc,
+        nextUpdateUTC: response.data.time_next_update_utc
+      });
       this.lastFetchFromApi = true; // API'den veri alındı
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Döviz kurları güncellenirken hata:', error);
+      logger.error('Döviz kurları güncellenirken hata', { 
+        error: error.message, 
+        stack: error.stack,
+        url: this.API_URL
+      });
       throw error;
     }
   }

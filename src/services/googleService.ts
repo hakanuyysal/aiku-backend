@@ -3,6 +3,7 @@ import { supabase } from "../config/supabase";
 import jwt, { SignOptions } from "jsonwebtoken";
 import dotenv from "dotenv";
 import axios from "axios";
+import logger from "../config/logger";
 
 dotenv.config();
 
@@ -10,12 +11,14 @@ export class GoogleService {
   async handleAuth(data: any) {
     try {
       console.log("GoogleService.handleAuth başladı:", data);
+      logger.info("GoogleService.handleAuth başladı", { data });
 
       // Google'dan kullanıcı bilgilerini al
       const googleUserInfo = await this.getGoogleUserInfo(
         data.user.access_token
       );
       console.log("Google kullanıcı bilgileri alındı:", googleUserInfo);
+      logger.info("Google kullanıcı bilgileri alındı", { googleUserInfo });
 
       // MongoDB'de kullanıcıyı ara veya oluştur
       let user = await User.findOne({ email: googleUserInfo.email });
@@ -33,6 +36,8 @@ export class GoogleService {
 
       if (!user) {
         console.log("Yeni kullanıcı oluşturuluyor:", userData);
+        logger.info("Yeni kullanıcı oluşturuluyor", { email: userData.email });
+        
         // Yeni kullanıcı için profil fotoğrafını ekle
         user = new User({
           ...userData,
@@ -44,6 +49,10 @@ export class GoogleService {
         console.log("Mevcut kullanıcı güncelleniyor:", {
           userId: user._id,
           mevcutProfilFoto: currentProfilePhoto,
+        });
+        logger.info("Mevcut kullanıcı güncelleniyor", {
+          userId: user._id.toString(),
+          email: user.email
         });
 
         // Bilgileri güncelle
@@ -58,12 +67,14 @@ export class GoogleService {
         // Eğer mevcut profil fotoğrafı yoksa, Google'dan gelen fotoğrafı kullan
         if (!currentProfilePhoto && googleUserInfo.picture) {
           console.log("Profil fotoğrafı ekleniyor çünkü mevcut fotoğraf yok");
+          logger.info("Profil fotoğrafı ekleniyor", { userId: user._id.toString() });
           user.profilePhoto = googleUserInfo.picture;
         } else {
           console.log(
             "Mevcut profil fotoğrafı korunuyor:",
             currentProfilePhoto
           );
+          logger.debug("Mevcut profil fotoğrafı korunuyor", { userId: user._id.toString() });
         }
 
         await user.save();
@@ -84,6 +95,7 @@ export class GoogleService {
       );
 
       console.log("JWT token oluşturuldu", token);
+      logger.info("JWT token oluşturuldu", { userId: user._id.toString() });
 
       return {
         user: {
@@ -99,6 +111,7 @@ export class GoogleService {
       };
     } catch (error: any) {
       console.error("Google auth error:", error);
+      logger.error("Google auth error", { error: error.message, stack: error.stack });
       throw new Error("Google ile giriş işlemi başarısız: " + error.message);
     }
   }
@@ -117,6 +130,11 @@ export class GoogleService {
         "Google userinfo error:",
         error.response?.data || error.message
       );
+      logger.error("Google userinfo error", { 
+        error: error.message, 
+        responseData: error.response?.data,
+        stack: error.stack
+      });
       throw new Error("Google kullanıcı bilgileri alınamadı");
     }
   }

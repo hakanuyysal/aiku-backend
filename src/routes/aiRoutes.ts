@@ -1,5 +1,8 @@
 import express from "express";
-import { GeminiService, RobotsDisallowedError } from "../services/geminiService";
+import {
+  GeminiService,
+  RobotsDisallowedError,
+} from "../services/geminiService";
 import { PowerPointService } from "../services/powerPointService";
 import multer from "multer";
 import path from "path";
@@ -11,6 +14,7 @@ import { promisify } from "util";
 import { Document } from "docx";
 import * as XLSX from "xlsx";
 import { exec } from "child_process";
+import logger from "../config/logger";
 
 const router = express.Router();
 const geminiService = new GeminiService();
@@ -71,7 +75,9 @@ function convertPagesWithTextutil(filePath: string): Promise<string> {
           resolve(content);
         } catch (readError: unknown) {
           reject(
-            new Error("Dönüştürülen dosya okunamadı: " + (readError as Error).message)
+            new Error(
+              "Dönüştürülen dosya okunamadı: " + (readError as Error).message
+            )
           );
         }
       }
@@ -221,6 +227,7 @@ async function readFileContent(file: Express.Multer.File): Promise<string> {
           return text;
         } catch (error) {
           console.error("Textract error:", error);
+          logger.error("Textract error:", error);
           throw new Error(`Dosya içeriği okunamadı: ${ext}`);
         }
 
@@ -233,6 +240,7 @@ async function readFileContent(file: Express.Multer.File): Promise<string> {
       fs.unlinkSync(file.path);
     } catch (error) {
       console.error("File deletion error:", error);
+      logger.error("File deletion error:", error);
     }
   }
 }
@@ -258,6 +266,7 @@ router.post(
       } catch (error) {
         const err = error as FileProcessingError;
         console.error("File processing error:", err);
+        logger.error("File processing error:", err);
         res.status(400).json({
           error: "File processing error",
           details: err.message,
@@ -265,6 +274,7 @@ router.post(
       }
     } catch (error) {
       console.error("Document analysis error:", error);
+      logger.error("Document analysis error:", error);
       res.status(500).json({ error: "Error during document analysis" });
     }
   }
@@ -274,7 +284,7 @@ router.post(
 router.post("/analyze-website", async (req, res) => {
   try {
     const { url } = req.body;
-    
+
     if (!url) {
       return res.status(400).json({ error: "URL gerekli" });
     }
@@ -289,6 +299,7 @@ router.post("/analyze-website", async (req, res) => {
       });
     } else {
       console.error("Website analysis error:", error);
+      logger.error("Website analysis error:", error);
       res.status(500).json({ error: (error as Error).message });
     }
   }
@@ -298,15 +309,17 @@ router.post("/analyze-website", async (req, res) => {
 router.post("/create-presentation", async (req, res) => {
   try {
     const { url } = req.body;
-    
+
     if (!url) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "URL gerekli" 
+      return res.status(400).json({
+        success: false,
+        error: "URL gerekli",
       });
     }
 
-    const presentationData = await geminiService.createPresentationFromWebsite(url);
+    const presentationData = await geminiService.createPresentationFromWebsite(
+      url
+    );
     res.json(presentationData);
   } catch (error) {
     if (error instanceof RobotsDisallowedError) {
@@ -317,9 +330,10 @@ router.post("/create-presentation", async (req, res) => {
       });
     } else {
       console.error("Presentation creation error:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: (error as Error).message 
+      logger.error("Presentation creation error:", error);
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message,
       });
     }
   }
@@ -330,11 +344,11 @@ router.post("/create-powerpoint", async (req, res) => {
   try {
     console.log("PowerPoint oluşturma isteği alındı");
     const { url } = req.body;
-    
+
     if (!url) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "URL gerekli" 
+      return res.status(400).json({
+        success: false,
+        error: "URL gerekli",
       });
     }
 
@@ -344,7 +358,7 @@ router.post("/create-powerpoint", async (req, res) => {
     } catch (urlError) {
       return res.status(400).json({
         success: false,
-        error: "Geçersiz URL formatı"
+        error: "Geçersiz URL formatı",
       });
     }
 
@@ -353,54 +367,70 @@ router.post("/create-powerpoint", async (req, res) => {
     try {
       // Önce web sitesinden sunum verileri oluştur
       console.log("Web sitesi taranıyor ve slayt verileri oluşturuluyor...");
-      const presentationData = await geminiService.createPresentationFromWebsite(url);
-      
-      if (!presentationData || !presentationData.slides || presentationData.slides.length === 0) {
+      const presentationData =
+        await geminiService.createPresentationFromWebsite(url);
+
+      if (
+        !presentationData ||
+        !presentationData.slides ||
+        presentationData.slides.length === 0
+      ) {
         return res.status(500).json({
           success: false,
-          error: "Web sitesinden slayt verileri oluşturulamadı"
+          error: "Web sitesinden slayt verileri oluşturulamadı",
         });
       }
-      
-      console.log(`${presentationData.slides.length} slayt oluşturuldu, PowerPoint dosyası oluşturuluyor...`);
-      
+
+      console.log(
+        `${presentationData.slides.length} slayt oluşturuldu, PowerPoint dosyası oluşturuluyor...`
+      );
+
       // Logo ile ilgili sorunları önlemek için logoUrl'i temizle
       presentationData.logoUrl = null;
-      
+
       // Her slayttan logo özelliğini kaldır
       presentationData.slides = presentationData.slides.map((slide: any) => {
         const { logo, ...rest } = slide;
         return rest;
       });
-      
+
       // Sonra bu verilerden PowerPoint dosyası oluştur
-      const pptxFilePath = await powerPointService.createPowerPoint(presentationData);
-      
+      const pptxFilePath = await powerPointService.createPowerPoint(
+        presentationData
+      );
+
       if (!pptxFilePath || !fs.existsSync(pptxFilePath)) {
         return res.status(500).json({
           success: false,
-          error: "PowerPoint dosyası oluşturulamadı veya bulunamadı"
+          error: "PowerPoint dosyası oluşturulamadı veya bulunamadı",
         });
       }
-      
+
       console.log(`PowerPoint oluşturuldu: ${pptxFilePath}`);
-      
+
       // Dosya adını URL'den türet
       const domain = new URL(url).hostname;
-      const fileName = `${domain.replace(/[^a-zA-Z0-9]/g, '_')}_presentation.pptx`;
-      
+      const fileName = `${domain.replace(
+        /[^a-zA-Z0-9]/g,
+        "_"
+      )}_presentation.pptx`;
+
       // PowerPoint dosyasını indir
       console.log(`Dosya indiriliyor: ${fileName}`);
-      console.log(`Dosya konumu: ${pptxFilePath} (Dosya silinmeyecek, test amaçlı olarak korunuyor)`);
-      
+      console.log(
+        `Dosya konumu: ${pptxFilePath} (Dosya silinmeyecek, test amaçlı olarak korunuyor)`
+      );
+
       res.download(pptxFilePath, fileName, (err) => {
         if (err) {
           console.error("Dosya indirme hatası:", err);
         }
-        
+
         // İndirme tamamlandıktan sonra yapılacak işlemler
-        console.log(`Dosya indirme tamamlandı. Dosya konumunuz: ${pptxFilePath}`);
-        
+        console.log(
+          `Dosya indirme tamamlandı. Dosya konumunuz: ${pptxFilePath}`
+        );
+
         // Dosyayı silmiyoruz artık
         /* 
         try {
@@ -417,7 +447,10 @@ router.post("/create-powerpoint", async (req, res) => {
       console.error("İşlem hatası:", processingError);
       return res.status(500).json({
         success: false,
-        error: processingError instanceof Error ? processingError.message : "PowerPoint oluşturma sırasında beklenmeyen bir hata oluştu"
+        error:
+          processingError instanceof Error
+            ? processingError.message
+            : "PowerPoint oluşturma sırasında beklenmeyen bir hata oluştu",
       });
     }
   } catch (error) {
@@ -430,9 +463,9 @@ router.post("/create-powerpoint", async (req, res) => {
       });
     } else {
       console.error("PowerPoint oluşturma hatası:", error);
-      res.status(500).json({ 
-        success: false, 
-        error: (error as Error).message || "Bilinmeyen bir hata oluştu"
+      res.status(500).json({
+        success: false,
+        error: (error as Error).message || "Bilinmeyen bir hata oluştu",
       });
     }
   }
@@ -457,54 +490,56 @@ router.post("/analyze-linkedin", async (req, res) => {
 router.post("/chat", async (req, res) => {
   try {
     const { message, sessionId = null } = req.body;
-    
+
     if (!message) {
-      return res.status(400).json({ 
-        success: false, 
-        error: "Mesaj girişi gereklidir" 
+      return res.status(400).json({
+        success: false,
+        error: "Mesaj girişi gereklidir",
       });
     }
 
     let session: ChatSession;
-    
+
     // Mevcut oturumu kontrol et veya yeni oturum oluştur
     if (sessionId && chatSessions.has(sessionId)) {
       session = chatSessions.get(sessionId)!;
       session.lastActivity = new Date();
     } else {
       // Yeni oturum oluştur
-      const newSessionId = Date.now().toString(36) + Math.random().toString(36).substring(2);
+      const newSessionId =
+        Date.now().toString(36) + Math.random().toString(36).substring(2);
       session = {
         id: newSessionId,
         history: [],
-        lastActivity: new Date()
+        lastActivity: new Date(),
       };
       chatSessions.set(newSessionId, session);
     }
 
     console.log(`Sohbet mesajı alındı, Oturum ID: ${session.id}`);
-    
+
     // Gemini ile sohbet et
     const chatResponse = await geminiService.chat(message, session.history);
-    
+
     // Oturum geçmişini güncelle
     session.history = chatResponse.conversationHistory;
-    
+
     // Yanıtı döndür
     res.json({
       success: true,
       sessionId: session.id,
       response: chatResponse.response,
       // İsteğe bağlı olarak UI için kullanılabilecek tam geçmiş
-      conversation: session.history
+      conversation: session.history,
     });
-    
   } catch (error) {
     console.error("Sohbet hatası:", error);
-    res.status(500).json({ 
-      success: false, 
-      error: (error as Error).message || "Bilinmeyen bir sohbet hatası oluştu" 
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message || "Bilinmeyen bir sohbet hatası oluştu",
     });
+    logger.error("Sohbet hatası:", error);
+    console.error("Sohbet hatası:", error);
   }
 });
 

@@ -25,6 +25,8 @@ import passport from "../config/passport";
 import { LinkedInService } from "../services/linkedInService";
 import { supabase } from "../config/supabase";
 import { GoogleService } from "../services/googleService";
+import logger from "../config/logger";
+import { log } from "console";
 
 const router = Router();
 
@@ -133,6 +135,7 @@ router.get("/auth/google", async (req, res) => {
     res.redirect(data.url);
   } catch (error) {
     console.error('Google auth error:', error);
+    logger.error('Google auth error:', error);
     res.redirect(`${process.env.CLIENT_URL}/auth/login?error=auth-failed`);
   }
 });
@@ -157,6 +160,7 @@ router.get("/auth/callback", async (req, res) => {
     );
   } catch (error) {
     console.error("Google callback error:", error);
+    logger.error("Google callback error:", error);
     res.redirect(`${process.env.CLIENT_URL}/auth/login?error=callback-failed`);
   }
 });
@@ -172,7 +176,8 @@ router.post("/google/login", async (req, res) => {
     const { accessToken } = req.body;
     
     if (!accessToken) {
-      console.log("Token bulunamadı:", req.body);
+      console.log("Google auth login token bulunamadı:", req.body);
+      logger.error("Google auth login Token bulunamadı:", req.body);
       return res.status(400).json({
         success: false,
         error: "Access token gereklidir",
@@ -196,6 +201,7 @@ router.post("/google/login", async (req, res) => {
     });
   } catch (error: any) {
     console.error("Google login error:", error);
+    logger.error("Google login error:", error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -230,6 +236,7 @@ router.post("/linkedin", async (req, res) => {
     res.json(authResult);
   } catch (error: any) {
     console.error("LinkedIn auth error:", error);
+    logger.error("LinkedIn auth error:", error);
     res.status(500).json({ error: error.message });
   }
 });

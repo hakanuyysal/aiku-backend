@@ -1,4 +1,5 @@
 import { verifyGoogleToken } from '../config/googleAuth';
+import logger from '../config/logger';
 
 /**
  * Kimlik doğrulama işlemleri için kullanılan servis
@@ -11,9 +12,14 @@ export const authService = {
    */
   verifyIdToken: async (idToken: string) => {
     console.log('[AuthService] Google token doğrulama başlatılıyor');
+    logger.info('[AuthService] Google token doğrulama başlatılıyor');
     try {
       const decodedToken = await verifyGoogleToken(idToken);
       console.log('[AuthService] Google token doğrulandı:', { 
+        uid: decodedToken.uid,
+        email: decodedToken.email
+      });
+      logger.info('[AuthService] Google token doğrulandı', { 
         uid: decodedToken.uid,
         email: decodedToken.email
       });
@@ -24,6 +30,12 @@ export const authService = {
         code: error.code,
         message: error.message,
         name: error.name
+      });
+      logger.error('[AuthService] Google token doğrulama hatası', {
+        error: error.message,
+        code: error.code,
+        name: error.name,
+        stack: error.stack
       });
       throw error;
     }

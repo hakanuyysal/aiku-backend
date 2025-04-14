@@ -2,6 +2,8 @@ import express from 'express';
 import linkedinAuthController from '../controllers/linkedinAuth.controller';
 import { supabase } from '../config/supabase';
 import { LinkedInService } from '../services/linkedInService';
+import { log } from 'console';
+import logger from '../config/logger';
 
 const router = express.Router();
 
@@ -24,6 +26,7 @@ router.get('/auth/linkedin', async (req, res) => {
     res.redirect(data.url);
   } catch (error) {
     console.error('LinkedIn auth error:', error);
+    logger.error('LinkedIn auth error:', error);
     res.redirect(`${process.env.CLIENT_URL}/auth/login?error=linkedin-auth-failed`);
   }
 });
@@ -48,6 +51,7 @@ router.get('/auth/linkedin/callback', async (req, res) => {
     );
   } catch (error) {
     console.error("LinkedIn callback error:", error);
+    logger.error("LinkedIn callback error:", error);
     res.redirect(`${process.env.CLIENT_URL}/auth/login?error=linkedin-callback-failed`);
   }
 });

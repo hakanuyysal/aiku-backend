@@ -5,6 +5,7 @@ import { protect } from '../middleware/auth';
 import { validateRequest } from '../middleware/validateRequest';
 import ParamPosService from '../services/ParamPosService';
 import { User, IUser } from '../models/User';
+import logger from '../config/logger';
 
 const router = express.Router();
 
@@ -103,6 +104,11 @@ router.post('/process-payment',
         }
       } catch (saveError) {
         console.error('Ödeme hatası kaydedilirken hata oluştu:', saveError);
+        logger.error('Ödeme hatası kaydedilirken hata oluştu', { 
+          error: saveError instanceof Error ? saveError.message : 'Unknown error',
+          stack: saveError instanceof Error ? saveError.stack : undefined,
+          userId: (req.user as IUser)?._id?.toString()
+        });
       }
 
       res.status(400).json({
@@ -131,8 +137,13 @@ router.post('/complete-payment',
       const callbackMD = req.body.callbackMD || ucdMD;
       
       console.log('3D ödeme tamamlama isteği:', { callbackMD, ucdMD, siparisId, islemGuid });
+      logger.info('3D ödeme tamamlama isteği', { callbackMD, ucdMD, siparisId, islemGuid });
+      
       console.log('Kullanıcı bilgisi:', req.user);
+      logger.info('3D ödeme kullanıcı bilgisi', { userId: (req.user as IUser)?._id?.toString() });
+      
       console.log('Auth token var mı:', !!req.headers.authorization);
+      logger.debug('3D ödeme auth token kontrolü', { hasToken: !!req.headers.authorization });
       
       // TP_WMD_Pay metodunu çağır
       const result = await ParamPosService.completePayment({
@@ -142,15 +153,24 @@ router.post('/complete-payment',
       });
       
       console.log('3D ödeme tamamlama sonucu:', result);
+      logger.info('3D ödeme tamamlama sonucu', { 
+        islemId: result.TURKPOS_RETVAL_Islem_ID,
+        sonuc: result.TURKPOS_RETVAL_Sonuc,
+        sonucStr: result.TURKPOS_RETVAL_Sonuc_Str
+      });
       
       // Kullanıcıyı bul ve ödeme geçmişini güncelle
       const user = req.user as IUser | undefined;
       if (user && user._id) {
         console.log('Kullanıcı ID ile aranıyor:', user._id);
+        logger.debug('Kullanıcı ID ile aranıyor', { userId: user._id.toString() });
+        
         const updatedUser = await User.findById(user._id);
 
         if (updatedUser) {
           console.log('Kullanıcı bulundu, abonelik durumu güncelleniyor');
+          logger.info('Kullanıcı bulundu, abonelik durumu güncelleniyor', { userId: user._id.toString() });
+          
           // Abonelik durumunu aktif olarak güncelle
           updatedUser.subscriptionStatus = 'active';
           updatedUser.subscriptionStartDate = new Date();
@@ -171,6 +191,11 @@ router.post('/complete-payment',
           
           const paymentAmount = parseFloat(result.TURKPOS_RETVAL_Odeme_Tutari.replace(',', '.')) || 0;
           console.log('Ödeme tutarı:', paymentAmount);
+          logger.info('Ödeme tutarı', { 
+            userId: user._id.toString(), 
+            amount: paymentAmount,
+            currency: 'TRY'
+          });
           
           updatedUser.paymentHistory.push({
             amount: paymentAmount,
@@ -182,19 +207,31 @@ router.post('/complete-payment',
           
           await updatedUser.save();
           console.log('Kullanıcı bilgileri güncellendi');
+          logger.info('Kullanıcı ödeme bilgileri güncellendi', { 
+            userId: user._id.toString(),
+            subscriptionStatus: 'active',
+            nextPaymentDate
+          });
         } else {
           console.log('Kullanıcı bulunamadı:', user._id);
+          logger.warn('Ödeme sonrası kullanıcı bulunamadı', { userId: user._id.toString() });
         }
       } else {
         console.log('Kullanıcı bilgisi yok veya ID eksik');
+        logger.warn('Ödeme işleminde kullanıcı bilgisi yok veya ID eksik');
       }
 
       res.status(200).json({
         success: true,
         data: result
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('3D ödeme tamamlama hatası:', error);
+      logger.error('3D ödeme tamamlama hatası', { 
+        error: error.message,
+        stack: error.stack,
+        userId: (req.user as IUser)?._id?.toString()
+      });
       
       // Hata durumunda da ödeme geçmişine ekle (başarısız olarak)
       try {
@@ -210,10 +247,16 @@ router.post('/complete-payment',
               description: `3D Ödeme tamamlama başarısız. Hata: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
             });
             await updatedUser.save();
+            logger.info('Başarısız ödeme kaydedildi', { userId: user._id.toString() });
           }
         }
-      } catch (saveError) {
+      } catch (saveError: any) {
         console.error('Ödeme hatası kaydedilirken hata oluştu:', saveError);
+        logger.error('Ödeme hatası kaydedilirken hata oluştu', { 
+          error: saveError.message,
+          stack: saveError.stack,
+          userId: (req.user as IUser)?._id?.toString()
+        });
       }
 
       res.status(400).json({
@@ -229,6 +272,10 @@ router.post('/callback', async (req: Request, res: Response) => {
   try {
     console.log('3D Secure callback verileri (body):', req.body);
     console.log('3D Secure callback verileri (query):', req.query);
+    logger.info('3D Secure callback verileri alındı', { 
+      body: req.body,
+      query: req.query
+    });
     
     // Banka tarafından gönderilen verileri al
     const { md, mdStatus, orderId, transactionAmount, islemGUID, islemHash, bankResult } = req.body;
@@ -236,6 +283,7 @@ router.post('/callback', async (req: Request, res: Response) => {
     // mdStatus kontrolü
     if (mdStatus !== '1') {
       console.error('3D Secure doğrulaması başarısız:', { mdStatus, bankResult });
+      logger.error('3D Secure doğrulaması başarısız', { mdStatus, bankResult, orderId });
       throw new Error(`3D Secure doğrulaması başarısız: ${bankResult || 'Bilinmeyen hata'}`);
     }
     
@@ -247,6 +295,11 @@ router.post('/callback', async (req: Request, res: Response) => {
     });
     
     console.log('Ödeme tamamlama sonucu:', result);
+    logger.info('Ödeme tamamlama sonucu', { 
+      result: result.TURKPOS_RETVAL_Sonuc, 
+      resultStr: result.TURKPOS_RETVAL_Sonuc_Str,
+      transactionId: result.TURKPOS_RETVAL_Islem_ID
+    });
     
     // Sonuca göre frontend'e yönlendir
     const frontendUrl = process.env.FRONTEND_URL || 'https://aikuaiplatform.com';
@@ -254,8 +307,12 @@ router.post('/callback', async (req: Request, res: Response) => {
     
     // Başarılı yanıt döndür ve frontend'e yönlendir
     res.redirect(redirectUrl);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Callback hatası:', error);
+    logger.error('Callback hatası', { 
+      error: error.message, 
+      stack: error.stack 
+    });
     
     // Hata durumunda frontend'e yönlendir
     const frontendUrl = process.env.FRONTEND_URL || 'https://aikuaiplatform.com';
