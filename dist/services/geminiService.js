@@ -151,55 +151,105 @@ class GeminiService {
         if (!isAllowed) {
           throw new Error("Bu site robots.txt tarafından engellenmiş");
         }
-        const browser = yield puppeteer_1.default.launch({
-          headless: true,
-          args: [
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-          ],
-        });
-        console.log("Browser launched");
-        try {
-          const page = yield browser.newPage();
-          yield page.setUserAgent(
-            "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
-          );
-          // Ana sayfayı tara
-          yield this.scrapePage(page, url, visitedUrls);
-          allContent += yield this.extractPageContent(page);
-          // Alt sayfaları bul
-          const subPages = yield this.findSubPages(page);
-          // Her alt sayfayı tara
-          for (const subPath of subPages) {
+        
+        // Her sayfa için yeni bir tarayıcı örneği oluşturuyoruz
+        // Bu, tarayıcı ve sayfa arasındaki bağlantı sorunlarını azaltır
+        for (let attempt = 0; attempt < 2; attempt++) {
+          let browser = null;
+          try {
+            browser = yield puppeteer_1.default.launch({
+              headless: true,
+              args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+              ],
+            });
+            
+            console.log("Browser launched");
+            
+            // Ana sayfayı tara
+            const page = yield browser.newPage();
+            yield page.setUserAgent(
+              "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
+            );
+            
             try {
-              const fullUrl = subPath.startsWith("http")
-                ? subPath
-                : new URL(subPath, baseUrl).href;
-              // Aynı domain'de olduğundan emin ol
-              if (!fullUrl.startsWith(baseUrl)) continue;
-              // Daha önce ziyaret edilmediyse tara
-              if (!visitedUrls.has(fullUrl)) {
-                yield this.delay(2000); // Rate limiting
-                yield this.scrapePage(page, fullUrl, visitedUrls);
-                allContent += "\n\n--- " + fullUrl + " ---\n";
-                allContent += yield this.extractPageContent(page);
-                foundUrls.push(fullUrl);
+              // Ana sayfayı tara
+              yield this.scrapePage(page, url, visitedUrls);
+              const mainContent = yield this.extractPageContent(page);
+              allContent += mainContent;
+              
+              // Alt sayfaları bul
+              const subPages = yield this.findSubPages(page);
+              
+              // Alt sayfa sayısını sınırla - en fazla 2 alt sayfa ziyaret edelim (sayıyı azalttık)
+              const maxSubPages = 2;
+              const limitedSubPages = subPages.slice(0, maxSubPages);
+              
+              // Alt sayfaları tek tek tarayalım, her biri için ayrı sayfa nesnesi kullanalım
+              for (const subPath of limitedSubPages) {
+                try {
+                  const fullUrl = subPath.startsWith("http")
+                    ? subPath
+                    : new URL(subPath, baseUrl).href;
+                  
+                  // Aynı domain'de olduğundan emin ol
+                  if (!fullUrl.startsWith(baseUrl)) continue;
+                  
+                  // Daha önce ziyaret edilmediyse tara
+                  if (!visitedUrls.has(fullUrl)) {
+                    yield this.delay(1000); // Rate limiting - süreyi biraz daha azalttık
+                    
+                    // Her alt sayfa için yeni bir sayfa nesnesi oluştur
+                    const subPage = yield browser.newPage();
+                    try {
+                      yield this.scrapePage(subPage, fullUrl, visitedUrls);
+                      allContent += "\n\n--- " + fullUrl + " ---\n";
+                      allContent += yield this.extractPageContent(subPage);
+                      foundUrls.push(fullUrl);
+                    } catch (subError) {
+                      console.warn(`Alt sayfa tarama hatası (${fullUrl}):`, subError);
+                    } finally {
+                      yield subPage.close().catch(e => console.warn("Alt sayfa kapatma hatası:", e));
+                    }
+                  }
+                } catch (error) {
+                  console.warn("Alt sayfa işleme hatası:", error);
+                  continue;
+                }
               }
-            } catch (error) {
-              console.warn("Sub-page scraping error:", error);
-              continue;
+              
+              // İşlem başarılı - döngüden çık
+              yield page.close().catch(e => console.warn("Ana sayfa kapatma hatası:", e));
+              return {
+                content: this.sanitizeText(allContent),
+                foundUrls,
+              };
+            } catch (pageError) {
+              console.error("Sayfa işleme hatası:", pageError);
+              yield page.close().catch(e => console.warn("Hata sonrası sayfa kapatma hatası:", e));
+              // İlk denemede hata olursa, ikinci denemeye geç
+              if (attempt === 0) {
+                console.log("İlk deneme başarısız oldu, tekrar deneniyor...");
+                continue;
+              } else {
+                throw pageError;
+              }
+            }
+          } catch (browserError) {
+            console.error("Tarayıcı hatası:", browserError);
+            throw browserError;
+          } finally {
+            if (browser) {
+              yield browser.close().catch(e => console.warn("Tarayıcı kapatma hatası:", e));
             }
           }
-          yield page.close();
-        } finally {
-          yield browser.close();
         }
-        return {
-          content: this.sanitizeText(allContent),
-          foundUrls,
-        };
+        
+        // Her iki denemede de başarısız olursa buraya ulaşır
+        throw new Error("Web sitesi içeriği alınamadı: Maksimum deneme sayısı aşıldı");
       } catch (error) {
         console.error("Web scraping error:", error);
         throw new Error("Web sitesi içeriği alınamadı: " + error.message);
@@ -212,49 +262,80 @@ class GeminiService {
       let retryCount = 0;
       const maxRetries = 3;
       
-      // JavaScript ve görüntüleri devre dışı bırakma seçeneği (ihtiyaç duyulursa aktifleştirin)
-      // await page.setRequestInterception(true);
-      // page.on('request', (req) => {
-      //   if (req.resourceType() === 'image' || req.resourceType() === 'script') {
-      //     req.abort();
-      //   } else {
-      //     req.continue();
-      //   }
-      // });
-      
-      while (retryCount < maxRetries) {
+      // İstek engellemesini daha güvenli bir şekilde yapılandır
+      try {
+        // İstek engellemesini ayarla
+        yield page.setRequestInterception(true);
+        
+        // Event listener'ı temizlemek için referans sakla
+        const requestHandler = (req) => {
+          const resourceType = req.resourceType();
+          
+          // Gereksiz kaynakları engelle ama kritik içeriği engelleme
+          if (resourceType === 'image' || resourceType === 'font' || 
+              resourceType === 'media' || resourceType === 'stylesheet') {
+            req.abort();
+          } else {
+            req.continue();
+          }
+        };
+        
+        // İstek dinlemeyi ekle
+        page.on('request', requestHandler);
+        
+        while (retryCount < maxRetries) {
+          try {
+            // Timeout süresini artır ve daha basit waitUntil stratejisi kullan
+            yield page.goto(url, {
+              waitUntil: "domcontentloaded",
+              timeout: 45000, // 60 saniyeden 45 saniyeye düşürdük - daha makul bir değer
+            });
+            
+            // Sayfa yüklendikten sonra kısa bir bekleme
+            yield this.delay(1000);
+            
+            visitedUrls.add(url);
+            break;
+          } catch (error) {
+            console.log(`Retry ${retryCount + 1}/${maxRetries} for ${url}: ${error.message}`);
+            retryCount++;
+            if (retryCount === maxRetries) throw error;
+            yield this.delay(1500 * retryCount);
+          }
+        }
+        
+        // İstek dinlemeyi temizle
+        page.removeListener('request', requestHandler);
+        yield page.setRequestInterception(false).catch(() => {}); // Hata olursa görmezden gel
+        
+        // CAPTCHA tespiti
         try {
-          // Timeout süresini 60 saniyeye çıkar ve domcontentloaded kullan (daha hızlı)
-          yield page.goto(url, {
-            waitUntil: "domcontentloaded", // networkidle0 yerine daha hızlı olan domcontentloaded
-            timeout: 60000, // 30 saniye yerine 60 saniye
+          const hasCaptcha = yield page.evaluate(() => {
+            var _a;
+            return (
+              ((_a = document.body.textContent) === null || _a === void 0
+                ? void 0
+                : _a.toLowerCase().includes("captcha")) ||
+              document.body.innerHTML.toLowerCase().includes("recaptcha")
+            );
           });
           
-          // İçerik yüklenmesi için biraz daha bekleyebiliriz
-          // page.waitForTimeout yerine this.delay() kullanılıyor
-          yield this.delay(2000);
-          
-          visitedUrls.add(url);
-          break;
-        } catch (error) {
-          console.log(`Retry ${retryCount + 1}/${maxRetries} for ${url}: ${error.message}`);
-          retryCount++;
-          if (retryCount === maxRetries) throw error;
-          // Her denemede artan bekleme süresi
-          yield this.delay(2000 * retryCount);
+          if (hasCaptcha) {
+            throw new Error("Captcha tespit edildi, scraping yapılamıyor");
+          }
+        } catch (evalError) {
+          // Sayfa içeriği değerlendirme hatası - muhtemelen sayfa yüklenemedi
+          console.warn("CAPTCHA kontrolü yapılamadı:", evalError);
+          // Kritik bir hata değil, devam et
         }
-      }
-      const hasCaptcha = yield page.evaluate(() => {
-        var _a;
-        return (
-          ((_a = document.body.textContent) === null || _a === void 0
-            ? void 0
-            : _a.toLowerCase().includes("captcha")) ||
-          document.body.innerHTML.toLowerCase().includes("recaptcha")
-        );
-      });
-      if (hasCaptcha) {
-        throw new Error("Captcha tespit edildi, scraping yapılamıyor");
+      } catch (error) {
+        // İstek engelleme hatası olduysa, temizlemeyi dene
+        try {
+          yield page.setRequestInterception(false).catch(() => {});
+        } catch (cleanupError) {
+          console.warn("İstek engelleme temizleme hatası:", cleanupError);
+        }
+        throw error;
       }
     });
   }
