@@ -4,6 +4,8 @@ export interface UserResponse {
   lastName: string;
   email: string;
   phone?: string;
+  countryCode?: string;
+  localPhone?: string;
   title?: string;
   location?: string;
   profileInfo?: string;

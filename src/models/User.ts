@@ -7,6 +7,8 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   phone?: string;
+  countryCode?: string;
+  localPhone?: string;
   title?: string;
   location?: string;
   profileInfo?: string;
@@ -106,6 +108,14 @@ const userSchema = new Schema<IUser>({
     select: false
   },
   phone: {
+    type: String,
+    trim: true
+  },
+  countryCode: {               
+    type: String,
+    trim: true,
+  },
+  localPhone: {            
     type: String,
     trim: true
   },

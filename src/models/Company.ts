@@ -13,6 +13,8 @@ export interface ICompany extends Document {
   fundSize?: string;
   companyEmail: string;
   companyPhone: string;
+  countryCode: string;
+  localPhone: string; 
   companyInfo: string;
   detailedDescription: string;
   companyWebsite?: string;
@@ -92,6 +94,16 @@ const companySchema = new Schema<ICompany>(
       trim: true,
       match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'],
       set: (value: string) => value.replace(/\s+/g, ''),
+    },
+    countryCode: {
+      type: String,
+      required: [true, 'Country code is required'],
+      trim: true,
+    },
+    localPhone: {
+      type: String,
+      required: [true, 'Local phone number is required'],
+      trim: true,
     },
     companyInfo: {
       type: String,

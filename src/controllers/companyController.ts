@@ -56,6 +56,8 @@ export const getAllCompanies = async (req: Request, res: Response) => {
       fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
+      countryCode: company.countryCode,
+      localPhone: company.localPhone,
       companyInfo: company.companyInfo,
       detailedDescription: company.detailedDescription,
       companyWebsite: company.companyWebsite,
@@ -113,6 +115,8 @@ export const createCompany = async (req: Request, res: Response) => {
       fundSize,
       companyEmail,
       companyPhone,
+      countryCode,
+      localPhone,
       companyInfo,
       detailedDescription,
       companyWebsite,
@@ -136,6 +140,8 @@ export const createCompany = async (req: Request, res: Response) => {
       fundSize,
       companyEmail,
       companyPhone,
+      countryCode,
+      localPhone,
       companyInfo,
       detailedDescription,
       companyWebsite,
@@ -161,6 +167,8 @@ export const createCompany = async (req: Request, res: Response) => {
       fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
+      countryCode: company.countryCode,
+      localPhone: company.localPhone,
       companyInfo: company.companyInfo,
       detailedDescription: company.detailedDescription,
       companyWebsite: company.companyWebsite,
@@ -206,6 +214,8 @@ export const getCompany = async (req: Request, res: Response) => {
       fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
+      countryCode: company.countryCode,
+      localPhone: company.localPhone,
       companyInfo: company.companyInfo,
       detailedDescription: company.detailedDescription,
       companyWebsite: company.companyWebsite,
@@ -259,6 +269,8 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
       fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
+      countryCode: company.countryCode,
+      localPhone: company.localPhone,
       companyInfo: company.companyInfo,
       detailedDescription: company.detailedDescription,
       companyWebsite: company.companyWebsite,
@@ -321,6 +333,8 @@ export const updateCompany = async (req: Request, res: Response) => {
       fundSize,
       companyEmail,
       companyPhone,
+      countryCode,
+      localPhone,
       companyInfo,
       detailedDescription,
       companyWebsite,
@@ -344,6 +358,8 @@ export const updateCompany = async (req: Request, res: Response) => {
     if (fundSize) company.fundSize = fundSize;
     if (companyEmail) company.companyEmail = companyEmail;
     if (companyPhone) company.companyPhone = companyPhone;
+    if (countryCode) company.countryCode = countryCode;
+    if (localPhone) company.localPhone = localPhone;
     if (companyInfo) company.companyInfo = companyInfo;
     if (detailedDescription) company.detailedDescription = detailedDescription;
     if (companyWebsite) company.companyWebsite = companyWebsite;
@@ -369,6 +385,8 @@ export const updateCompany = async (req: Request, res: Response) => {
       fundSize: company.fundSize,
       companyEmail: company.companyEmail,
       companyPhone: company.companyPhone,
+      countryCode: company.countryCode,
+      localPhone: company.localPhone,
       companyInfo: company.companyInfo,
       detailedDescription: company.detailedDescription,
       companyWebsite: company.companyWebsite,

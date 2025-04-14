@@ -34,6 +34,8 @@ export const register = async (req: Request, res: Response) => {
       email,
       password,
       phone,
+      countryCode,
+      localPhone,
       title,
       location,
       profileInfo,
@@ -62,6 +64,8 @@ export const register = async (req: Request, res: Response) => {
       email,
       password,
       phone,
+      countryCode,
+      localPhone,
       title,
       location,
       profileInfo,
@@ -96,6 +100,8 @@ export const register = async (req: Request, res: Response) => {
       lastName: user.lastName,
       email: user.email,
       phone: user.phone,
+      countryCode: user.countryCode,
+      localPhone: user.localPhone,
       title: user.title,
       location: user.location,
       profileInfo: user.profileInfo,
@@ -278,6 +284,8 @@ export const login = async (req: Request, res: Response) => {
       lastName: user.lastName,
       email: user.email,
       phone: user.phone,
+      countryCode: user.countryCode,
+      localPhone: user.localPhone,
       title: user.title,
       location: user.location,
       profileInfo: user.profileInfo,
@@ -344,6 +352,8 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
+        countryCode: user.countryCode,
+        localPhone: user.localPhone,
         title: user.title,
         location: user.location,
         profileInfo: user.profileInfo,
@@ -400,6 +410,8 @@ export const updateUser = async (req: Request, res: Response) => {
       lastName,
       email,
       phone,
+      countryCode,
+      localPhone,
       title,
       location,
       profileInfo,
@@ -418,6 +430,8 @@ export const updateUser = async (req: Request, res: Response) => {
     if (lastName) user.lastName = lastName;
     if (email) user.email = email;
     if (phone) user.phone = phone;
+    if (countryCode) user.countryCode = countryCode;
+    if (localPhone) user.localPhone = localPhone;
     if (title) user.title = title;
     if (location) user.location = location;
     if (profileInfo) user.profileInfo = profileInfo;
@@ -449,6 +463,8 @@ export const updateUser = async (req: Request, res: Response) => {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
+        countryCode: user.countryCode,
+        localPhone: user.localPhone,
         title: user.title,
         location: user.location,
         profileInfo: user.profileInfo,
@@ -495,6 +511,8 @@ export const getUserById = async (req: Request, res: Response) => {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
+        countryCode: user.countryCode,
+        localPhone: user.localPhone,
         title: user.title,
         location: user.location,
         profileInfo: user.profileInfo,
