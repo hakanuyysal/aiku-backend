@@ -1269,57 +1269,198 @@ Instagram: ${companyData.companyInstagram}
    */
   async chat(message: string, conversationHistory: any[] = []): Promise<{ response: string; conversationHistory: any[] }> {
     try {
-      // Model için chat oluştur
-      const chat = this.chatModel.startChat({
-        history: conversationHistory.map(item => ({
-          role: item.role,
-          parts: [{ text: item.content }]
-        })),
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2048,
-        },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ]
-      });
-
-      // Mesajı gönder ve yanıt al
-      const result = await chat.sendMessage(message);
-      const responseText = await result.response;
-      const responseContent = responseText.text();
-
-      // Konuşma geçmişine ekle
-      const updatedHistory = [
-        ...conversationHistory,
-        { role: "user", content: message },
-        { role: "model", content: responseContent }
-      ];
-
-      return {
-        response: responseContent,
-        conversationHistory: updatedHistory
+      // Aiku platform information
+      const aikuWebsiteInfo = {
+        "companyName": "Aiku AI Startup Platform",
+        "companyLogo": "https://aikuaiplatform.com/static/media/ai-startup-logo3.01c8164f5d9593a28c2a.png",
+        "companyEmail": "info@aikuaiplatform.com",
+        "companyPhone": "+90 850 757 94",
+        "companyWebsite": "https://aikuaiplatform.com",
+        "companyAddress": "",
+        "companyInfo": "Aiku AI Startup Platform brings together AI startup products. The platform serves as a central hub for various AI solutions. It positions itself within the AI startup ecosystem.",
+        "detailedDescription": "Aiku AI Startup Platform is designed to aggregate AI startup products into a single, accessible platform, streamlining the discovery and integration of emerging AI technologies.\n\nThe platform simplifies access to a diverse range of AI tools and services, catering to individuals and organizations looking to leverage innovative AI solutions.\n\nBy centralizing these products, Aiku AI aims to reduce the complexities of navigating the fragmented AI market, making it easier for users to find and implement the AI solutions they need.\n\nAiku AI Startup Platform focuses on providing a convenient and efficient way to explore the AI landscape, facilitating collaboration and innovation within the AI startup community.",
+        "companyType": "Startup",
+        "businessModel": "B2B",
+        "companySector": "Artificial Intelligence",
+        "companySize": "1-10",
+        "companyLinkedIn": "https://www.linkedin.com/company/aiku-ai-platform/",
+        "companyTwitter": "",
+        "companyInstagram": "https://www.instagram.com/aikuai_platform/",
+        "productName": "Aiku AI Startup Platform",
+        "productLogo": "https://aikuaiplatform.com/static/media/ai-startup-logo3.01c8164f5d9593a28c2a.png",
+        "productCategory": "AI Platform",
+        "productDescription": "Aiku AI Startup Platform brings together AI startup products, offering a centralized hub for various AI solutions.",
+        "tags": [
+          "AI",
+          "startup",
+          "platform",
+          "aggregation",
+          "innovation"
+        ],
+        "problems": [
+          "fragmented AI market",
+          "difficulty in discovering new AI tools",
+          "complex integration processes"
+        ],
+        "solutions": [
+          "centralized platform",
+          "streamlined access",
+          "simplified discovery"
+        ],
+        "improvements": [],
+        "keyFeatures": [
+          "centralized hub",
+          "easy discovery",
+          "streamlined access"
+        ],
+        "pricingModel": "",
+        "releaseDate": "",
+        "productPrice": 0,
+        "productWebsite": "https://aikuaiplatform.com",
+        "productLinkedIn": "https://www.linkedin.com/company/aiku-ai-platform/",
+        "productTwitter": ""
       };
+
+      // Create system instructions (will be used in the first message if history is empty)
+      const systemInstructions = `You are Aiku, the virtual assistant for Aiku AI Startup Platform.
+
+Based on the following information about Aiku AI Startup Platform, help users with their questions:
+
+Aiku AI Startup Platform brings together AI startup products. The platform serves as a central hub for various AI solutions. It positions itself within the AI startup ecosystem. It has a B2B business model as an AI platform. It has a small team of 1-10 people.
+
+Contact: info@aikuaiplatform.com, +90 850 757 94
+Website: https://aikuaiplatform.com
+LinkedIn: https://www.linkedin.com/company/aiku-ai-platform/
+Instagram: https://www.instagram.com/aikuai_platform/
+
+Product Description: Aiku AI Startup Platform brings together AI startup products, offering a centralized hub for various AI solutions.
+
+Key Features:
+- Centralized hub
+- Easy discovery
+- Streamlined access
+
+Problems solved:
+- Fragmented AI market
+- Difficulty in discovering new AI tools
+- Complex integration processes
+
+Solutions offered:
+- Centralized platform
+- Streamlined access
+- Simplified discovery
+
+Please provide your answers in English. Answer questions in a friendly and helpful manner. As a representative of the platform, your goal is to assist users. If asked questions unrelated to this platform, politely redirect the conversation back to Aiku AI Platform.
+
+Now, please respond to my question or request.`;
+
+      let updatedHistory = [...conversationHistory];
+      
+      // If conversation history is empty, start with user message containing system instructions
+      // followed by the actual user message
+      if (updatedHistory.length === 0) {
+        // First add a "virtual" initial message with system instructions if this is a new conversation
+        const chat = this.chatModel.startChat({
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        });
+
+        // First send system instructions as a context message from the user
+        const contextResult = await chat.sendMessage(systemInstructions);
+        const contextResponse = await contextResult.response;
+        
+        // Then send the actual user message
+        const result = await chat.sendMessage(message);
+        const responseText = await result.response;
+        const responseContent = responseText.text();
+
+        // Build history from scratch with the proper sequence
+        updatedHistory = [
+          { role: "user", content: systemInstructions },
+          { role: "model", content: contextResponse.text() },
+          { role: "user", content: message },
+          { role: "model", content: responseContent }
+        ];
+
+        return {
+          response: responseContent,
+          conversationHistory: updatedHistory
+        };
+      } else {
+        // For existing conversations, just continue with the current history
+        const chat = this.chatModel.startChat({
+          history: updatedHistory.map(item => ({
+            role: item.role, 
+            parts: [{ text: item.content }]
+          })),
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 2048,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        });
+
+        // Send message and get response
+        const result = await chat.sendMessage(message);
+        const responseText = await result.response;
+        const responseContent = responseText.text();
+
+        // Add to conversation history
+        updatedHistory = [
+          ...updatedHistory,
+          { role: "user", content: message },
+          { role: "model", content: responseContent }
+        ];
+
+        return {
+          response: responseContent,
+          conversationHistory: updatedHistory
+        };
+      }
     } catch (error) {
       console.error("Chat error:", error);
-      throw new Error(`Sohbet sırasında bir hata oluştu: ${(error as Error).message}`);
+      throw new Error(`An error occurred during chat: ${(error as Error).message}`);
     }
   }
 }
