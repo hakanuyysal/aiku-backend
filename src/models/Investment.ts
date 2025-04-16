@@ -1,7 +1,7 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface IInvestment extends Document {
-  investmentTitle:string;
+  investmentTitle: string;
   companyName: string;
   companyId: mongoose.Schema.Types.ObjectId;
   productName: string;
@@ -12,11 +12,12 @@ export interface IInvestment extends Document {
   investmentType: string;
   description: string;
   logo?: string;
+  completedInvestment: number;
   createdAt: Date;
   slug: string;
 }
 
-interface IInvestmentModel extends Model<IInvestment> {}
+interface IInvestmentModel extends Model<IInvestment> { }
 
 const investmentSchema = new Schema<IInvestment>(
   {
@@ -72,6 +73,11 @@ const investmentSchema = new Schema<IInvestment>(
     logo: {
       type: String,
       trim: true,
+    },
+    completedInvestment: {
+      type: Number,
+      default: 0,
+      min: [0, 'Completed investment cannot be negative'],
     },
     createdAt: {
       type: Date,

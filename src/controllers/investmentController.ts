@@ -34,6 +34,7 @@ export const createInvestment = async (req: Request, res: Response) => {
             investmentType,
             description,
             logo,
+            completedInvestment,
         } = req.body;
 
         // Yeni yatırım teklifi oluştur
@@ -49,7 +50,7 @@ export const createInvestment = async (req: Request, res: Response) => {
             investmentType,
             description,
             logo,
-            // Eğer modelinizde user alanı varsa:
+            completedInvestment: completedInvestment !== undefined ? completedInvestment : 0,
             user: userId,
         });
 
