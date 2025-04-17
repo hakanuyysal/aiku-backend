@@ -2,8 +2,8 @@
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
-import { Investment } from '../models/Investment';
 import mongoose from 'mongoose';
+import { Investment } from '../models/Investment';
 
 // **Yeni Yatırım Teklifi Oluşturma**
 export const createInvestment = async (req: Request, res: Response) => {
@@ -26,8 +26,6 @@ export const createInvestment = async (req: Request, res: Response) => {
             investmentTitle,
             companyName,
             companyId,
-            productName,
-            productId,
             targetedInvestment,
             minimumTicket,
             deadline,
@@ -37,13 +35,10 @@ export const createInvestment = async (req: Request, res: Response) => {
             completedInvestment,
         } = req.body;
 
-        // Yeni yatırım teklifi oluştur
-        const investment = await Investment.create({
+        const data: any = {
             investmentTitle,
             companyName,
             companyId,
-            productName,
-            productId,
             targetedInvestment,
             minimumTicket,
             deadline,
@@ -52,8 +47,17 @@ export const createInvestment = async (req: Request, res: Response) => {
             logo,
             completedInvestment: completedInvestment !== undefined ? completedInvestment : 0,
             user: userId,
-        });
+        };
 
+        // Eğer gönderilmişse ekle
+        if (req.body.productName) {
+            data.productName = req.body.productName;
+        }
+        if (req.body.productId) {
+            data.productId = req.body.productId;
+        }
+
+        const investment = await Investment.create(data);
         res.status(201).json({ success: true, investment });
     } catch (err: any) {
         res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
@@ -71,18 +75,37 @@ export const updateInvestment = async (req: Request, res: Response) => {
         const userId = decoded.id;
 
         const { id } = req.params;
-        let investment = await Investment.findById(id);
+        const investment = await Investment.findById(id);
         if (!investment) {
             return res.status(404).json({ success: false, message: 'Yatırım teklifi bulunamadı' });
         }
-        // Eğer yatırım teklifi oluşturulurken user alanı kaydedildiyse, güncelleme yetkisi kontrolü yapın
-        // @ts-expect-error - IInvestment tipinde user alanı tanımlı değil fakat kod içinde kullanılıyor
+        // @ts-expect-error - user alanı modelde tanımlı değil, ancak varsa kontrol edelim
         if (investment.user && investment.user.toString() !== userId) {
             return res.status(403).json({ success: false, message: 'Bu yatırım teklifini güncelleme yetkiniz yok' });
         }
 
-        // Güncellenecek alanları belirle
-        Object.assign(investment, req.body);
+        // Güncellenmesine izin verilen alanlar
+        const updatableFields = [
+            'investmentTitle',
+            'companyName',
+            'companyId',
+            'targetedInvestment',
+            'minimumTicket',
+            'deadline',
+            'investmentType',
+            'description',
+            'logo',
+            'completedInvestment',
+            'productName',
+            'productId',
+        ];
+
+        updatableFields.forEach(field => {
+            if (req.body[field] !== undefined) {
+                // @ts-expect-error
+                investment[field] = req.body[field];
+            }
+        });
 
         await investment.save();
         res.status(200).json({ success: true, investment });
@@ -106,7 +129,7 @@ export const deleteInvestment = async (req: Request, res: Response) => {
         if (!investment) {
             return res.status(404).json({ success: false, message: 'Yatırım teklifi bulunamadı' });
         }
-        // @ts-expect-error - IInvestment tipinde user alanı tanımlı değil fakat kod içinde kullanılıyor
+        // @ts-expect-error
         if (investment.user && investment.user.toString() !== userId) {
             return res.status(403).json({ success: false, message: 'Bu yatırım teklifini silme yetkiniz yok' });
         }

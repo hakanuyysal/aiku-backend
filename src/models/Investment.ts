@@ -4,8 +4,8 @@ export interface IInvestment extends Document {
   investmentTitle: string;
   companyName: string;
   companyId: mongoose.Schema.Types.ObjectId;
-  productName: string;
-  productId: mongoose.Schema.Types.ObjectId;
+  productName?: string;
+  productId?: mongoose.Schema.Types.ObjectId;
   targetedInvestment: number;
   minimumTicket: number;
   deadline: Date;
@@ -38,12 +38,10 @@ const investmentSchema = new Schema<IInvestment>(
     },
     productName: {
       type: String,
-      required: [true, 'Product name is required'],
       trim: true,
     },
     productId: {
       type: mongoose.Schema.Types.ObjectId,
-      required: [true, 'Product ID is required'],
       ref: 'Product',
     },
     targetedInvestment: {
@@ -91,10 +89,14 @@ const investmentSchema = new Schema<IInvestment>(
 );
 
 investmentSchema.virtual('slug').get(function (this: IInvestment) {
-  return `${this.companyName} ${this.productName}`
+  const prodPart = this.productName ? ` ${this.productName}` : '';
+  return `${this.companyName}${prodPart}`
     .toLowerCase()
     .replace(/ /g, '-')
     .replace(/[^\w-]+/g, '');
 });
 
-export const Investment = mongoose.model<IInvestment, IInvestmentModel>('Investment', investmentSchema);
+export const Investment = mongoose.model<IInvestment, IInvestmentModel>(
+  'Investment',
+  investmentSchema
+);
