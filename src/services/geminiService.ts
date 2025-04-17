@@ -27,14 +27,14 @@ interface FormData {
   businessModel?: "B2B" | "B2C" | "B2G" | "C2C" | "C2B" | "D2C" | "B2B2C";
   companySector?: string;
   companySize?:
-    | "1-10"
-    | "11-50"
-    | "51-200"
-    | "201-500"
-    | "501-1000"
-    | "1001-5000"
-    | "5001-10000"
-    | "10001+";
+  | "1-10"
+  | "11-50"
+  | "51-200"
+  | "201-500"
+  | "501-1000"
+  | "1001-5000"
+  | "5001-10000"
+  | "10001+";
   companyEmail: string;
   companyPhone: string;
   companyInfo?: string;
@@ -197,42 +197,42 @@ export class GeminiService {
               "--disable-gpu",
             ],
           });
-          
+
           console.log("Browser launched");
-          
+
           // Ana sayfayı tara
           const page = await browser.newPage();
           await page.setUserAgent(
             "Mozilla/5.0 (compatible; AIKUBot/1.0; +https://aiku.com/bot)"
           );
-          
+
           try {
             // Ana sayfayı tara
             await this.scrapePage(page, url, visitedUrls);
             const mainContent = await this.extractPageContent(page);
             allContent += mainContent;
-            
+
             // Alt sayfaları bul
             const subPages = await this.findSubPages(page);
-            
+
             // Alt sayfa sayısını sınırla - en fazla 2 alt sayfa ziyaret edelim (sayıyı azalttık)
             const maxSubPages = 2;
             const limitedSubPages = subPages.slice(0, maxSubPages);
-            
+
             // Alt sayfaları tek tek tarayalım, her biri için ayrı sayfa nesnesi kullanalım
             for (const subPath of limitedSubPages) {
               try {
                 const fullUrl = subPath.startsWith("http")
                   ? subPath
                   : new URL(subPath, baseUrl).href;
-                
+
                 // Aynı domain'de olduğundan emin ol
                 if (!fullUrl.startsWith(baseUrl)) continue;
-                
+
                 // Daha önce ziyaret edilmediyse tara
                 if (!visitedUrls.has(fullUrl)) {
                   await this.delay(1000); // Rate limiting - süreyi biraz daha azalttık
-                  
+
                   // Her alt sayfa için yeni bir sayfa nesnesi oluştur
                   const subPage = await browser.newPage();
                   try {
@@ -251,7 +251,7 @@ export class GeminiService {
                 continue;
               }
             }
-            
+
             // İşlem başarılı - döngüden çık
             await page.close().catch(e => console.warn("Ana sayfa kapatma hatası:", e));
             return {
@@ -278,7 +278,7 @@ export class GeminiService {
           }
         }
       }
-      
+
       // Her iki denemede de başarısız olursa buraya ulaşır
       throw new Error("Web sitesi içeriği alınamadı: Maksimum deneme sayısı aşıldı");
     } catch (error) {
@@ -302,28 +302,28 @@ export class GeminiService {
 
     let retryCount = 0;
     const maxRetries = 3;
-    
+
     // İstek engellemesini daha güvenli bir şekilde yapılandır
     try {
       // İstek engellemesini ayarla
       await page.setRequestInterception(true);
-      
+
       // Event listener'ı temizlemek için referans sakla
       const requestHandler = (req: any) => {
         const resourceType = req.resourceType();
-        
+
         // Gereksiz kaynakları engelle ama kritik içeriği engelleme
-        if (resourceType === 'image' || resourceType === 'font' || 
-            resourceType === 'media' || resourceType === 'stylesheet') {
+        if (resourceType === 'image' || resourceType === 'font' ||
+          resourceType === 'media' || resourceType === 'stylesheet') {
           req.abort();
         } else {
           req.continue();
         }
       };
-      
+
       // İstek dinlemeyi ekle
       page.on('request', requestHandler);
-      
+
       while (retryCount < maxRetries) {
         try {
           // Timeout süresini artır ve daha basit waitUntil stratejisi kullan
@@ -331,10 +331,10 @@ export class GeminiService {
             waitUntil: "domcontentloaded",
             timeout: 45000, // 60 saniyeden 45 saniyeye düşürdük - daha makul bir değer
           });
-          
+
           // Sayfa yüklendikten sonra kısa bir bekleme
           await this.delay(1000);
-          
+
           visitedUrls.add(url);
           break;
         } catch (error) {
@@ -344,7 +344,7 @@ export class GeminiService {
           await this.delay(1500 * retryCount);
         }
       }
-      
+
       // İstek dinlemeyi temizle - removeListener yerine off kullanıyoruz
       try {
         // Bazı Puppeteer sürümleri removeListener, bazıları off kullanır
@@ -354,12 +354,12 @@ export class GeminiService {
           (page as any).removeListener('request', requestHandler);
         }
         // Her durumda request interception'ı kapatmayı dene
-        await page.setRequestInterception(false).catch(() => {});
+        await page.setRequestInterception(false).catch(() => { });
       } catch (cleanupError) {
         console.warn("Olay dinleyici temizleme hatası:", cleanupError);
         // Yine de devam et - kritik bir hata değil
       }
-      
+
       // CAPTCHA tespiti
       try {
         const hasCaptcha = await page.evaluate(() => {
@@ -368,7 +368,7 @@ export class GeminiService {
             document.body.innerHTML.toLowerCase().includes("recaptcha")
           );
         });
-        
+
         if (hasCaptcha) {
           throw new Error("Captcha tespit edildi, scraping yapılamıyor");
         }
@@ -380,7 +380,7 @@ export class GeminiService {
     } catch (error) {
       // İstek engelleme hatası olduysa, temizlemeyi dene
       try {
-        await page.setRequestInterception(false).catch(() => {});
+        await page.setRequestInterception(false).catch(() => { });
       } catch (cleanupError) {
         console.warn("İstek engelleme temizleme hatası:", cleanupError);
       }
@@ -1199,7 +1199,7 @@ Instagram: ${companyData.companyInstagram}
         );
 
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-        
+
         // waitForTimeout yerine Promise ile setTimeout kullanma
         await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -1322,40 +1322,92 @@ Instagram: ${companyData.companyInstagram}
       };
 
       // Create system instructions (will be used in the first message if history is empty)
-      const systemInstructions = `You are Aiku, the virtual assistant for Aiku AI Startup Platform.
+      const systemInstructions = `You are Aiku, the official virtual assistant for Aiku AI Startup Platform. You have complete knowledge of every feature, workflow, limitation and policy of the site. Always answer in clear, friendly English using the platform’s exact terminology, but if the user addresses you in another language, you may reply in that language while still prioritizing English responses when appropriate.
 
-Based on the following information about Aiku AI Startup Platform, help users with their questions:
+=== PLATFORM OVERVIEW ===
+Aiku AI Startup Platform is a B2B AI ecosystem that connects three distinct membership types:
+  • Startup  
+  • Business (Enterprise)  
+  • Investor  
 
-Aiku AI Startup Platform brings together AI startup products. The platform serves as a central hub for various AI solutions. It positions itself within the AI startup ecosystem. It has a B2B business model as an AI platform. It has a small team of 1-10 people.
+Each member type has tailored capabilities and access levels. The platform is a React‑based SPA communicating via a JWT‑secured REST API. Data models include Company, Product, InvestmentRound, UserProfile, and TalentProfile.
 
-Contact: info@aikuaiplatform.com, +90 850 757 94
-Website: https://aikuaiplatform.com
-LinkedIn: https://www.linkedin.com/company/aiku-ai-platform/
-Instagram: https://www.instagram.com/aikuai_platform/
+=== MEMBERSHIP TIERS & BILLING ===
+• **Startup membership**  
+  – First 3 months are free.  
+  – After trial, subscription renews monthly or annually.  
+  – Startup members may register “Startup Company” profiles only.  
 
-Product Description: Aiku AI Startup Platform brings together AI startup products, offering a centralized hub for various AI solutions.
+• **Business (Enterprise) membership**  
+  – Paid plan starting at $49/month.  
+  – Can register “Enterprise Company” profiles.  
+  – Access to AI solutions by Department, Project or Technology.  
 
-Key Features:
-- Centralized hub
-- Easy discovery
-- Streamlined access
+• **Investor membership**  
+  – Paid plan grants full access to investment features.  
+  – Can register as an individual Angel Investor (appears in Investor Directory).  
 
-Problems solved:
-- Fragmented AI market
-- Difficulty in discovering new AI tools
-- Complex integration processes
+• **Company & Product Creation**  
+  – Requires active subscription (any tier).  
+  – Startup members add Startup Companies & Products.  
+  – Business members add Enterprise Companies & Products.  
+  – Investor members may add a personal Investor profile only.
 
-Solutions offered:
-- Centralized platform
-- Streamlined access
-- Simplified discovery
+=== POST‑SUBSCRIPTION FEATURES ===
+All active subscribers (Startup, Business, Investor) gain:
+  1. **User Chat**  
+     – One‑to‑one messaging with any other online member.  
+  2. **AI Assistant Chat**  
+     – Natural‑language conversation powered by our internal GPT‑based agent.  
+  3. **Marketplace & Company List**  
+     – Browse and filter AI Products & Company profiles by category, industry, or tags.  
+  4. **Investment Rounds** (Startups only)  
+     – Create funding rounds: title, description, target amount, minimum ticket, deadline, logo.  
+     – Track commitments, view progress bar and investor leads.  
+  5. **Angel Investor Directory** (Investors only)  
+     – Register individually, set min/max ticket, risk profile and sectors of interest.  
+     – Appear in public directory for Startups to approach.  
+  6. **Talent Pool**  
+     – View profiles of vetted, ready‑to‑work developers and data scientists.  
+     – Contact candidates directly via in‑platform messaging.  
 
-Please provide your answers in English. Answer questions in a friendly and helpful manner. As a representative of the platform, your goal is to assist users. If asked questions unrelated to this platform, politely redirect the conversation back to Aiku AI Platform.
+=== CORE WORKFLOWS ===
+1. **Sign Up & Onboarding**  
+   – Choose your membership type, complete profile, upload logo and pitch deck.  
 
-Now, please respond to my question or request.`;
+2. **Discovery**  
+   – Use global search, filter by Technology (GenAI, ML, Web Apps, Data Engineering), Department (Marketing, R&D, Sales), or Project (Analytics, Automation).  
+   – Save Favorites, follow Companies, request demo sessions.  
+
+3. **Connection**  
+   – Initiate chats, schedule video calls via built‑in scheduler, exchange documents securely.  
+
+4. **Growth & Execution**  
+   – Startups issue Investment Rounds; Investors commit funds; Businesses purchase services or pilot projects.  
+   – Use dashboard analytics to monitor KPIs: funds raised, active deals, candidate responses.  
+
+5. **Support & Resources**  
+   – Blog articles, customer success stories, video tutorials.  
+   – Dedicated support team reachable at info@aikuaiplatform.com or +90 850 757 94.  
+
+=== CONTACT & SOCIAL ===
+Website: https://aikuaiplatform.com  
+Email: info@aikuaiplatform.com  
+Phone: +90 850 757 94  
+LinkedIn: https://www.linkedin.com/company/aiku-ai-platform/  
+Instagram: https://www.instagram.com/aikuai_platform/  
+
+=== TONE & GUIDELINES ===
+- Always answer in English by default, in a friendly and professional tone.  
+- If the user writes in another language, you may respond in that language, but still maintain clear English terminology when possible.  
+- Use the platform’s exact terminology: Startups, Businesses, Investors, Marketplace, Investment Rounds, Talent Pool, Angel Investor Directory.  
+- If a question falls outside the platform’s scope, politely redirect back to available features and workflows.  
+
+Now, please respond to the user’s request or question using this complete context.`;
+
 
       let updatedHistory = [...conversationHistory];
-      
+
       // If conversation history is empty, start with user message containing system instructions
       // followed by the actual user message
       if (updatedHistory.length === 0) {
@@ -1390,7 +1442,7 @@ Now, please respond to my question or request.`;
         // First send system instructions as a context message from the user
         const contextResult = await chat.sendMessage(systemInstructions);
         const contextResponse = await contextResult.response;
-        
+
         // Then send the actual user message
         const result = await chat.sendMessage(message);
         const responseText = await result.response;
@@ -1412,7 +1464,7 @@ Now, please respond to my question or request.`;
         // For existing conversations, just continue with the current history
         const chat = this.chatModel.startChat({
           history: updatedHistory.map(item => ({
-            role: item.role, 
+            role: item.role,
             parts: [{ text: item.content }]
           })),
           generationConfig: {
