@@ -91,20 +91,30 @@ export class GeminiService {
   }
 
   private validateUrl(url: string): string {
-    if (!url.startsWith("http")) {
-      url = "https://" + url;
+    // Boşlukları kırp
+    let formattedUrl = url.trim();
+
+    // Eğer "www." ile başlıyorsa başına https:// ekle
+    if (formattedUrl.toLowerCase().startsWith("www.")) {
+      formattedUrl = "https://" + formattedUrl;
+    }
+    // Eğer http:// veya https:// ile başlamıyorsa yine https:// ekle
+    else if (!/^https?:\/\//i.test(formattedUrl)) {
+      formattedUrl = "https://" + formattedUrl;
     }
 
     try {
-      const parsedUrl = new URL(url);
+      const parsedUrl = new URL(formattedUrl);
+      // Domain kontrolü (en az bir nokta içermeli)
       if (!parsedUrl.hostname.includes(".")) {
         throw new Error("Geçersiz domain");
       }
-      return url;
-    } catch (error) {
+      return formattedUrl;
+    } catch (err) {
       throw new Error("Geçersiz URL formatı");
     }
   }
+
 
   private async delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
