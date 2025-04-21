@@ -154,7 +154,7 @@ export const changeSubscriptionPlan = async (
         user.subscriptionStatus = "trial";
         const trialEndDate = new Date();
         const trialPeriod =
-          "trialPeriod" in planPricing ? planPricing.trialPeriod : 3;
+          "trialPeriod" in planPricing ? planPricing.trialPeriod : 6;
         trialEndDate.setMonth(trialEndDate.getMonth() + trialPeriod);
         user.trialEndsAt = trialEndDate;
         user.nextPaymentDate = trialEndDate;

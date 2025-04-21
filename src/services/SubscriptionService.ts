@@ -188,7 +188,7 @@ class SubscriptionService {
       if (plan === 'startup' && isFirstSubscription) {
         user.subscriptionStatus = 'trial';
         const trialEndDate = new Date(now);
-        trialEndDate.setMonth(trialEndDate.getMonth() + 3); // 3 ay deneme süresi
+        trialEndDate.setMonth(trialEndDate.getMonth() + 6); // 6 ay deneme süresi
         user.trialEndsAt = trialEndDate;
         user.nextPaymentDate = trialEndDate;
       } else if (period === 'yearly') {
@@ -261,13 +261,13 @@ class SubscriptionService {
         pricing: {
           monthly: {
             price: 49,
-            trialPeriod: 3, // ay
+            trialPeriod: 6, // ay
             isFirstTimeOnly: true // Sadece ilk abonelikte geçerli
           },
           yearly: {
             price: 529,
             discount: '10% off',
-            trialPeriod: 3, // ay
+            trialPeriod: 6, // ay
             isFirstTimeOnly: true, // Sadece ilk abonelikte geçerli
             extraMonths: 0 // Startup planında extra ay yok
           }

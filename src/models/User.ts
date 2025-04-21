@@ -321,7 +321,7 @@ userSchema.pre('save', async function (this: IUser, next) {
   next();
 });
 
-// Abonelik planı startup olarak ayarlandığında 3 aylık deneme süresi tanımlanır
+// Abonelik planı startup olarak ayarlandığında 6 aylık deneme süresi tanımlanır
 userSchema.pre('save', function(next) {
   // Abonelik planı değiştiyse ve plan startup ise
   if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup') {
@@ -332,7 +332,7 @@ userSchema.pre('save', function(next) {
     if (isFirstSubscription) {
       this.subscriptionStatus = 'trial';
       const trialEndDate = new Date();
-      trialEndDate.setMonth(trialEndDate.getMonth() + 3);
+      trialEndDate.setMonth(trialEndDate.getMonth() + 6);
       this.trialEndsAt = trialEndDate;
       this.nextPaymentDate = trialEndDate; // Deneme süresi bitiminde otomatik çekim
     } else if (this.subscriptionStatus !== 'active') {

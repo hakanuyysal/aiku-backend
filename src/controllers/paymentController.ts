@@ -107,7 +107,7 @@ export const processPayment = async (
         const trialPeriod =
           planPricing && "trialPeriod" in planPricing
             ? planPricing.trialPeriod
-            : 3;
+            : 6;
 
         if (hasTrial) {
           user.subscriptionStatus = "trial";
@@ -175,7 +175,7 @@ export const processPayment = async (
         const trialPeriod =
           planPricing && "trialPeriod" in planPricing
             ? planPricing.trialPeriod
-            : 3;
+            : 6;
 
         if (hasTrial) {
           user.subscriptionStatus = "trial";
@@ -328,7 +328,7 @@ export const recordFreePayment = async (
       const trialPeriod =
         planPricing && "trialPeriod" in planPricing
           ? planPricing.trialPeriod
-          : 3;
+          : 6;
 
       if (hasTrial) {
         user.subscriptionStatus = "trial";
