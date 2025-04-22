@@ -1,6 +1,7 @@
 import supabase from '../config/supabaseClient';
 import dotenv from 'dotenv';
 import axios from 'axios';
+import logger from '../config/logger';
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ class LinkedInAuthService {
       return response.data;
     } catch (error) {
       console.error('LinkedIn token alınamadı:', error);
+      logger.error(`LinkedIn token alınamadı linkedinAuth.Service: ${error}`);
       throw error;
     }
   }
@@ -86,6 +88,7 @@ class LinkedInAuthService {
       };
     } catch (error) {
       console.error('LinkedIn kullanıcı bilgileri alınamadı:', error);
+      logger.error(`LinkedIn kullanıcı bilgileri alınamadı linkedinAuth.Service: ${error}`);
       throw error;
     }
   }
@@ -125,6 +128,7 @@ class LinkedInAuthService {
 
         if (updateError) {
           console.error('Kullanıcı güncelleme hatası:', updateError);
+          logger.error(`Kullanıcı güncelleme hatası linkedinAuth.Service: ${updateError}`);
           throw updateError;
         }
 
@@ -149,6 +153,7 @@ class LinkedInAuthService {
 
         if (insertError) {
           console.error('Kullanıcı oluşturma hatası:', insertError);
+          logger.error(`Kullanıcı oluşturma hatası linkedinAuth.Service: ${insertError}`);
           throw insertError;
         }
 
@@ -156,6 +161,7 @@ class LinkedInAuthService {
       }
     } catch (error) {
       console.error('LinkedIn kullanıcısı Supabase\'e kaydedilemedi:', error);
+      logger.error(`LinkedIn kullanıcısı Supabase\'e kaydedilemedi linkedinAuth.Service: ${error}`);
       throw error;
     }
   }

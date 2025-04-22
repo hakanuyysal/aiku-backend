@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import jwt, { SignOptions, Secret } from "jsonwebtoken";
 import { User } from "../models/User";
 import { supabase } from "../config/supabase";
+import logger from "../config/logger";
 
 dotenv.config();
 
@@ -73,6 +74,11 @@ export class LinkedInService {
         "LinkedIn access token error:",
         error.response?.data || error.message
       );
+      logger.error(
+        `LinkedIn access token alınamadı: ${
+          error.response?.data?.error_description || error.message
+        }`
+      );
       throw new Error(
         `LinkedIn access token alınamadı: ${
           error.response?.data?.error_description || error.message
@@ -99,6 +105,11 @@ export class LinkedInService {
       console.error(
         "LinkedIn profile error:",
         error.response?.data || error.message
+      );
+      logger.error(
+        `LinkedIn profil bilgileri alınamadı: ${
+          error.response?.data?.error_description || error.message
+        }`
       );
       throw new Error(
         `LinkedIn profil bilgileri alınamadı: ${
@@ -226,6 +237,9 @@ export class LinkedInService {
       };
     } catch (error: any) {
       console.error("LinkedIn auth error:", error);
+      logger.error(
+        `LinkedIn ile giriş işlemi başarısız: ${error.message}`
+      );
       throw new Error("LinkedIn ile giriş işlemi başarısız: " + error.message);
     }
   }
@@ -239,6 +253,9 @@ export class LinkedInService {
       return response.data;
     } catch (error: any) {
       console.error("LinkedIn userinfo error:", error.response?.data || error.message);
+      logger.error(
+        `LinkedIn kullanıcı bilgileri alınamadı: ${error.response?.data?.error_description || error.message}`
+      );
       throw new Error("LinkedIn kullanıcı bilgileri alınamadı");
     }
   }

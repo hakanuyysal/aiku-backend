@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { LinkedInService } from "../services/linkedInService";
-
+import logger from "../config/logger";
 export class LinkedInController {
   private linkedInService: LinkedInService;
 
@@ -50,6 +50,7 @@ export class LinkedInController {
       });
     } catch (error: any) {
       console.error("Callback error:", error);
+      logger.error(`LinkedIn callback hatası: ${error.message}`);
       res.status(500).json({
         success: false,
         error: error.message,
