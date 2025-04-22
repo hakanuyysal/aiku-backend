@@ -1344,7 +1344,7 @@ Each member type has tailored capabilities and access levels. The platform is a 
 
 === MEMBERSHIP TIERS & BILLING ===
 • **Startup membership**  
-  – First 3 months are free.  
+  – First 6 months are free.  
   – After trial, subscription renews monthly or annually.  
   – Startup members may register “Startup Company” profiles only.  
 

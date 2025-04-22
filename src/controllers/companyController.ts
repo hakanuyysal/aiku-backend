@@ -438,7 +438,7 @@ export const deleteCompany = async (req: Request, res: Response) => {
     }
 
     // @ts-expect-error - Mongoose'un yeni sürümlerinde remove metodu yerine deleteOne kullanılmalı
-    await company.remove();
+    await company.deleteOne(); 
     res
       .status(200)
       .json({ success: true, message: "Şirket başarıyla silindi" });
