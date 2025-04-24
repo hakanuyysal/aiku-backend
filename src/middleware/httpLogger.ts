@@ -4,16 +4,47 @@ import geoip from 'geoip-lite';
 import * as UAParser from 'ua-parser-js';
 
 /**
+ * Gerçek IP adresini tespit eden yardımcı fonksiyon
+ */
+const getClientIP = (req: Request): string => {
+  // Öncelik sırası:
+  // 1. X-Real-IP (Nginx tarafından ayarlanır)
+  // 2. X-Forwarded-For'un ilk IP'si (proxy zincirinin başlangıç noktası)
+  // 3. req.ip (Express'in tespit ettiği IP)
+  // 4. Socket remote address
+  
+  const realIP = req.headers['x-real-ip'] as string;
+  if (realIP) return realIP;
+
+  const forwardedFor = req.headers['x-forwarded-for'] as string;
+  if (forwardedFor) {
+    // İlk IP'yi al (proxy zincirinin başlangıç noktası)
+    const ips = forwardedFor.split(',').map(ip => ip.trim());
+    return ips[0];
+  }
+
+  return req.ip || req.socket.remoteAddress || '';
+};
+
+/**
  * İstek detaylarını hazırlayan yardımcı fonksiyon
  */
-const prepareRequestDetails = (req: Request) => {
+const prepareRequestDetails = (req?: Request) => {
+  if (!req) return null;
+
   // IP adresi tespiti
-  const ip = ((req.headers['x-forwarded-for'] as string) || 
-             req.socket.remoteAddress || 
-             req.ip || '').split(',')[0].trim();
+  const clientIP = getClientIP(req);
 
   // GeoIP bilgisi
-  const geo = ip ? geoip.lookup(ip) : null;
+  const geo = clientIP ? geoip.lookup(clientIP) : null;
+
+  // Proxy bilgileri
+  const proxyInfo = {
+    realIP: req.headers['x-real-ip'],
+    forwardedFor: req.headers['x-forwarded-for'],
+    via: req.headers['via'],
+    forwarded: req.headers['forwarded']
+  };
 
   // User-Agent parser
   const parser = new UAParser.UAParser();
@@ -21,12 +52,13 @@ const prepareRequestDetails = (req: Request) => {
   const result = parser.setUA(userAgent).getResult();
 
   return {
-    ip,
+    ip: clientIP,
+    proxy: proxyInfo,
     geoLocation: geo ? {
       country: geo.country,
       region: geo.region,
       city: geo.city,
-      ll: geo.ll, // latitude/longitude
+      ll: geo.ll,
       timezone: geo.timezone
     } : null,
     device: {
@@ -57,10 +89,8 @@ const prepareRequestDetails = (req: Request) => {
         'referer': req.headers['referer'],
         'origin': req.headers['origin']
       },
-      query: req.query,
-      body: req.method !== 'GET' ? sanitizeRequestBody(req.body) : undefined
+      query: req.query
     },
-    timestamp: new Date().toISOString(),
     user: req.user ? {
       id: (req.user as any).id,
       email: (req.user as any).email
