@@ -8,6 +8,8 @@ import passport from "./config/passport";
 import cors from "cors";
 import logger from "./config/logger";
 import httpLogger from "./middleware/httpLogger";
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -406,6 +408,96 @@ app.use("/test", express.static(path.join(__dirname, "../test")));
 // Socket.io test sayfası
 app.get("/socket-test", (_req: Request, res: Response) => {
   res.sendFile(path.join(__dirname, "../test/socket-test.html"));
+});
+
+// Güvenlik başlıkları
+app.use(helmet());
+
+// XSS koruması için Content Security Policy
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", 'accounts.google.com'],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", 'data:', 'https:'],
+    connectSrc: ["'self'", 'https://api.aikuaiplatform.com'],
+    fontSrc: ["'self'", 'https:', 'data:'],
+    objectSrc: ["'none'"],
+    mediaSrc: ["'self'"],
+    frameSrc: ["'self'", 'accounts.google.com'],
+  },
+}));
+
+// Rate limiting ayarları
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 100, // IP başına maksimum istek
+  message: 'Çok fazla istek gönderildi, lütfen daha sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    logger.warn('Rate limit aşıldı', {
+      ip: req.ip,
+      url: req.url,
+      headers: req.headers
+    });
+    res.status(429).json({
+      error: 'Çok fazla istek gönderildi, lütfen daha sonra tekrar deneyin.'
+    });
+  }
+});
+
+// Tüm route'lara rate limiting uygula
+app.use(limiter);
+
+// Özel rate limiting - auth route'ları için daha sıkı
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 saat
+  max: 5, // IP başına maksimum 5 başarısız deneme
+  message: 'Çok fazla başarısız giriş denemesi, lütfen daha sonra tekrar deneyin.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    logger.warn('Auth rate limit aşıldı', {
+      ip: req.ip,
+      url: req.url,
+      headers: req.headers
+    });
+    res.status(429).json({
+      error: 'Çok fazla başarısız giriş denemesi, lütfen daha sonra tekrar deneyin.'
+    });
+  }
+});
+
+// Auth route'ları için özel rate limiting
+app.use('/api/auth', authLimiter);
+
+// Şüpheli istekleri engelle
+app.use((req: Request, res: Response, next: any) => {
+  const suspiciousPatterns = [
+    /eval-stdin\.php/i,
+    /phpunit/i,
+    /think\\app/i,
+    /pearcmd/i,
+    /\.env/i,
+    /wp-content/i,
+    /wp-admin/i,
+    /wp-login/i
+  ];
+
+  const url = req.url.toLowerCase();
+  
+  if (suspiciousPatterns.some(pattern => pattern.test(url))) {
+    logger.warn('Şüpheli istek engellendi', {
+      ip: req.ip,
+      url: req.url,
+      method: req.method,
+      headers: req.headers
+    });
+    return res.status(403).json({ error: 'İstek engellendi' });
+  }
+  
+  next();
 });
 
 // MongoDB bağlantısı
