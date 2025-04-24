@@ -1,20 +1,44 @@
-// @ts-nocheck - Typescript hatalarını görmezden gel
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { Investment } from '../models/Investment';
 
+function parseCompletedInvestment(input: any) {
+    const result = { amount: 0, description: '' };
+    if (input == null) return result;
+
+    if (typeof input === 'string') {
+        const [amtStr, desc] = input.split('-').map(s => s.trim());
+        const amount = parseFloat(amtStr.replace(/[^0-9.]/g, '')) || 0;
+        return { amount, description: desc || '' };
+    }
+
+    if (typeof input === 'object') {
+        const amount = Number(input.amount) || 0;
+        const description = String(input.description || '');
+        return { amount, description };
+    }
+
+    return result;
+}
+
+function parseCompletedInvestments(input: any) {
+    if (!input) return [];
+    const list = Array.isArray(input) ? input : [input];
+    return list.map(item => parseCompletedInvestment(item));
+}
+
 // **Yeni Yatırım Teklifi Oluşturma**
 export const createInvestment = async (req: Request, res: Response) => {
     try {
-        // Validasyon hatalarını kontrol et
+        // 1) Validasyon hatalarını kontrol et
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
-        // Token doğrulama
+        // 2) Yetkilendirme
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
@@ -22,6 +46,7 @@ export const createInvestment = async (req: Request, res: Response) => {
         const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
         const userId = decoded.id;
 
+        // 3) Body’den alanları oku
         const {
             investmentTitle,
             companyName,
@@ -32,9 +57,16 @@ export const createInvestment = async (req: Request, res: Response) => {
             investmentType,
             description,
             logo,
-            completedInvestment,
+            completedInvestments: rawCompleted,
+            productName,
+            productId,
         } = req.body;
 
+        // 4) completedInvestment parse et
+        const rawList = req.body.completedInvestments;
+        const completedInvestments = parseCompletedInvestments(rawList);
+
+        // 5) Oluşturma objesi
         const data: any = {
             investmentTitle,
             companyName,
@@ -45,18 +77,13 @@ export const createInvestment = async (req: Request, res: Response) => {
             investmentType,
             description,
             logo,
-            completedInvestment: completedInvestment !== undefined ? completedInvestment : 0,
+            completedInvestments,
             user: userId,
         };
+        if (productName) data.productName = productName;
+        if (productId) data.productId = productId;
 
-        // Eğer gönderilmişse ekle
-        if (req.body.productName) {
-            data.productName = req.body.productName;
-        }
-        if (req.body.productId) {
-            data.productId = req.body.productId;
-        }
-
+        // 6) Kaydet
         const investment = await Investment.create(data);
         res.status(201).json({ success: true, investment });
     } catch (err: any) {
@@ -67,24 +94,34 @@ export const createInvestment = async (req: Request, res: Response) => {
 // **Yatırım Teklifini Güncelleme**
 export const updateInvestment = async (req: Request, res: Response) => {
     try {
+        // 1) Yetkilendirme
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
-            return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+            return res
+                .status(401)
+                .json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
         }
         const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
         const userId = decoded.id;
 
+        // 2) Yatırımı bul
         const { id } = req.params;
         const investment = await Investment.findById(id);
         if (!investment) {
-            return res.status(404).json({ success: false, message: 'Yatırım teklifi bulunamadı' });
-        }
-        // @ts-expect-error - user alanı modelde tanımlı değil, ancak varsa kontrol edelim
-        if (investment.user && investment.user.toString() !== userId) {
-            return res.status(403).json({ success: false, message: 'Bu yatırım teklifini güncelleme yetkiniz yok' });
+            return res
+                .status(404)
+                .json({ success: false, message: 'Yatırım teklifi bulunamadı' });
         }
 
-        // Güncellenmesine izin verilen alanlar
+        // 3) Sahip kontrolü
+        // @ts-expect-error
+        if (investment.user && investment.user.toString() !== userId) {
+            return res
+                .status(403)
+                .json({ success: false, message: 'Güncelleme yetkiniz yok' });
+        }
+
+        // 4) Diğer alanları güncelle
         const updatableFields = [
             'investmentTitle',
             'companyName',
@@ -95,11 +132,9 @@ export const updateInvestment = async (req: Request, res: Response) => {
             'investmentType',
             'description',
             'logo',
-            'completedInvestment',
             'productName',
             'productId',
         ];
-
         updatableFields.forEach(field => {
             if (req.body[field] !== undefined) {
                 // @ts-expect-error
@@ -107,10 +142,20 @@ export const updateInvestment = async (req: Request, res: Response) => {
             }
         });
 
+        // 5) completedInvestments varsa parse edip ata
+        if (req.body.completedInvestments !== undefined) {
+            investment.completedInvestments = parseCompletedInvestments(
+                req.body.completedInvestments
+            );
+        }
+
+        // 6) Kaydet ve dön
         await investment.save();
         res.status(200).json({ success: true, investment });
     } catch (err: any) {
-        res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+        res
+            .status(500)
+            .json({ success: false, message: 'Sunucu hatası', error: err.message });
     }
 };
 
@@ -119,7 +164,9 @@ export const deleteInvestment = async (req: Request, res: Response) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
-            return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
+            return res
+                .status(401)
+                .json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
         }
         const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
         const userId = decoded.id;
@@ -127,17 +174,26 @@ export const deleteInvestment = async (req: Request, res: Response) => {
         const { id } = req.params;
         const investment = await Investment.findById(id);
         if (!investment) {
-            return res.status(404).json({ success: false, message: 'Yatırım teklifi bulunamadı' });
+            return res
+                .status(404)
+                .json({ success: false, message: 'Yatırım teklifi bulunamadı' });
         }
+
         // @ts-expect-error
         if (investment.user && investment.user.toString() !== userId) {
-            return res.status(403).json({ success: false, message: 'Bu yatırım teklifini silme yetkiniz yok' });
+            return res
+                .status(403)
+                .json({ success: false, message: 'Silme yetkiniz yok' });
         }
 
         await investment.deleteOne();
-        res.status(200).json({ success: true, message: 'Yatırım teklifi başarıyla silindi' });
+        res
+            .status(200)
+            .json({ success: true, message: 'Yatırım teklifi başarıyla silindi' });
     } catch (err: any) {
-        res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+        res
+            .status(500)
+            .json({ success: false, message: 'Sunucu hatası', error: err.message });
     }
 };
 
@@ -149,11 +205,15 @@ export const getInvestmentById = async (req: Request, res: Response) => {
             .populate('companyId', 'companyName companyLogo')
             .populate('productId', 'productName productLogo');
         if (!investment) {
-            return res.status(404).json({ success: false, message: 'Yatırım teklifi bulunamadı' });
+            return res
+                .status(404)
+                .json({ success: false, message: 'Yatırım teklifi bulunamadı' });
         }
         res.status(200).json({ success: true, investment });
     } catch (err: any) {
-        res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
+        res
+            .status(500)
+            .json({ success: false, message: 'Sunucu hatası', error: err.message });
     }
 };
 

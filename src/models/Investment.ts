@@ -1,5 +1,10 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
+export interface ICompletedInvestment {
+  amount: number;
+  description: string;
+}
+
 export interface IInvestment extends Document {
   investmentTitle: string;
   companyName: string;
@@ -12,12 +17,29 @@ export interface IInvestment extends Document {
   investmentType: string;
   description: string;
   logo?: string;
-  completedInvestment: number;
+  completedInvestments: ICompletedInvestment[];
   createdAt: Date;
   slug: string;
+  completedInvestmentDisplay?: string;
 }
 
 interface IInvestmentModel extends Model<IInvestment> { }
+
+const CompletedInvestmentSchema = new Schema<ICompletedInvestment>(
+  {
+    amount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Completed investment cannot be negative'],
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+  },
+  { _id: false }
+);
 
 const investmentSchema = new Schema<IInvestment>(
   {
@@ -72,10 +94,10 @@ const investmentSchema = new Schema<IInvestment>(
       type: String,
       trim: true,
     },
-    completedInvestment: {
-      type: Number,
-      default: 0,
-      min: [0, 'Completed investment cannot be negative'],
+    completedInvestments: {
+      type: [CompletedInvestmentSchema],
+      default: [],
+      required: true,
     },
     createdAt: {
       type: Date,
@@ -88,6 +110,16 @@ const investmentSchema = new Schema<IInvestment>(
   }
 );
 
+// Virtual: okunabilir format
+investmentSchema
+  .virtual('completedInvestmentDisplay')
+  .get(function (this: IInvestment) {
+    return this.completedInvestments
+      .map(ci => `${ci.amount.toLocaleString()} – ${ci.description}`)
+      .join(', ');
+  });
+
+// Slug virtual’ı
 investmentSchema.virtual('slug').get(function (this: IInvestment) {
   const prodPart = this.productName ? ` ${this.productName}` : '';
   return `${this.companyName}${prodPart}`
