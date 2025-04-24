@@ -500,30 +500,6 @@ const limiter = rateLimit({
 // Tüm route'lara rate limiting uygula
 app.use(limiter);
 
-// Özel rate limiting - auth route'ları için daha sıkı
-const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 saat
-  max: 5, // IP başına maksimum 5 başarısız deneme
-  message:
-    "Çok fazla başarısız giriş denemesi, lütfen daha sonra tekrar deneyin.",
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
-    logger.warn("Auth rate limit aşıldı", {
-      ip: req.ip,
-      url: req.url,
-      headers: req.headers,
-    });
-    res.status(429).json({
-      error:
-        "Çok fazla başarısız giriş denemesi, lütfen daha sonra tekrar deneyin.",
-    });
-  },
-});
-
-// Auth route'ları için özel rate limiting
-app.use("/api/auth", authLimiter);
-
 // Şüpheli istekleri engelle
 app.use((req: Request, res: Response, next: any) => {
   const suspiciousPatterns = [
