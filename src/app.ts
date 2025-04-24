@@ -360,12 +360,32 @@ app.get("/test-google-auth", (req, res) => {
 // Hata yakalama middleware'i
 app.use((err: any, req: Request, res: Response, next: any) => {
   console.error("❌ Sunucu Hatası:", err);
+  
+  // Daha detaylı hata logu
   logger.error("Sunucu Hatası", { 
-    error: err.message, 
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-    userId: req.user?.id
+    error: {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+      code: err.code
+    },
+    request: {
+      url: req.url,
+      method: req.method,
+      path: req.path,
+      query: req.query,
+      params: req.params,
+      headers: {
+        'user-agent': req.headers['user-agent'],
+        'content-type': req.headers['content-type'],
+        host: req.headers.host
+      }
+    },
+    user: req.user ? {
+      id: req.user.id,
+      email: req.user.email
+    } : null,
+    timestamp: new Date().toISOString()
   });
   
   res.status(err.status || 500).json({
