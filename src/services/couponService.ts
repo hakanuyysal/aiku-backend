@@ -10,7 +10,7 @@ export class CouponService {
   ): Promise<ICoupon> {
     const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
     if (existingCoupon) {
-      throw new BadRequestError("Kupon kodu zaten mevcut");
+      throw new BadRequestError("Coupon code already exists");
     }
 
     const coupon = new Coupon({
@@ -30,28 +30,28 @@ export class CouponService {
     const coupon = await Coupon.findOne({ code: code.toUpperCase() });
 
     if (!coupon) {
-      throw new NotFoundError("Kupon bulunamadı");
+      throw new NotFoundError("Coupon not found");
     }
 
     if (!coupon.isActive) {
-      throw new BadRequestError("Bu kupon artık geçerli değil");
+      throw new BadRequestError("This coupon is no longer valid");
     }
 
     if (coupon.usedBy.some((id) => id.toString() === userId)) {
-      throw new BadRequestError("Bu kuponu daha önce kullandınız");
+      throw new BadRequestError("You have already used this coupon");
     }
 
     if (coupon.planType !== planType) {
-      throw new BadRequestError("Bu kupon seçilen plan için geçerli değil");
+      throw new BadRequestError("This coupon is not valid for the selected plan");
     }
 
     return coupon;
   }
 
-  async applyCoupon(code: string, userId: string): Promise<ICoupon> {
-    const coupon = await Coupon.findOne({ code: code.toUpperCase() });
+  async applyCoupon(couponCode: string, userId: string): Promise<ICoupon> {
+    const coupon = await Coupon.findOne({ code: couponCode.toUpperCase() });
     if (!coupon) {
-      throw new NotFoundError("Kupon bulunamadı");
+      throw new NotFoundError("Coupon not found");
     }
 
     coupon.usedBy.push(userId);
@@ -66,7 +66,7 @@ export class CouponService {
   async deactivateCoupon(code: string): Promise<ICoupon> {
     const coupon = await Coupon.findOne({ code: code.toUpperCase() });
     if (!coupon) {
-      throw new NotFoundError("Kupon bulunamadı");
+      throw new NotFoundError("Coupon not found");
     }
 
     coupon.isActive = false;

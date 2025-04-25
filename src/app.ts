@@ -40,9 +40,7 @@ const app = express();
 const server = http.createServer(app);
 
 // Proxy güven ayarları
-app.set("trust proxy", true);
-// app.set('trust proxy', 'loopback'); // Sadece localhost proxy'si için
-// app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']); // Daha spesifik güven ayarları için
+app.set("trust proxy", 1); // Sadece bir proxy'ye güven
 
 // CORS için izin verilen domainler
 const whitelist = [
@@ -481,11 +479,11 @@ app.use(
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
   max: 100, // IP başına maksimum istek
-  message: "Çok fazla istek gönderildi, lütfen daha sonra tekrar deneyin.",
+  message: "Too many requests, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
-    logger.warn("Rate limit aşıldı", {
+    logger.warn("Rate limit exceeded", {
       ip: req.ip,
       realIP: req.headers["x-real-ip"],
       forwardedFor: req.headers["x-forwarded-for"],
@@ -493,9 +491,17 @@ const limiter = rateLimit({
       headers: req.headers,
     });
     res.status(429).json({
-      error: "Çok fazla istek gönderildi, lütfen daha sonra tekrar deneyin.",
+      error: "Too many requests, please try again later."
     });
   },
+  // Rate limit için IP belirleme fonksiyonu
+  keyGenerator: (req: Request) => {
+    return req.headers["x-forwarded-for"]?.toString() || 
+           req.headers["x-real-ip"]?.toString() || 
+           req.ip || 
+           req.connection.remoteAddress || 
+           'unknown';
+  }
 });
 
 // Tüm route'lara rate limiting uygula
