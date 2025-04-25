@@ -4,7 +4,7 @@
   "main": "dist/app.js",
   "scripts": {
     "start": "node dist/app.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
+    "dev": "NODE_ENV=development ts-node-dev --respawn --transpile-only src/app.ts",
     "build": "tsc && cp -r uploads dist/",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix"
