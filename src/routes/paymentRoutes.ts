@@ -6,8 +6,10 @@ import { validateRequest } from '../middleware/validateRequest';
 import ParamPosService from '../services/ParamPosService';
 import { User, IUser } from '../models/User';
 import logger from '../config/logger';
+import { CouponService } from '../services/couponService';
 
 const router = express.Router();
+const couponService = new CouponService();
 
 router.post("/pay", processPayment);
 
@@ -386,5 +388,30 @@ router.delete("/methods/:cardId", protect, deletePaymentMethod);
  * @access  Private
  */
 router.put("/methods/:cardId/default", protect, updateDefaultPaymentMethod);
+
+// Kupon doğrulama endpoint'i
+router.post('/validate-coupon',
+  protect,
+  async (req: Request, res: Response) => {
+    try {
+      const { couponCode } = req.body;
+      const userId = req.user.id;
+      const planType = req.body.planType || 'MONTHLY';
+
+      const coupon = await couponService.validateCoupon(couponCode, userId, planType);
+      
+      res.json({
+        isValid: true,
+        discountRate: coupon.discountRate,
+        planType: coupon.planType
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Kupon doğrulama hatası'
+      });
+    }
+  }
+);
 
 export default router;

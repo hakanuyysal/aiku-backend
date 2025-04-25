@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import { UnauthorizedError } from '../utils/errors';
 
 dotenv.config();
 
@@ -158,5 +159,22 @@ export const optionalSupabaseToken = async (req: Request, res: Response, next: N
       success: false,
       message: "Geçersiz veya süresi dolmuş token",
     });
+  }
+};
+
+export const authenticateToken = (req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    throw new UnauthorizedError('Token bulunamadı');
+  }
+
+  try {
+    const user = jwt.verify(token, process.env.JWT_SECRET!);
+    req.user = user;
+    next();
+  } catch (error) {
+    throw new UnauthorizedError('Geçersiz token');
   }
 };

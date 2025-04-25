@@ -1,13 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
-import { validationResult } from 'express-validator';
+import { z } from 'zod';
+import { BadRequestError } from '../utils/errors';
 
-export const validateRequest = (req: Request, res: Response, next: NextFunction) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      success: false,
-      errors: errors.array()
-    });
+export const validateRequest = async <T>(data: any, schema: z.Schema<T>): Promise<T> => {
+  try {
+    return await schema.parseAsync(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(error.errors.map(e => e.message).join(', '));
+    }
+    throw error;
   }
-  next();
 }; 
