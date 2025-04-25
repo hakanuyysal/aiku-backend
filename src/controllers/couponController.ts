@@ -1,12 +1,11 @@
 import { Request, Response } from "express";
 import { CouponService } from "../services/couponService";
-import { validateRequest } from "../middleware/validateRequest";
 import { z } from "zod";
 
 const couponService = new CouponService();
 
 // Validation schemas
-const createCouponSchema = z.object({
+export const createCouponSchema = z.object({
   code: z
     .string()
     .min(3, "Coupon code must be at least 3 characters")
@@ -25,7 +24,7 @@ const createCouponSchema = z.object({
     .max(100, "Discount rate must be at most 100"),
 });
 
-const validateCouponSchema = z.object({
+export const validateCouponSchema = z.object({
   couponCode: z.string(),
   planType: z.enum([
     "STARTUP_MONTHLY",
@@ -49,37 +48,50 @@ export const applyCouponSchema = z.object({
   ]),
 });
 
+type CreateCouponType = z.infer<typeof createCouponSchema>;
+type ValidateCouponType = z.infer<typeof validateCouponSchema>;
+type ApplyCouponType = z.infer<typeof applyCouponSchema>;
+
 export class CouponController {
   async createCoupon(req: Request, res: Response) {
-    const { code, planType, discountRate } = await validateRequest(
-      req.body,
-      createCouponSchema
-    );
-    const coupon = await couponService.createCoupon(
-      code,
-      planType,
-      discountRate
-    );
-    res.status(201).json(coupon);
+    try {
+      const { code, planType, discountRate } = req.body as CreateCouponType;
+      
+      const coupon = await couponService.createCoupon(
+        code,
+        planType,
+        discountRate
+      );
+      res.status(201).json(coupon);
+    } catch (error) {
+      const err = error as Error;
+      res.status(400).json({ error: err.message });
+    }
   }
 
   async validateCoupon(req: Request, res: Response) {
-    const { couponCode, planType } = await validateRequest(
-      req.body,
-      validateCouponSchema
-    );
-    const userId = req.user.id;
+    try {
+      const { couponCode, planType } = req.body as ValidateCouponType;
+      const userId = req.user?.id;
 
-    const coupon = await couponService.validateCoupon(
-      couponCode,
-      userId,
-      planType
-    );
-    res.json({
-      isValid: true,
-      discountRate: coupon.discountRate,
-      planType: coupon.planType,
-    });
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const coupon = await couponService.validateCoupon(
+        couponCode,
+        userId,
+        planType
+      );
+      res.json({
+        isValid: true,
+        discountRate: coupon.discountRate,
+        planType: coupon.planType,
+      });
+    } catch (error) {
+      const err = error as Error;
+      res.status(400).json({ error: err.message });
+    }
   }
 
   async applyCoupon(req: Request, res: Response) {
@@ -91,8 +103,7 @@ export class CouponController {
         });
       }
 
-      // Request body'den direkt alalım
-      const { couponCode, planType } = req.body;
+      const { couponCode, planType } = req.body as ApplyCouponType;
       const userId = req.user.id;
 
       if (!couponCode) {
@@ -102,20 +113,18 @@ export class CouponController {
         });
       }
 
-      // Önce kuponu validate edelim
       await couponService.validateCoupon(couponCode, userId, planType);
-
-      // Sonra uygulayalım
       const coupon = await couponService.applyCoupon(couponCode, userId);
+      
       res.json({
         success: true,
         coupon,
       });
     } catch (error) {
-      console.error("Kupon uygulama hatası:", error);
-      res.status(error.status || 400).json({
+      const err = error as Error & { status?: number };
+      res.status(err.status || 400).json({
         success: false,
-        message: error.message || "Kupon uygulanırken bir hata oluştu",
+        message: err.message || "Kupon uygulanırken bir hata oluştu",
       });
     }
   }
