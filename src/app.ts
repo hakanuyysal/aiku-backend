@@ -478,7 +478,7 @@ app.use(
 // Rate limiting ayarları
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 100, // IP başına maksimum istek
+  max: process.env.NODE_ENV === 'development' ? Infinity : 200, // Development'da sınırsız, production'da 200
   message: "Too many requests, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
