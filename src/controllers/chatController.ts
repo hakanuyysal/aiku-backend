@@ -1,9 +1,93 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { ChatSession } from '../models/ChatSession';
 import { Message } from '../models/Message';
 import { Company } from '../models/Company';
 import { io } from '../app';
+
+
+/** SystemBot ID’si: */
+// const SYSTEM_BOT_ID = new Types.ObjectId(process.env.SYSTEM_BOT_ID!);
+
+// export const broadcastMessage = async (req: Request, res: Response) => {
+//   try {
+//     const { content, attachment } = req.body;
+//     if (!content) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Mesaj içeriği (content) zorunludur'
+//       });
+//     }
+
+//     if (!mongoose.Types.ObjectId.isValid(SYSTEM_BOT_ID)) {
+//       return res.status(500).json({
+//         success: false,
+//         message: 'SYSTEM_BOT_ID hatalı yapılandırılmış'
+//       });
+//     }
+
+//     const companies = await Company.find({}, '_id');
+
+//     let broadcastCount = 0;
+//     for (const { _id: companyId } of companies) {
+//       let session = await ChatSession.findOne({
+//         $or: [
+//           { initiatorCompany: SYSTEM_BOT_ID, targetCompany: companyId },
+//           { initiatorCompany: companyId, targetCompany: SYSTEM_BOT_ID }
+//         ]
+//       });
+//       if (!session) {
+//         session = await ChatSession.create({
+//           initiatorCompany: SYSTEM_BOT_ID,
+//           targetCompany: companyId,
+//           title: 'System Broadcast'
+//         });
+//       }
+
+//       const message = await Message.create({
+//         chatSession: session._id,
+//         sender: new mongoose.Types.ObjectId(SYSTEM_BOT_ID),
+//         content,
+//         attachment
+//       });
+
+//       session.lastMessageText = content;
+//       session.lastMessageSender = new mongoose.Types.ObjectId(SYSTEM_BOT_ID); 
+//       session.lastMessageDate = new Date();
+//       if (session.initiatorCompany.toString() === SYSTEM_BOT_ID) {
+//         session.unreadCountTarget += 1;
+//       } else {
+//         session.unreadCountInitiator += 1;
+//       }
+//       await session.save();
+
+//       io.to(`chat-${session._id}`).emit('new-message', message);
+//       io.to(`company-${companyId.toString()}`).emit('chat-notification', {
+//         type: 'new-message',
+//         chatSessionId: session._id,
+//         message,
+//         unreadCount:
+//           session.initiatorCompany.toString() === SYSTEM_BOT_ID
+//             ? session.unreadCountTarget
+//             : session.unreadCountInitiator
+//       });
+
+//       broadcastCount++;
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       message: `Broadcast tamamlandı, ${broadcastCount} şirkete mesaj gönderildi`
+//     });
+//   } catch (error) {
+//     console.error('Broadcast hatası:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Broadcast sırasında hata oluştu',
+//       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+//     });
+//   }
+// };
 
 // Bir şirketin tüm sohbet oturumlarını getirme
 export const getCompanyChatSessions = async (req: Request, res: Response) => {
@@ -173,7 +257,7 @@ export const getChatMessages = async (req: Request, res: Response) => {
 
     // Şirketin karşı tarafından gelen mesajları okundu olarak işaretle
     await Message.updateMany(
-      { 
+      {
         chatSession: chatSessionId,
         sender: isInitiator ? chatSession.targetCompany : chatSession.initiatorCompany,
         isRead: false

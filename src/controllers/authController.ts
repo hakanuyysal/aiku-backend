@@ -44,6 +44,7 @@ export const register = async (req: Request, res: Response) => {
       instagram,
       facebook,
       twitter,
+      role,
     } = req.body;
 
     let user = await User.findOne({ email });
@@ -74,6 +75,7 @@ export const register = async (req: Request, res: Response) => {
       instagram,
       facebook,
       twitter,
+      role,
       authProvider: "email",
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
@@ -129,6 +131,7 @@ export const register = async (req: Request, res: Response) => {
       vatNumber: user.vatNumber,
       isSubscriptionActive: hasActiveSubscription,
       isAngelInvestor: user.isAngelInvestor,
+      role: user.role,
     };
 
     res.status(201).json({
@@ -313,6 +316,7 @@ export const login = async (req: Request, res: Response) => {
       vatNumber: user.vatNumber,
       isSubscriptionActive: hasActiveSubscription,
       isAngelInvestor: user.isAngelInvestor,
+      role: user.role,
     };
 
     res.status(200).json({
@@ -381,6 +385,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         vatNumber: user.vatNumber,
         isSubscriptionActive: hasActiveSubscription,
         isAngelInvestor: user.isAngelInvestor,
+        role: user.role,
       },
     });
   } catch (err: any) {
@@ -422,7 +427,8 @@ export const updateUser = async (req: Request, res: Response) => {
       twitter,
       password,
       locale,
-      isAngelInvestor 
+      isAngelInvestor,
+      role
     } = req.body;
 
     // Gerekli alanları güncelle
@@ -476,6 +482,7 @@ export const updateUser = async (req: Request, res: Response) => {
         emailVerified: user.emailVerified,
         locale: user.locale,
         isAngelInvestor: user.isAngelInvestor,
+        role: user.role,
       },
     });
   } catch (err: any) {
@@ -540,6 +547,7 @@ export const getUserById = async (req: Request, res: Response) => {
         vatNumber: user.vatNumber,
         isSubscriptionActive: hasActiveSubscription,
         isAngelInvestor: user.isAngelInvestor,
+        role: user.role,
       },
     });
   } catch (err: any) {

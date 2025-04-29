@@ -36,4 +36,5 @@ export interface UserResponse {
   vatNumber?: string;
   isSubscriptionActive?: boolean;
   isAngelInvestor?: boolean;
+  role?: 'admin' | 'user' | 'editor';
 } 

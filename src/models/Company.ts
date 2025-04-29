@@ -14,7 +14,7 @@ export interface ICompany extends Document {
   companyEmail: string;
   companyPhone: string;
   countryCode: string;
-  localPhone: string; 
+  localPhone: string;
   companyInfo: string;
   detailedDescription: string;
   companyWebsite?: string;
@@ -24,6 +24,7 @@ export interface ICompany extends Document {
   companyInstagram?: string;
   interestedSectors?: string[];
   isIncorporated?: boolean;
+  isHighlighted?: boolean;
   user: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   slug: string;
@@ -74,7 +75,7 @@ const companySchema = new Schema<ICompany>(
     fundSize: {
       type: String,
       trim: true,
-    },    
+    },
     businessScale: {
       type: String,
       required: true,
@@ -157,6 +158,10 @@ const companySchema = new Schema<ICompany>(
       default: [],
     },
     isIncorporated: {
+      type: Boolean,
+      default: false,
+    },
+    isHighlighted: {
       type: Boolean,
       default: false,
     },

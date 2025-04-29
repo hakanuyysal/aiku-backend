@@ -28,6 +28,7 @@ interface CompanyResponse {
   companyInstagram?: string;
   interestedSectors?: string[];
   isIncorporated?: boolean;
+  isHighlighted?: boolean;
   user: string;
   createdAt: Date;
 }
@@ -67,6 +68,7 @@ export const getAllCompanies = async (req: Request, res: Response) => {
       companyInstagram: company.companyInstagram,
       interestedSectors: company.interestedSectors,
       isIncorporated: company.isIncorporated,
+      isHighlighted: company.isHighlighted,
       user: company.user.toString(),
       createdAt: company.createdAt,
     }));
@@ -126,6 +128,7 @@ export const createCompany = async (req: Request, res: Response) => {
       companyInstagram,
       interestedSectors,
       isIncorporated,
+      isHighlighted,
     } = req.body;
 
     const company = await Company.create({
@@ -151,6 +154,7 @@ export const createCompany = async (req: Request, res: Response) => {
       companyInstagram,
       interestedSectors,
       isIncorporated,
+      isHighlighted,
       user: userId,
     });
 
@@ -178,6 +182,7 @@ export const createCompany = async (req: Request, res: Response) => {
       companyInstagram: company.companyInstagram,
       interestedSectors: company.interestedSectors,
       isIncorporated: company.isIncorporated,
+      isHighlighted: company.isHighlighted,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -225,6 +230,7 @@ export const getCompany = async (req: Request, res: Response) => {
       companyInstagram: company.companyInstagram,
       interestedSectors: company.interestedSectors,
       isIncorporated: company.isIncorporated,
+      isHighlighted: company.isHighlighted,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -280,6 +286,7 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
       companyInstagram: company.companyInstagram,
       interestedSectors: company.interestedSectors,
       isIncorporated: company.isIncorporated,
+      isHighlighted: company.isHighlighted,
       user: company.user.toString(),
       createdAt: company.createdAt,
     }));
@@ -344,6 +351,7 @@ export const updateCompany = async (req: Request, res: Response) => {
       companyInstagram,
       interestedSectors,
       isIncorporated,
+      isHighlighted,
     } = req.body;
 
     if (companyName) company.companyName = companyName;
@@ -369,6 +377,7 @@ export const updateCompany = async (req: Request, res: Response) => {
     if (companyInstagram) company.companyInstagram = companyInstagram;
     if (interestedSectors) company.interestedSectors = interestedSectors;
     if (isIncorporated !== undefined) company.isIncorporated = isIncorporated;
+    if (isHighlighted !== undefined) company.isHighlighted = isHighlighted;
 
     await company.save();
 
@@ -396,6 +405,7 @@ export const updateCompany = async (req: Request, res: Response) => {
       companyInstagram: company.companyInstagram,
       interestedSectors: company.interestedSectors,
       isIncorporated: company.isIncorporated,
+      isHighlighted: company.isHighlighted,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };

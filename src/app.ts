@@ -31,6 +31,7 @@ import billingInfoRoutes from "./routes/billingInfoRoutes";
 import complaintRoutes from "./routes/complaintRoutes";
 import exchangeRateRoutes from "./routes/exchangeRateRoutes";
 import couponRoutes from "./routes/couponRoutes";
+import clickTrackRoutes from "./routes/clickTrackRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -567,6 +568,7 @@ app.use("/api/billing-info", billingInfoRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/exchange-rates", exchangeRateRoutes);
 app.use("/api/coupons", couponRoutes);
+app.use("/api/click", clickTrackRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
