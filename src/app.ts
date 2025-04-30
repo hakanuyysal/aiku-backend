@@ -10,6 +10,8 @@ import logger from "./config/logger";
 import httpLogger from "./middleware/httpLogger";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import cron from "node-cron";
+import { fetchAndStoreNews } from './controllers/newsController';
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -32,6 +34,7 @@ import complaintRoutes from "./routes/complaintRoutes";
 import exchangeRateRoutes from "./routes/exchangeRateRoutes";
 import couponRoutes from "./routes/couponRoutes";
 import clickTrackRoutes from "./routes/clickTrackRoutes";
+import newsRoutes from "./routes/newsRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -429,9 +432,9 @@ app.use((err: any, req: Request, res: Response, next: any) => {
     },
     user: req.user
       ? {
-          id: req.user.id,
-          email: req.user.email,
-        }
+        id: req.user.id,
+        email: req.user.email,
+      }
       : null,
     timestamp: new Date().toISOString(),
   });
@@ -497,11 +500,11 @@ const limiter = rateLimit({
   },
   // Rate limit için IP belirleme fonksiyonu
   keyGenerator: (req: Request) => {
-    return req.headers["x-forwarded-for"]?.toString() || 
-           req.headers["x-real-ip"]?.toString() || 
-           req.ip || 
-           req.connection.remoteAddress || 
-           'unknown';
+    return req.headers["x-forwarded-for"]?.toString() ||
+      req.headers["x-real-ip"]?.toString() ||
+      req.ip ||
+      req.connection.remoteAddress ||
+      'unknown';
   }
 });
 
@@ -534,6 +537,14 @@ app.use((req: Request, res: Response, next: any) => {
   }
 
   next();
+});
+
+const NEWS_FETCH_SCHEDULE = process.env.NEWS_FETCH_CRON_SCHEDULE || '0 3 * * *';
+
+cron.schedule(NEWS_FETCH_SCHEDULE, () => {
+  fetchAndStoreNews()
+    .then(() => console.log('Haberler güncellendi'))
+    .catch(err => console.error('Haber çekme hatası:', err));
 });
 
 // MongoDB bağlantısı
@@ -569,6 +580,7 @@ app.use("/api/complaints", complaintRoutes);
 app.use("/api/exchange-rates", exchangeRateRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/click", clickTrackRoutes);
+app.use("/api/news", newsRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
