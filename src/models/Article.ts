@@ -12,6 +12,7 @@ export interface IArticle extends Document {
     urlToImage: string | null;
     publishedAt: Date;
     content: string | null;
+    fullContent: { type: String, default: null },   
     createdAt: Date;
     updatedAt: Date;
 }
@@ -31,6 +32,7 @@ const ArticleSchema = new Schema<IArticle>(
         urlToImage: { type: String, default: null, trim: true },
         publishedAt: { type: Date, required: true },
         content: { type: String, default: null, trim: true },
+        fullContent: { type: String, default: null, trim: true },   
     },
     {
         timestamps: true,

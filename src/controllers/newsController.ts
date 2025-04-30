@@ -6,11 +6,14 @@ import { Setting } from '../models/Setting';
 const NEWS_API_KEY = process.env.NEWS_API_KEY!;
 const QUERY = process.env.QUERY!;
 
+const DIFFBOT_TOKEN = process.env.DIFFBOT_TOKEN!;
+const DIFFBOT_URL = 'https://api.diffbot.com/v3/article';
+
 /**
  * NewsAPI’dan yeni haberleri çekip MongoDB’ye kaydeder.
  */
 export const fetchAndStoreNews = async (): Promise<void> => {
-    // 1) Son çekim zamanını oku
+    // 1) Son çekim zamanını oku ya da yeni ayarla
     let setting = await Setting.findOne({ key: 'lastFetchedAt' });
     if (!setting) {
         setting = new Setting({
@@ -19,21 +22,25 @@ export const fetchAndStoreNews = async (): Promise<void> => {
         });
     }
     const from = setting.value;
-
-    // **DEBUG LOG**: fonksiyon gerçekten çağrıldı mı, hangi tarihten çekiyor?
     console.log('>> [DEBUG] fetchAndStoreNews çalıştı, from:', from);
 
-    // 2) NewsAPI çağrısı
+    // 2) NewsAPI’den makaleleri al
     const response = await axios.get('https://newsapi.org/v2/everything', {
-        params: { apiKey: NEWS_API_KEY, q: QUERY, /* from, */ pageSize: 100, sortBy: 'publishedAt' }
-      });
+        params: {
+            apiKey: NEWS_API_KEY,
+            q: QUERY,
+            from,               // eğer kullanıyorsanız
+            pageSize: 100,
+            sortBy: 'publishedAt'
+        }
+    });
+    const fetched = response.data.articles as any[];
+    console.log('>> [DEBUG] NewsAPI returned:', fetched.length, 'articles');
 
-    // **DEBUG LOG**: NewsAPI kaç makale döndürüyor?
-    console.log('>> [DEBUG] NewsAPI returned articles count:', response.data.articles.length);
-
-    // 3) Upsert döngüsü
-    for (const a of response.data.articles) {
-        await Article.updateOne(
+    // 3) Her makale için upsert + Diffbot
+    for (const a of fetched) {
+        // upsert ile belgeyi oluştur veya güncelle, yenisini döndür (new: true)
+        const doc = await Article.findOneAndUpdate(
             { url: a.url },
             {
                 $setOnInsert: {
@@ -47,14 +54,37 @@ export const fetchAndStoreNews = async (): Promise<void> => {
                     content: a.content,
                 }
             },
-            { upsert: true }
+            {
+                upsert: true,
+                new: true,
+                setDefaultsOnInsert: true
+            }
         );
+
+        // Eğer yeni kaydedildiyse veya fullContent hâlâ boşsa, Diffbot’tan çek
+        if (!doc.fullContent) {
+            try {
+                const dbRes = await axios.get(DIFFBOT_URL, {
+                    params: {
+                        token: DIFFBOT_TOKEN,
+                        url: doc.url,
+                        fields: 'text'
+                    }
+                });
+                const fullText = dbRes.data.objects?.[0]?.text || '';
+                doc.fullContent = fullText;
+                await doc.save();
+                console.log(`>> [Diffbot] fullContent kaydedildi for ${doc._id}`);
+            } catch (e: any) {
+                console.warn(`>> [Diffbot] failed for ${doc._id}:`, e.message);
+            }
+        }
     }
 
     // 4) Ayarı güncelle
     setting.value = new Date().toISOString();
     await setting.save();
-    console.log('>> [DEBUG] Upsert bitti.');
+    console.log('>> [DEBUG] fetchAndStoreNews tamamlandı.');
 };
 
 
@@ -108,5 +138,106 @@ export const getNewsById = async (req: Request, res: Response) => {
         res.json({ success: true, article });
     } catch (err: any) {
         res.status(500).json({ success: false, message: 'Haber getirirken hata', error: err.message });
+    }
+};
+
+// Tek bir haber için fullContent al
+export const fetchFullContentById = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const article = await Article.findById(req.params.id);
+        if (!article) {
+            res.status(404).json({ success: false, message: 'Haber bulunamadı' });
+            return;
+        }
+
+        const diffbotRes = await axios.get(DIFFBOT_URL, {
+            params: {
+                token: DIFFBOT_TOKEN,
+                url: article.url,
+                fields: 'text',
+            }
+        });
+
+        const fullText = diffbotRes.data.objects?.[0]?.text || '';
+        article.fullContent = fullText;
+        await article.save();
+
+        res.json({ success: true, fullText });
+    } catch (err: any) {
+        console.error('Diffbot error:', err.response?.data || err.message);
+        res.status(500).json({ success: false, message: 'Tam içerik alınamadı', error: err.message });
+    }
+};
+
+// Tüm haberleri fullContent ile güncelle
+export const fetchFullContentAll = async (
+    _req: Request,          // parametre kullanmıyorsanız bile tip koyun
+    res: Response
+): Promise<void> => {
+    try {
+        const articles = await Article.find({});
+        for (const art of articles) {
+            try {
+                const diffbotRes = await axios.get(DIFFBOT_URL, {
+                    params: {
+                        token: DIFFBOT_TOKEN,
+                        url: art.url,
+                        fields: 'text',
+                    }
+                });
+                art.fullContent = diffbotRes.data.objects?.[0]?.text || '';
+                await art.save();
+            } catch (e: any) {
+                console.warn(`Diffbot failed for ${art._id}:`, e.message);
+            }
+        }
+        res.json({ success: true, message: `${articles.length} haberin fullContent’ı güncellendi.` });
+    } catch (err: any) {
+        res.status(500).json({ success: false, message: 'Toplu güncelleme sırasında hata', error: err.message });
+    }
+};
+
+export const fetchMissingFullContent = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        // fullContent null veya boş string olanları bul
+        const missing = await Article.find({
+            $or: [
+                { fullContent: { $exists: false } },
+                { fullContent: null },
+                { fullContent: "" }
+            ]
+        });
+
+        let updatedCount = 0;
+        for (const art of missing) {
+            try {
+                const diffbotRes = await axios.get(DIFFBOT_URL, {
+                    params: {
+                        token: DIFFBOT_TOKEN,
+                        url: art.url,
+                        fields: 'text'
+                    }
+                });
+                const text = diffbotRes.data.objects?.[0]?.text || '';
+                if (text) {
+                    art.fullContent = text;
+                    await art.save();
+                    updatedCount++;
+                }
+            } catch (e: any) {
+                console.warn(`Diffbot failed for ${art._id}:`, e.message);
+            }
+        }
+
+        res.json({
+            success: true,
+            totalMissing: missing.length,
+            updatedCount
+        });
+    } catch (err: any) {
+        res.status(500).json({ success: false, message: 'Eksik güncelleme sırasında hata', error: err.message });
     }
 };
