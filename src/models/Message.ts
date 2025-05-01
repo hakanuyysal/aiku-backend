@@ -1,25 +1,25 @@
-import mongoose, { Document, Model, Schema } from 'mongoose';
+import mongoose, { Document, Model, Schema } from "mongoose";
 
-// Mesaj arayüzü
 export interface IMessage extends Document {
-  // Mesajın ait olduğu sohbet oturumu
   chatSession: mongoose.Schema.Types.ObjectId;
-  // Mesajı gönderen şirket
+
   sender: mongoose.Schema.Types.ObjectId;
-  // Mesaj içeriği
+
   content: string;
-  // Dosya eki (varsa)
+
   attachment?: {
     fileName: string;
     fileType: string;
     fileSize: number;
     filePath: string;
   };
-  // Mesaj okundu mu?
+
+  isReplyable: boolean;
+
   isRead: boolean;
-  // Oluşturulma tarihi
+
   createdAt: Date;
-  // Güncelleme tarihi
+
   updatedAt: Date;
 }
 
@@ -29,18 +29,18 @@ const messageSchema = new Schema<IMessage>(
   {
     chatSession: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'ChatSession',
-      required: [true, 'Sohbet oturumu zorunludur'],
-      index: true, // Sohbete göre mesajları hızlı sorgulama için index
+      ref: "ChatSession",
+      required: [true, "Sohbet oturumu zorunludur"],
+      index: true,
     },
     sender: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Company',
-      required: [true, 'Gönderici zorunludur'],
+      ref: "Company",
+      required: [true, "Gönderici zorunludur"],
     },
     content: {
       type: String,
-      required: [true, 'Mesaj içeriği zorunludur'],
+      required: [true, "Mesaj içeriği zorunludur"],
       trim: true,
     },
     attachment: {
@@ -60,6 +60,10 @@ const messageSchema = new Schema<IMessage>(
         trim: true,
       },
     },
+    isReplyable: {
+      type: Boolean,
+      default: true,
+    },
     isRead: {
       type: Boolean,
       default: false,
@@ -74,14 +78,13 @@ const messageSchema = new Schema<IMessage>(
     },
   },
   {
-    timestamps: true, // createdAt ve updatedAt alanlarını otomatik ekler
+    timestamps: true,
   }
 );
 
-// Mesajların sohbet içinde oluşturulma tarihine göre sıralanması için index
 messageSchema.index({ chatSession: 1, createdAt: 1 });
 
 export const Message = mongoose.model<IMessage, IMessageModel>(
-  'Message',
+  "Message",
   messageSchema
-); 
+);

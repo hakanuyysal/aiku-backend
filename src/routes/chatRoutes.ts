@@ -6,6 +6,7 @@ import {
   sendMessage,
   toggleArchiveChat,
   deleteChat,
+  broadcastToAllCompanies
 } from '../controllers/chatController';
 import { protect } from '../middleware/auth';
 import { check } from 'express-validator';
@@ -55,5 +56,16 @@ router.patch('/archive/:chatSessionId', protect, toggleArchiveChat);
 // Sohbeti silme
 // DELETE /api/chat/sessions/:chatSessionId
 router.delete('/sessions/:chatSessionId', protect, deleteChat);
+
+// Tüm şirketlere toplu mesaj gönderme
+// POST /api/chat/broadcast
+router.post(
+  '/broadcast',
+  protect,
+  [
+    check('content', 'Mesaj içeriği zorunludur').not().isEmpty(),
+  ],
+  broadcastToAllCompanies
+);
 
 export default router; 
