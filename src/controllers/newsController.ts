@@ -109,15 +109,27 @@ export const getNews = async (req: Request, res: Response) => {
     try {
         const limit = parseInt((req.query.limit as string) ?? '20', 10);
         const page = parseInt((req.query.page as string) ?? '1', 10);
+        const search = (req.query.search as string) ?? '';
         const skip = (page - 1) * limit;
 
+        // Eğer search varsa, title, content veya fullContent içinde ara:
+        const filter: any = {};
+        if (search.trim()) {
+            const regex = new RegExp(search, 'i');
+            filter.$or = [
+                { title: regex },
+                { content: regex },
+                { fullContent: regex }
+            ];
+        }
+
         const articles = await Article
-            .find({})
+            .find(filter)
             .sort({ publishedAt: -1 })
             .skip(skip)
             .limit(limit);
 
-        const total = await Article.countDocuments();
+        const total = await Article.countDocuments(filter);
         res.json({ success: true, page, limit, total, articles });
     } catch (err: any) {
         res.status(500).json({ success: false, message: 'Haberleri listelerken hata', error: err.message });
