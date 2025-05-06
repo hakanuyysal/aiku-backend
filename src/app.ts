@@ -36,6 +36,7 @@ import exchangeRateRoutes from "./routes/exchangeRateRoutes";
 import couponRoutes from "./routes/couponRoutes";
 import clickTrackRoutes from "./routes/clickTrackRoutes";
 import newsRoutes from "./routes/newsRoutes";
+import panelUserRoutes from "./routes/panelUserRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -585,6 +586,7 @@ app.use("/api/exchange-rates", exchangeRateRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api/click", clickTrackRoutes);
 app.use("/api/news", newsRoutes);
+app.use("/api/panel-users", panelUserRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
