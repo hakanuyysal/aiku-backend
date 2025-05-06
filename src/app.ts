@@ -12,6 +12,7 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import cron from "node-cron";
 import { fetchAndStoreNews } from './controllers/newsController';
+import { ipBlocker } from './middleware/ipBlocker';
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -42,6 +43,9 @@ dotenv.config();
 // Express uygulamasını oluştur
 const app = express();
 const server = http.createServer(app);
+
+// IP engelleyici middleware'i ekle (en üstte olmalı)
+app.use(ipBlocker);
 
 // Proxy güven ayarları
 app.set("trust proxy", 1); // Sadece bir proxy'ye güven
