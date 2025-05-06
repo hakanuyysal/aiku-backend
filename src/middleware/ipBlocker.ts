@@ -1,7 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 
 // Engellenen IP'ler listesi
-const BLOCKED_IPS = new Set(["154.83.103.179", "23.27.46.35", "168.76.20.229"]);
+const BLOCKED_IPS = new Set([
+  "154.83.103.179",
+  "23.27.46.35",
+  "168.76.20.229",
+  "164.92.207.75",
+]);
 
 // IP engelleyici middleware
 export const ipBlocker = (req: Request, res: Response, next: NextFunction) => {
