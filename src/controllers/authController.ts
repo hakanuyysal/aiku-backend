@@ -557,6 +557,53 @@ export const getUserById = async (req: Request, res: Response) => {
   }
 };
 
+export const updateUserById = async (req: Request, res: Response) => {
+  // Sadece admin rolündekilere izin ver
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Yetkiniz yok.' });
+  }
+
+  const { id } = req.params;
+  const user = await User.findById(id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+  }
+
+  // Güncellenmesine izin verdiğiniz alanları listeleyin
+  const updatable = [
+    'firstName',
+    'lastName',
+    'email',
+    'role',
+    'subscriptionStatus',
+    'subscriptionPlan',
+    // ihtiyaca göre diğer alanlar...
+  ];
+
+  updatable.forEach((field) => {
+    if (req.body[field] !== undefined) {
+      (user as any)[field] = req.body[field];
+    }
+  });
+
+  await user.save();
+
+  res.json({
+    success: true,
+    user: {
+      id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionPlan: user.subscriptionPlan,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }
+  });
+};
+
 export const addFavorite = async (req: Request, res: Response) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");

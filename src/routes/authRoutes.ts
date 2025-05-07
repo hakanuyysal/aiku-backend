@@ -15,6 +15,7 @@ import {
   createOrUpdateSubscription,
   checkAndRenewTrialSubscriptions,
   googleLogin,
+  updateUserById,
   logout,
   verifyEmail,
   resendVerificationEmail,
@@ -60,6 +61,12 @@ router.put("/updateUser", optionalSupabaseToken, updateUser);
 
 // Kullanıcı id'si ile bilgilerini alma rotası
 router.get("/user/:id", optionalSupabaseToken, getUserById);
+
+router.put(
+  '/updateUserById/:id',
+  protect,      
+  updateUserById
+);
 
 // **Yeni Eklenti: Tüm kullanıcıları çekme rotası (Sadece admin erişimi)**
 router.get("/users", protect, getAllUsers);

@@ -12,13 +12,16 @@ const DIFFBOT_URL = 'https://api.diffbot.com/v3/article';
 /**
  * NewsAPI’dan yeni haberleri çekip MongoDB’ye kaydeder.
  */
-export const fetchAndStoreNews = async (): Promise<void> => {
-    // 1) Son çekim zamanını oku ya da yeni ayarla
+export const fetchAndStoreNews = async (): Promise<{
+    fetchedCount: number;
+    newCount: number;
+}> => {
+    // 1) Son çekim zamanını oku ya da 30 gün öncesine ayarla
     let setting = await Setting.findOne({ key: 'lastFetchedAt' });
     if (!setting) {
         setting = new Setting({
             key: 'lastFetchedAt',
-            value: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+            value: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString(),
         });
     }
     const from = setting.value;
@@ -29,18 +32,21 @@ export const fetchAndStoreNews = async (): Promise<void> => {
         params: {
             apiKey: NEWS_API_KEY,
             q: QUERY,
-            from,               // eğer kullanıyorsanız
+            from,
             pageSize: 100,
-            sortBy: 'publishedAt'
-        }
+            sortBy: 'publishedAt',
+        },
     });
     const fetched = response.data.articles as any[];
     console.log('>> [DEBUG] NewsAPI returned:', fetched.length, 'articles');
 
+    const fetchedCount = fetched.length;
+    let newCount = 0;
+
     // 3) Her makale için upsert + Diffbot
     for (const a of fetched) {
-        // upsert ile belgeyi oluştur veya güncelle, yenisini döndür (new: true)
-        const doc = await Article.findOneAndUpdate(
+        // upsert + rawResult ile yeni mi kontrol et
+        const result = await Article.findOneAndUpdate(
             { url: a.url },
             {
                 $setOnInsert: {
@@ -52,24 +58,31 @@ export const fetchAndStoreNews = async (): Promise<void> => {
                     urlToImage: a.urlToImage,
                     publishedAt: new Date(a.publishedAt),
                     content: a.content,
-                }
+                },
             },
             {
                 upsert: true,
                 new: true,
-                setDefaultsOnInsert: true
+                setDefaultsOnInsert: true,
+                rawResult: true,            // MongoDB driver cevabını al
             }
         );
 
-        // Eğer yeni kaydedildiyse veya fullContent hâlâ boşsa, Diffbot’tan çek
+        const doc = result.value!;
+        // Eğer var olanı güncellemedi (yeni insert), sayacı arttır
+        if (!result.lastErrorObject!.updatedExisting) {
+            newCount++;
+        }
+
+        // Henüz fullContent yoksa Diffbot’tan çek
         if (!doc.fullContent) {
             try {
                 const dbRes = await axios.get(DIFFBOT_URL, {
                     params: {
                         token: DIFFBOT_TOKEN,
                         url: doc.url,
-                        fields: 'text'
-                    }
+                        fields: 'text',
+                    },
                 });
                 const fullText = dbRes.data.objects?.[0]?.text || '';
                 doc.fullContent = fullText;
@@ -81,10 +94,15 @@ export const fetchAndStoreNews = async (): Promise<void> => {
         }
     }
 
-    // 4) Ayarı güncelle
+    // 4) Ayarı güncelle ve sayıları dön
     setting.value = new Date().toISOString();
     await setting.save();
-    console.log('>> [DEBUG] fetchAndStoreNews tamamlandı.');
+    console.log(
+        '>> [DEBUG] fetchAndStoreNews tamamlandı.',
+        { fetchedCount, newCount }
+    );
+
+    return { fetchedCount, newCount };
 };
 
 
@@ -94,10 +112,18 @@ export const fetchAndStoreNews = async (): Promise<void> => {
  */
 export const manualFetchNews = async (req: Request, res: Response) => {
     try {
-        await fetchAndStoreNews();
-        res.json({ success: true, message: 'Haberler başarıyla güncellendi.' });
+        const { fetchedCount, newCount } = await fetchAndStoreNews();
+        res.json({
+            success: true,
+            message: 'Haberler başarıyla güncellendi.',
+            data: { fetchedCount, newCount },
+        });
     } catch (err: any) {
-        res.status(500).json({ success: false, message: 'Haber çekme sırasında hata', error: err.message });
+        res.status(500).json({
+            success: false,
+            message: 'Haber çekme sırasında hata',
+            error: err.message,
+        });
     }
 };
 
