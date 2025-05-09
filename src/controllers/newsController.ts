@@ -32,7 +32,7 @@ export const fetchAndStoreNews = async (): Promise<{
         params: {
             apiKey: NEWS_API_KEY,
             q: QUERY,
-            from,
+            // from,
             pageSize: 100,
             sortBy: 'publishedAt',
         },
@@ -112,18 +112,18 @@ export const fetchAndStoreNews = async (): Promise<{
  */
 export const manualFetchNews = async (req: Request, res: Response) => {
     try {
+        if (req.query.reset === 'true') {
+            const resetDate = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+            await Setting.findOneAndUpdate(
+                { key: 'lastFetchedAt' },
+                { value: resetDate },
+                { upsert: true }
+            );
+        }
         const { fetchedCount, newCount } = await fetchAndStoreNews();
-        res.json({
-            success: true,
-            message: 'Haberler başarıyla güncellendi.',
-            data: { fetchedCount, newCount },
-        });
+        res.json({ success: true, fetchedCount, newCount });
     } catch (err: any) {
-        res.status(500).json({
-            success: false,
-            message: 'Haber çekme sırasında hata',
-            error: err.message,
-        });
+        res.status(500).json({ success: false, message: err.message });
     }
 };
 

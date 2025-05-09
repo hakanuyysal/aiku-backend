@@ -4,6 +4,7 @@ import { User } from '../models/User';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { UnauthorizedError } from '../utils/errors';
+import { PanelUser } from '../models/PanelUser';
 
 dotenv.config();
 
@@ -14,6 +15,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 interface JwtPayload {
   id: string;
+  userId?: string;
+  type?: string;
 }
 
 // Request tipini genişletiyoruz - module augmentation kullanarak
@@ -26,46 +29,43 @@ declare module 'express' {
 
 export const protect = async (req: Request, res: Response, next: NextFunction) => {
   let token: string | undefined;
-
-  // Token kontrolü
-  if (req.headers.authorization?.startsWith("Bearer ")) {
-    token = req.headers.authorization.split(" ")[1];
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.split(' ')[1];
   } else if (req.cookies?.token) {
     token = req.cookies.token;
   }
 
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Oturum açmanız gerekiyor'
-    });
+    return res.status(401).json({ success: false, message: 'Oturum açmanız gerekiyor' });
   }
 
   try {
-    // Token'i doğrula
+    // Token'i doğrula (hem normal hem panel login token'ı bu secret ile)
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
 
-    // Kullanıcıyı veritabanında ara (şifreyi hariç tut)
-    const user = await User.findById(decoded.id).select("-password");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Kullanıcı bulunamadı",
-      });
+    let userDoc;
+    if (decoded.type === 'panel' && decoded.userId) {
+      // panel login token
+      userDoc = await PanelUser.findById(decoded.userId).select('-password');
+    } else if (decoded.id) {
+      // normal email/password login token
+      userDoc = await User.findById(decoded.id).select('-password');
     }
 
-    // Kullanıcıyı request objesine ekleyerek sonraki middleware'lere ilet
-    req.user = user;
+    if (!userDoc) {
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
+    }
+
+    // İster PanelUser, ister normal User; frontend için ortak `req.user`
+    req.user = userDoc;
     next();
+
   } catch (err) {
-    console.error("Token doğrulama hatası:", err);
-    return res.status(401).json({
-      success: false,
-      message: "Geçersiz veya süresi dolmuş token",
-    });
+    console.error('Token doğrulama hatası:', err);
+    return res.status(401).json({ success: false, message: 'Geçersiz veya süresi dolmuş token' });
   }
 };
+
 
 /**
  * Admin yetkilendirmesi için middleware
@@ -99,7 +99,6 @@ export const adminProtect = (req: Request, res: Response, next: NextFunction) =>
 export const optionalSupabaseToken = async (req: Request, res: Response, next: NextFunction) => {
   let token: string | undefined;
 
-  // Token kontrolü
   if (req.headers.authorization?.startsWith("Bearer ")) {
     token = req.headers.authorization.split(" ")[1];
   } else if (req.cookies?.token) {
@@ -107,60 +106,56 @@ export const optionalSupabaseToken = async (req: Request, res: Response, next: N
   }
 
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: 'Oturum açmanız gerekiyor'
-    });
+    return res.status(401).json({ success: false, message: 'Oturum açmanız gerekiyor' });
   }
 
   try {
-    // Önce normal JWT token olarak doğrulamayı dene
+    // 1) Önce JWT olarak deneyelim (normal user ya da panel user)
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
-      const user = await User.findById(decoded.id).select("-password");
-      
-      if (user) {
-        // Kullanıcı bulundu, request'e ekle ve devam et
-        req.user = user;
-        return next();
+
+      // -- panel token mı?
+      if (decoded.type === 'panel' && decoded.userId) {
+        const panelUser = await PanelUser.findById(decoded.userId).select('-password');
+        if (panelUser) {
+          req.user = panelUser;
+          return next();
+        }
       }
-    } catch (jwtError) {
-      // JWT doğrulama hatası, Supabase ile deneyelim
-      console.log('JWT token doğrulama başarısız, Supabase ile deneniyor');
+      // -- normal JWT token mı?
+      if (decoded.id) {
+        const user = await User.findById(decoded.id).select('-password');
+        if (user) {
+          req.user = user;
+          return next();
+        }
+      }
+    } catch (jwtErr) {
+      // JWT doğrulama hatası ise bir sonraki adıma geç
+      console.log('JWT doğrulama başarısız veya token tipi farklı, Supabase ile deneniyor');
     }
 
-    // JWT başarısız oldu, Supabase token olarak dene
+    // 2) Supabase token olarak dene
     const { data: { user: supabaseUser }, error } = await supabase.auth.getUser(token);
-    
     if (error || !supabaseUser) {
-      return res.status(401).json({ 
-        success: false,
-        message: 'Geçersiz veya süresi dolmuş token',
-        error: error?.message 
-      });
+      return res.status(401).json({ success: false, message: 'Geçersiz veya süresi dolmuş token', error: error?.message });
     }
-    
+
     // Supabase ID ile MongoDB'deki kullanıcıyı bul
     const user = await User.findOne({ supabaseId: supabaseUser.id });
-    
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "Kullanıcı bulunamadı",
-      });
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
     }
-    
-    // Kullanıcıyı request nesnesine ekle
+
     req.user = user;
     next();
+
   } catch (err) {
     console.error("Token doğrulama hatası:", err);
-    return res.status(401).json({
-      success: false,
-      message: "Geçersiz veya süresi dolmuş token",
-    });
+    return res.status(401).json({ success: false, message: 'Geçersiz veya süresi dolmuş token' });
   }
 };
+
 
 export const authenticateToken = (req: Request, _res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
