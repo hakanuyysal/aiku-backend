@@ -28,6 +28,7 @@ export interface ICompany extends Document {
   user: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   slug: string;
+  acceptMessages: boolean;
 }
 
 
@@ -164,6 +165,10 @@ const companySchema = new Schema<ICompany>(
     isHighlighted: {
       type: Boolean,
       default: false,
+    },
+    acceptMessages: {
+      type: Boolean,
+      default: true,
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,
