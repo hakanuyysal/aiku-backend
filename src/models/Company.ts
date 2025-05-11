@@ -84,7 +84,7 @@ const companySchema = new Schema<ICompany>(
     },
     companyEmail: {
       type: String,
-      required: [true, 'Company email is required'],
+      // required: [true, 'Company email is required'],
       trim: true,
       lowercase: true,
       unique: true,
@@ -92,19 +92,19 @@ const companySchema = new Schema<ICompany>(
     },
     companyPhone: {
       type: String,
-      required: [true, 'Company phone is required'],
+      // required: [true, 'Company phone is required'],
       trim: true,
       match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'],
       set: (value: string) => value.replace(/\s+/g, ''),
     },
     countryCode: {
       type: String,
-      required: [true, 'Country code is required'],
+      // required: [true, 'Country code is required'],
       trim: true,
     },
     localPhone: {
       type: String,
-      required: [true, 'Local phone number is required'],
+      // required: [true, 'Local phone number is required'],
       trim: true,
     },
     companyInfo: {
