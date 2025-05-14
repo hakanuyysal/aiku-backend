@@ -10,6 +10,9 @@ export const config = {
   frontend: {
     url: process.env.FRONTEND_URL || 'http://localhost:3000',
   },
+  panel: {
+    url: process.env.PANEL_URL || 'http://localhost:3001',
+  },
   jwt: {
     secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
     expire: process.env.JWT_EXPIRE || '30d',

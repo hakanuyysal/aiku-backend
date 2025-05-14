@@ -3,10 +3,11 @@
 import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface IClickTrack extends Document {
-    elementId: string;                    // Unique identifier for the element
-    elementType: 'button' | 'link';       // Type of element being tracked
-    pageUrl?: string;                     // (Optional) Page or route where the element lives
-    clickCount: number;                   // Total number of clicks
+    elementId: string;
+    elementType: 'button' | 'link';
+    pageUrl?: string;
+    clickCount: number;
+    clickHistory: { timestamp: Date }[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -35,6 +36,15 @@ const clickTrackSchema = new Schema<IClickTrack>(
             default: 0,
             min: [0, 'Click count cannot be negative'],
         },
+        clickHistory: [
+            {
+                timestamp: {
+                    type: Date,
+                    default: Date.now,
+                    required: true,
+                }
+            }
+        ]
     },
     {
         timestamps: true, // Automatically adds createdAt & updatedAt
