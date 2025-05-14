@@ -321,6 +321,7 @@ export const updateCompany = async (req: Request, res: Response) => {
     }
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
     const userId = decoded.id;
+    const userRole = decoded.role;
 
     const { id } = req.params;
     let company = await Company.findById(id);
@@ -329,7 +330,7 @@ export const updateCompany = async (req: Request, res: Response) => {
         .status(404)
         .json({ success: false, message: "Şirket bulunamadı" });
     }
-    if (company.user.toString() !== userId) {
+    if (company.user.toString() !== userId && userRole !== 'admin') {
       return res
         .status(403)
         .json({ success: false, message: "Bu şirket üzerinde yetkiniz yok" });
@@ -458,7 +459,7 @@ export const deleteCompany = async (req: Request, res: Response) => {
     }
 
     // @ts-expect-error - Mongoose'un yeni sürümlerinde remove metodu yerine deleteOne kullanılmalı
-    await company.deleteOne(); 
+    await company.deleteOne();
     res
       .status(200)
       .json({ success: true, message: "Şirket başarıyla silindi" });

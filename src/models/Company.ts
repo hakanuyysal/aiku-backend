@@ -97,7 +97,7 @@ const companySchema = new Schema<ICompany>(
       trim: true,
       sparse: true,
       match: [/^\+?[1-9]\d{1,14}$/, 'Please enter a valid phone number'],
-      set: (value: string) => value.replace(/\s+/g, ''),
+      set: (value: string) => value.replace(/[^\d+]/g, ''),
     },
     countryCode: {
       type: String,
