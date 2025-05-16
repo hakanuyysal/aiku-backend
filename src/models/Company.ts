@@ -29,6 +29,8 @@ export interface ICompany extends Document {
   createdAt: Date;
   slug: string;
   acceptMessages: boolean;
+  numberOfInvestments?: number;
+  numberOfExits?: number;
 }
 
 
@@ -171,6 +173,16 @@ const companySchema = new Schema<ICompany>(
     acceptMessages: {
       type: Boolean,
       default: true,
+    },
+    numberOfInvestments: {
+      type: Number,
+      default: 0,
+      min: [0, 'Number of investments cannot be negative'],
+    },
+    numberOfExits: {
+      type: Number,
+      default: 0,
+      min: [0, 'Number of exits cannot be negative'],
     },
     user: {
       type: mongoose.Schema.Types.ObjectId,

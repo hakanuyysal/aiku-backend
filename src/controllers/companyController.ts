@@ -19,6 +19,8 @@ interface CompanyResponse {
   fundSize?: string;
   companyEmail: string;
   companyPhone: string;
+  countryCode: string;
+  localPhone: string;
   companyInfo: string;
   detailedDescription: string;
   companyWebsite?: string;
@@ -30,6 +32,8 @@ interface CompanyResponse {
   isIncorporated?: boolean;
   isHighlighted?: boolean;
   acceptMessages?: boolean;
+  numberOfInvestments?: number;
+  numberOfExits?: number;
   user: string;
   createdAt: Date;
 }
@@ -71,6 +75,8 @@ export const getAllCompanies = async (req: Request, res: Response) => {
       isIncorporated: company.isIncorporated,
       isHighlighted: company.isHighlighted,
       acceptMessages: company.acceptMessages,
+      numberOfInvestments: company.numberOfInvestments,
+      numberOfExits: company.numberOfExits,
       user: company.user.toString(),
       createdAt: company.createdAt,
     }));
@@ -132,6 +138,8 @@ export const createCompany = async (req: Request, res: Response) => {
       isIncorporated,
       isHighlighted,
       acceptMessages,
+      numberOfInvestments,
+      numberOfExits,
     } = req.body;
 
     const company = await Company.create({
@@ -159,6 +167,8 @@ export const createCompany = async (req: Request, res: Response) => {
       isIncorporated,
       isHighlighted,
       acceptMessages,
+      numberOfInvestments,
+      numberOfExits,
       user: userId,
     });
 
@@ -188,6 +198,8 @@ export const createCompany = async (req: Request, res: Response) => {
       isIncorporated: company.isIncorporated,
       isHighlighted: company.isHighlighted,
       acceptMessages: company.acceptMessages,
+      numberOfInvestments: company.numberOfInvestments,
+      numberOfExits: company.numberOfExits,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -237,6 +249,8 @@ export const getCompany = async (req: Request, res: Response) => {
       isIncorporated: company.isIncorporated,
       isHighlighted: company.isHighlighted,
       acceptMessages: company.acceptMessages,
+      numberOfInvestments: company.numberOfInvestments,
+      numberOfExits: company.numberOfExits,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
@@ -294,6 +308,8 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
       isIncorporated: company.isIncorporated,
       isHighlighted: company.isHighlighted,
       acceptMessages: company.acceptMessages,
+      numberOfInvestments: company.numberOfInvestments,
+      numberOfExits: company.numberOfExits,
       user: company.user.toString(),
       createdAt: company.createdAt,
     }));
@@ -361,6 +377,8 @@ export const updateCompany = async (req: Request, res: Response) => {
       isIncorporated,
       isHighlighted,
       acceptMessages,
+      numberOfInvestments,
+      numberOfExits,
     } = req.body;
 
     if (companyName) company.companyName = companyName;
@@ -388,6 +406,8 @@ export const updateCompany = async (req: Request, res: Response) => {
     if (isIncorporated !== undefined) company.isIncorporated = isIncorporated;
     if (isHighlighted !== undefined) company.isHighlighted = isHighlighted;
     if (acceptMessages !== undefined) company.acceptMessages = acceptMessages;
+    if (numberOfInvestments !== undefined) company.numberOfInvestments = numberOfInvestments;
+    if (numberOfExits !== undefined) company.numberOfExits = numberOfExits;
 
     await company.save();
 
@@ -417,6 +437,8 @@ export const updateCompany = async (req: Request, res: Response) => {
       isIncorporated: company.isIncorporated,
       isHighlighted: company.isHighlighted,
       acceptMessages: company.acceptMessages,
+      numberOfInvestments: company.numberOfInvestments,
+      numberOfExits: company.numberOfExits,
       user: company.user.toString(),
       createdAt: company.createdAt,
     };
