@@ -7,13 +7,11 @@ import { Blog } from '../models/Blog';
 // **Yeni Blog Oluşturma**
 export const createBlog = async (req: Request, res: Response) => {
     try {
-        // Validasyon hatalarını kontrol et
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ success: false, errors: errors.array() });
         }
 
-        // Token doğrulama
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
@@ -23,12 +21,12 @@ export const createBlog = async (req: Request, res: Response) => {
 
         const { title, coverPhoto, fullContent } = req.body;
 
-        // Yeni blog oluştur
         const blog = await Blog.create({
             title,
             coverPhoto,
             fullContent,
             author: userId,
+            // isApproved otomatik false
         });
 
         res.status(201).json({ success: true, blog });
@@ -37,32 +35,39 @@ export const createBlog = async (req: Request, res: Response) => {
     }
 };
 
-// **Blog Güncelleme**
+// **Blog Güncelleme (kendi içeriğini güncelleme veya admin isApproved değiştirme)**
 export const updateBlog = async (req: Request, res: Response) => {
     try {
-        // Token doğrulama
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
         }
         const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
         const userId = decoded.id;
+        const isAdmin = decoded.isAdmin === true;
 
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Geçersiz Blog ID\'si' });
+            return res.status(400).json({ success: false, message: "Geçersiz Blog ID'si" });
         }
 
         const blog = await Blog.findById(id);
         if (!blog) {
             return res.status(404).json({ success: false, message: 'Blog bulunamadı' });
         }
-        if (blog.author.toString() !== userId) {
+
+        // Normal kullanıcı yalnızca kendi blog'unu güncelleyebilir
+        if (!isAdmin && blog.author.toString() !== userId) {
             return res.status(403).json({ success: false, message: 'Bu blogu güncelleme yetkiniz yok' });
         }
 
-        // Güncellenecek alanları belirle
-        Object.assign(blog, req.body);
+        // Sadece admin isApproved alanını güncelleyebilir
+        const updates: any = { ...req.body };
+        if (!isAdmin) {
+            delete updates.isApproved;
+        }
+
+        Object.assign(blog, updates);
         await blog.save();
 
         res.status(200).json({ success: true, blog });
@@ -74,7 +79,6 @@ export const updateBlog = async (req: Request, res: Response) => {
 // **Blog Silme**
 export const deleteBlog = async (req: Request, res: Response) => {
     try {
-        // Token doğrulama
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
@@ -84,7 +88,7 @@ export const deleteBlog = async (req: Request, res: Response) => {
 
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Geçersiz Blog ID\'si' });
+            return res.status(400).json({ success: false, message: "Geçersiz Blog ID'si" });
         }
 
         const blog = await Blog.findById(id);
@@ -107,11 +111,10 @@ export const getBlogById = async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ success: false, message: 'Geçersiz Blog ID\'si' });
+            return res.status(400).json({ success: false, message: "Geçersiz Blog ID'si" });
         }
 
-        const blog = await Blog.findById(id)
-            .populate('author', 'username email'); // user’da hangi alanlar gösterilsin
+        const blog = await Blog.findById(id).populate('author', 'username email');
         if (!blog) {
             return res.status(404).json({ success: false, message: 'Blog bulunamadı' });
         }
@@ -125,7 +128,6 @@ export const getBlogById = async (req: Request, res: Response) => {
 // **Kullanıcının Tüm Bloglarını Getirme**
 export const getBlogsByUser = async (req: Request, res: Response) => {
     try {
-        // Token doğrulama
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });

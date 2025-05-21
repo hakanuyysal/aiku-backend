@@ -4,6 +4,7 @@ import { protect } from '../middleware/auth';
 import { Request, Response } from 'express';
 import { Company } from '../models/Company';
 import { Product } from '../models/Product';
+import { Blog } from '../models/Blog';
 import { TeamMember } from '../models/TeamMember';
 import { Investment } from '../models/Investment';
 import { deleteFile } from '../utils/fileUtils';
@@ -415,5 +416,93 @@ router.post('/document', protect, upload.single('document'), async (req: Request
     });
   }
 });
+
+router.post(
+  '/blog-cover/:blogId',
+  protect,
+  upload.single('cover'),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lütfen bir dosya yükleyin'
+        });
+      }
+
+      const blog = await Blog.findById(req.params.blogId);
+      if (!blog) {
+        return res.status(404).json({
+          success: false,
+          message: 'Blog bulunamadı'
+        });
+      }
+
+      // Eski cover fotoğrafını sil
+      if (blog.coverPhoto) {
+        deleteFile(blog.coverPhoto);
+      }
+
+      // Yeni dosya yolu
+      const fileUrl = `/uploads/images/${req.file.filename}`;
+
+      // Blog coverPhoto alanını güncelle
+      blog.coverPhoto = fileUrl;
+      await blog.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Blog cover fotoğrafı başarıyla yüklendi',
+        data: { url: fileUrl }
+      });
+    } catch (error) {
+      logger.error('Blog cover yükleme hatası', {
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+      res.status(500).json({
+        success: false,
+        message: 'Dosya yükleme hatası',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+    }
+  }
+);
+
+// **Blog Cover Fotoğrafı Silme**
+router.delete(
+  '/blog-cover/:blogId',
+  protect,
+  async (req: Request, res: Response) => {
+    try {
+      const blog = await Blog.findById(req.params.blogId);
+      if (!blog) {
+        return res.status(404).json({
+          success: false,
+          message: 'Blog bulunamadı'
+        });
+      }
+
+      if (blog.coverPhoto) {
+        deleteFile(blog.coverPhoto);
+        blog.coverPhoto = null;   
+        await blog.save();
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Blog cover fotoğrafı başarıyla silindi'
+      });
+    } catch (error) {
+      logger.error('Blog cover silme hatası', {
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+      res.status(500).json({
+        success: false,
+        message: 'Dosya silme hatası',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+    }
+  }
+);
 
 export default router; 
