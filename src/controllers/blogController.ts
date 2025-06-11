@@ -35,16 +35,17 @@ export const createBlog = async (req: Request, res: Response) => {
     }
 };
 
-// **Blog Güncelleme (kendi içeriğini güncelleme veya admin isApproved değiştirme)**
+// **Blog Güncelleme (kendi içeriğini veya admin onayını değiştirme)**
 export const updateBlog = async (req: Request, res: Response) => {
     try {
+        // Token doğrulama
         const token = req.header('Authorization')?.replace('Bearer ', '');
         if (!token) {
             return res.status(401).json({ success: false, message: 'Yetkilendirme başarısız, token bulunamadı' });
         }
         const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
         const userId = decoded.id;
-        const isAdmin = decoded.isAdmin === true;
+        const userRole = decoded.role;              // ← role alanını alıyoruz
 
         const { id } = req.params;
         if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -56,14 +57,14 @@ export const updateBlog = async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, message: 'Blog bulunamadı' });
         }
 
-        // Normal kullanıcı yalnızca kendi blog'unu güncelleyebilir
-        if (!isAdmin && blog.author.toString() !== userId) {
-            return res.status(403).json({ success: false, message: 'Bu blogu güncelleme yetkiniz yok' });
+        // Sadece sahibi ya da admin güncelleyebilir
+        if (blog.author.toString() !== userId && userRole !== 'admin') {
+            return res.status(403).json({ success: false, message: 'Bu blog üzerinde yetkiniz yok' });
         }
 
-        // Sadece admin isApproved alanını güncelleyebilir
+        // Normal kullanıcılar sadece içerik değiştirebilir; admin 'isApproved' da değiştirebilir
         const updates: any = { ...req.body };
-        if (!isAdmin) {
+        if (userRole !== 'admin') {
             delete updates.isApproved;
         }
 
@@ -75,6 +76,7 @@ export const updateBlog = async (req: Request, res: Response) => {
         res.status(500).json({ success: false, message: 'Sunucu hatası', error: err.message });
     }
 };
+
 
 // **Blog Silme**
 export const deleteBlog = async (req: Request, res: Response) => {

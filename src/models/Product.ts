@@ -102,7 +102,7 @@ const productSchema = new Schema<IProduct>(
       type: String,
       trim: true,
       match: [
-        /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,6}\.?)(\/[\w.-]*)*\/?$/,
+        /^(https?:\/\/)?([\w.-]+)\.([a-z]{2,})(\.[a-z]{2,})?(\/[\w.-]*)*\/?$/i,
         'Please enter a valid URL',
       ],
     },
