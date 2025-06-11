@@ -80,9 +80,7 @@ export class GoogleService {
         await user.save();
       }
       const jwtOptions: SignOptions = {
-        expiresIn: process.env.JWT_EXPIRE
-          ? parseInt(process.env.JWT_EXPIRE)
-          : "24h",
+        expiresIn: "90d"
       };
 
       const token = jwt.sign(

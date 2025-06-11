@@ -14,7 +14,7 @@ import { mailgunService } from "../services/mailgunService";
 const createToken = (id: string): string => {
   // @ts-expect-error - JWT sign işlemi için expiresIn tipi uyumsuzluğunu görmezden geliyoruz
   return jwt.sign({ id }, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRE,
+    expiresIn: "90d", // Token süresini 90 güne çıkarıyoruz
   });
 };
 

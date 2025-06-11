@@ -15,6 +15,6 @@ export const config = {
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
-    expire: process.env.JWT_EXPIRE || '30d',
+    expire: process.env.JWT_EXPIRE || '90d',
   },
 }; 
