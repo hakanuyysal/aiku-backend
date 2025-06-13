@@ -4,7 +4,7 @@ import { Article } from '../models/Article';
 import { Setting } from '../models/Setting';
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY!;
-const QUERY = process.env.QUERY!;
+const QUERY = process.env.QUERY!;  // artık kullanmıyoruz, sabit q içinde tanımladık
 
 const DIFFBOT_TOKEN = process.env.DIFFBOT_TOKEN!;
 const DIFFBOT_URL = 'https://api.diffbot.com/v3/article';
@@ -27,14 +27,30 @@ export const fetchAndStoreNews = async (): Promise<{
     const from = setting.value;
     console.log('>> [DEBUG] fetchAndStoreNews çalıştı, from:', from);
 
-    // 2) NewsAPI’den makaleleri al
+    // 2a) İngilizce, teknoloji kategorisindeki kaynakları çek
+    const sourcesResp = await axios.get('https://newsapi.org/v2/top-headlines/sources', {
+        params: {
+            apiKey: NEWS_API_KEY,
+            category: 'technology',
+            language: 'en',
+        },
+    });
+    const sourceIds = (sourcesResp.data.sources as any[])
+        .map(src => src.id)
+        .join(',');
+    console.log('>> [DEBUG] Teknoloji kaynakları:', sourceIds);
+
+    // 2b) Everything ile AI haberlerini al
     const response = await axios.get('https://newsapi.org/v2/everything', {
         params: {
             apiKey: NEWS_API_KEY,
-            q: QUERY,
-            // from,
-            pageSize: 100,
-            sortBy: 'publishedAt',
+            sources: sourceIds,                       // sadece teknoloji siteleri
+            language: 'en',                           // İngilizce
+            q: '"artificial intelligence" OR AI',     // tam ifade + kısaltma
+            searchIn: 'title,description',            // başlık ve açıklamada ara
+            // from,                                     // sadece son çekim tarihinden sonrası
+            sortBy: 'publishedAt',                    // en yeni önce
+            pageSize: 100,                            // maksimum 100 sonuç
         },
     });
     const fetched = response.data.articles as any[];
@@ -45,7 +61,6 @@ export const fetchAndStoreNews = async (): Promise<{
 
     // 3) Her makale için upsert + Diffbot
     for (const a of fetched) {
-        // upsert + rawResult ile yeni mi kontrol et
         const result = await Article.findOneAndUpdate(
             { url: a.url },
             {
@@ -64,17 +79,15 @@ export const fetchAndStoreNews = async (): Promise<{
                 upsert: true,
                 new: true,
                 setDefaultsOnInsert: true,
-                rawResult: true,            // MongoDB driver cevabını al
+                rawResult: true,
             }
         );
 
         const doc = result.value!;
-        // Eğer var olanı güncellemedi (yeni insert), sayacı arttır
         if (!result.lastErrorObject!.updatedExisting) {
             newCount++;
         }
 
-        // Henüz fullContent yoksa Diffbot’tan çek
         if (!doc.fullContent) {
             try {
                 const dbRes = await axios.get(DIFFBOT_URL, {
@@ -104,7 +117,6 @@ export const fetchAndStoreNews = async (): Promise<{
 
     return { fetchedCount, newCount };
 };
-
 
 /**
  * (Opsiyonel) HTTP isteği ile haberleri güncellemek için:
@@ -138,7 +150,6 @@ export const getNews = async (req: Request, res: Response) => {
         const search = (req.query.search as string) ?? '';
         const skip = (page - 1) * limit;
 
-        // Eğer search varsa, title, content veya fullContent içinde ara:
         const filter: any = {};
         if (search.trim()) {
             const regex = new RegExp(search, 'i');
@@ -212,7 +223,7 @@ export const fetchFullContentById = async (
 
 // Tüm haberleri fullContent ile güncelle
 export const fetchFullContentAll = async (
-    _req: Request,          // parametre kullanmıyorsanız bile tip koyun
+    _req: Request,
     res: Response
 ): Promise<void> => {
     try {
@@ -240,7 +251,6 @@ export const fetchFullContentAll = async (
 
 export const fetchMissingFullContent = async (_req: Request, res: Response): Promise<void> => {
     try {
-        // fullContent null veya boş string olanları bul
         const missing = await Article.find({
             $or: [
                 { fullContent: { $exists: false } },

@@ -38,6 +38,7 @@ export const createProduct = async (req: Request, res: Response) => {
       productWebsite,
       productLinkedIn,
       productTwitter,
+      isHighlighted,
       companyName,
       companyId,
     } = req.body;
@@ -60,6 +61,7 @@ export const createProduct = async (req: Request, res: Response) => {
       productWebsite,
       productLinkedIn,
       productTwitter,
+      isHighlighted,
       companyName,
       companyId,
       user: userId,

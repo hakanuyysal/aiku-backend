@@ -17,6 +17,7 @@ export interface IProduct extends Document {
   productWebsite?: string;
   productLinkedIn?: string;
   productTwitter?: string;
+  isHighlighted?: boolean;
   companyId: mongoose.Schema.Types.ObjectId;
   companyName: string;
   user: mongoose.Schema.Types.ObjectId;
@@ -121,6 +122,10 @@ const productSchema = new Schema<IProduct>(
         /^(https?:\/\/)?(www\.)?twitter\.com\/[A-Za-z0-9_]+\/?$/,
         'Please enter a valid Twitter URL',
       ],
+    },
+    isHighlighted: {
+      type: Boolean,
+      default: false,
     },
     companyId: {
       type: mongoose.Schema.Types.ObjectId,
