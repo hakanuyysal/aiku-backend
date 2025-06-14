@@ -180,14 +180,14 @@ router.post("/google/login", async (req, res) => {
       headers: req.headers
     });
 
-    const { accessToken } = req.body;
+    const { idToken, accessToken } = req.body;
     
-    if (!accessToken) {
+    if (!idToken && !accessToken) {
       console.log("Google auth login token bulunamadı:", req.body);
       logger.error("Google auth login Token bulunamadı:", req.body);
       return res.status(400).json({
         success: false,
-        error: "Access token gereklidir",
+        error: "idToken veya accessToken gereklidir",
         details: "Kimlik doğrulama başarısız",
         errorCode: 400
       });
@@ -196,6 +196,7 @@ router.post("/google/login", async (req, res) => {
     const googleService = new GoogleService();
     const authResult = await googleService.handleAuth({
       user: {
+        id_token: idToken,
         access_token: accessToken
       }
     });

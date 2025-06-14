@@ -11,6 +11,13 @@ const googleClient = new OAuth2Client({
   redirectUri: `${process.env.API_URL}/api/auth/google/callback`
 });
 
+// Desteklenen client ID'ler
+const SUPPORTED_CLIENT_IDS = [
+  process.env.GOOGLE_CLIENT_ID!, // Web client ID
+  '974504980015-2e15l52tr86h8o42v8puf36lrtaamjqc.apps.googleusercontent.com', // iOS client ID
+  '974504980015-p5e88nccp7v1i40o41t1tkl5rudrqdvf.apps.googleusercontent.com'  // Android client ID
+];
+
 /**
  * Google ID token'ı doğrular
  * @param idToken Google tarafından verilen ID token
@@ -29,7 +36,7 @@ export const verifyGoogleToken = async (idToken: string) => {
     
     const ticket = await googleClient.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID!
+      audience: SUPPORTED_CLIENT_IDS
     });
     
     const payload = ticket.getPayload();
@@ -39,7 +46,8 @@ export const verifyGoogleToken = async (idToken: string) => {
     
     console.log('[GoogleAuth] Token doğrulandı:', { 
       sub: payload.sub,
-      email: payload.email
+      email: payload.email,
+      aud: payload.aud // Hangi client ID ile giriş yapıldığını logla
     });
     
     return {
