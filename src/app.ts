@@ -38,6 +38,7 @@ import clickTrackRoutes from "./routes/clickTrackRoutes";
 import newsRoutes from "./routes/newsRoutes";
 import panelUserRoutes from "./routes/panelUserRoutes";
 import blogRoutes from "./routes/blogRoutes";
+import investmentNewsRoutes from './routes/investmentNewsRoutes';
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -590,6 +591,7 @@ app.use("/api/click", clickTrackRoutes);
 app.use("/api/news", newsRoutes);
 app.use("/api/blog", blogRoutes);
 app.use("/api/panel-users", panelUserRoutes);
+app.use('/api/investment-news', investmentNewsRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

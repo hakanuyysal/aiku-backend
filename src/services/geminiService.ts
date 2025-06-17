@@ -2,6 +2,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
 import puppeteer, { ElementHandle, Page } from "puppeteer";
+// import * as tools from './AiChatTools';
 
 dotenv.config();
 
@@ -10,6 +11,93 @@ if (!process.env.GEMINI_API_KEY) {
 }
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// const toolDefinitions = [
+  
+//   {
+//     name: 'fetchProductById',
+//     description: 'Get a product by its MongoDB ObjectId',
+//     parameters: {
+//       type: 'object',
+//       properties: { id: { type: 'string' } },
+//       required: ['id']
+//     }
+//   },
+//   {
+//     name: 'fetchAllProducts',
+//     description: 'Get all products',
+//     parameters: { type: 'object', properties: {}, required: [] }
+//   },
+//   {
+//     name: 'fetchProductsByCompany',
+//     description: 'Get products for a given companyId',
+//     parameters: {
+//       type: 'object',
+//       properties: { companyId: { type: 'string' } },
+//       required: ['companyId']
+//     }
+//   },
+
+ 
+//   {
+//     name: 'fetchCompanyById',
+//     description: 'Get a company by its MongoDB ObjectId',
+//     parameters: {
+//       type: 'object',
+//       properties: { id: { type: 'string' } },
+//       required: ['id']
+//     }
+//   },
+//   {
+//     name: 'fetchAllCompanies',
+//     description: 'Get all companies',
+//     parameters: { type: 'object', properties: {}, required: [] }
+//   },
+//   {
+//     name: 'fetchCompaniesForUser',
+//     description: 'Get companies owned by a specific user',
+//     parameters: {
+//       type: 'object',
+//       properties: { userId: { type: 'string' } },
+//       required: ['userId']
+//     }
+//   },
+
+  
+//   {
+//     name: 'fetchArticleList',
+//     description: 'Get a list of all articles sorted by date',
+//     parameters: { type: 'object', properties: {}, required: [] }
+//   },
+//   {
+//     name: 'fetchArticleById',
+//     description: 'Get a single article by its MongoDB ObjectId',
+//     parameters: {
+//       type: 'object',
+//       properties: { id: { type: 'string' } },
+//       required: ['id']
+//     }
+//   },
+//   {
+//     name: 'fetchArticleFullContentById',
+//     description: 'Get full content for one article',
+//     parameters: {
+//       type: 'object',
+//       properties: { id: { type: 'string' } },
+//       required: ['id']
+//     }
+//   },
+//   {
+//     name: 'fetchAllArticleFullContents',
+//     description: 'Get full content for all articles',
+//     parameters: { type: 'object', properties: {}, required: [] }
+//   },
+//   {
+//     name: 'fetchMissingArticleFullContents',
+//     description: 'Get IDs of articles missing full content',
+//     parameters: { type: 'object', properties: {}, required: [] }
+//   }
+// ];
 
 // Özel hata sınıfları
 export class RobotsDisallowedError extends Error {
@@ -1423,6 +1511,8 @@ Now, please respond to the user’s request or question using this complete cont
       if (updatedHistory.length === 0) {
         // First add a "virtual" initial message with system instructions if this is a new conversation
         const chat = this.chatModel.startChat({
+          // systemMessage: systemInstructions,
+          // tools: toolDefinitions,
           generationConfig: {
             temperature: 0.7,
             topK: 40,
@@ -1477,6 +1567,8 @@ Now, please respond to the user’s request or question using this complete cont
             role: item.role,
             parts: [{ text: item.content }]
           })),
+          // systemMessage: systemInstructions,
+          // tools: toolDefinitions,
           generationConfig: {
             temperature: 0.7,
             topK: 40,

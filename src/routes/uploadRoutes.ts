@@ -4,6 +4,7 @@ import { protect } from '../middleware/auth';
 import { Request, Response } from 'express';
 import { Company } from '../models/Company';
 import { Product } from '../models/Product';
+import { InvestmentNews } from '../models/InvestmentNews';
 import { Blog } from '../models/Blog';
 import { TeamMember } from '../models/TeamMember';
 import { Investment } from '../models/Investment';
@@ -484,7 +485,7 @@ router.delete(
 
       if (blog.coverPhoto) {
         deleteFile(blog.coverPhoto);
-        blog.coverPhoto = null;   
+        blog.coverPhoto = null;
         await blog.save();
       }
 
@@ -499,6 +500,92 @@ router.delete(
       res.status(500).json({
         success: false,
         message: 'Dosya silme hatası',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+    }
+  }
+);
+
+// InvestmentNews kapak görseli yükleme
+router.post(
+  '/investment-news-cover/:newsId',
+  protect,
+  upload.single('cover'),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'Lütfen bir dosya yükleyin'
+        });
+      }
+
+      const news = await InvestmentNews.findById(req.params.newsId);
+      if (!news) {
+        return res.status(404).json({
+          success: false,
+          message: 'Yatırım haberi bulunamadı'
+        });
+      }
+
+      // Eski görsel varsa sil
+      if (news.coverPhoto) {
+        deleteFile(news.coverPhoto);
+      }
+
+      const fileUrl = `/uploads/images/${req.file.filename}`;
+      news.coverPhoto = fileUrl;
+      await news.save();
+
+      res.status(200).json({
+        success: true,
+        message: 'Kapak görseli başarıyla yüklendi',
+        data: { url: fileUrl }
+      });
+    } catch (error) {
+      logger.error('InvestmentNews cover yükleme hatası', {
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+      res.status(500).json({
+        success: false,
+        message: 'Yükleme hatası',
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+    }
+  }
+);
+
+// InvestmentNews kapak görseli silme
+router.delete(
+  '/investment-news-cover/:newsId',
+  protect,
+  async (req: Request, res: Response) => {
+    try {
+      const news = await InvestmentNews.findById(req.params.newsId);
+      if (!news) {
+        return res.status(404).json({
+          success: false,
+          message: 'Yatırım haberi bulunamadı'
+        });
+      }
+
+      if (news.coverPhoto) {
+        deleteFile(news.coverPhoto);
+        news.coverPhoto = null;
+        await news.save();
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Kapak görseli başarıyla silindi'
+      });
+    } catch (error) {
+      logger.error('InvestmentNews cover silme hatası', {
+        error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+      });
+      res.status(500).json({
+        success: false,
+        message: 'Silme hatası',
         error: error instanceof Error ? error.message : 'Bilinmeyen hata'
       });
     }

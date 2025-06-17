@@ -49,6 +49,7 @@
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^3.12.0",
     "puppeteer": "^24.4.0",
+    "rss-parser": "^3.13.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "textract": "^2.5.0",
