@@ -13,34 +13,44 @@ class LinkedInAuthService {
     // Platform'a göre redirect URI'yi belirle
     if (platform === 'mobile') {
       redirectURI = 'com.aikumobile://auth/linkedin-callback';
+      console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Auth] Mobil platform için redirect URI:', redirectURI);
     } else {
       redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
+      console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Auth] Web platform için redirect URI:', redirectURI);
     }
     
     const linkedInClientId = process.env.LINKEDIN_CLIENT_ID;
     
     if (!linkedInClientId) {
+      console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Auth] HATA: LinkedIn Client ID bulunamadı!');
       throw new Error('LinkedIn Client ID is not defined in environment variables');
     }
 
     const scopes = ['openid', 'profile', 'email'].join(' ');
     const state = Math.random().toString(36).substring(2, 15); // Rastgele state değeri
     
-    // LinkedIn OAuth 2.0 URL'si
-    return `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedInClientId}&redirect_uri=${encodeURIComponent(redirectURI)}&state=${state}&scope=${encodeURIComponent(scopes)}`;
+    const authURL = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${linkedInClientId}&redirect_uri=${encodeURIComponent(redirectURI)}&state=${state}&scope=${encodeURIComponent(scopes)}`;
+    console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Auth] Oluşturulan Auth URL:', authURL);
+    
+    return authURL;
   }
 
   // LinkedIn'den gelen auth code ile token alma
   async getTokenFromCode(code: string): Promise<any> {
     try {
+      console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Token] Token alınmaya çalışılıyor. Code:', code);
+      
       const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
       const linkedInClientId = process.env.LINKEDIN_CLIENT_ID;
       const linkedInClientSecret = process.env.LINKEDIN_CLIENT_SECRET;
       
       if (!linkedInClientId || !linkedInClientSecret) {
+        console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Token] HATA: Client ID veya Secret bulunamadı!');
         throw new Error('LinkedIn Client ID or Client Secret is not defined in environment variables');
       }
 
+      console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Token] Token isteği gönderiliyor...');
+      
       // LinkedIn token URL'sine istek gönder
       const response = await axios.post('https://www.linkedin.com/oauth/v2/accessToken', null, {
         params: {
@@ -55,9 +65,10 @@ class LinkedInAuthService {
         }
       });
 
+      console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Token] Token başarıyla alındı:', response.data);
       return response.data;
-    } catch (error) {
-      console.error('LinkedIn token alınamadı:', error);
+    } catch (error: any) {
+      console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Token] HATA:', error.response?.data || error.message);
       logger.error(`LinkedIn token alınamadı linkedinAuth.Service: ${error}`);
       throw error;
     }
@@ -66,6 +77,8 @@ class LinkedInAuthService {
   // LinkedIn token ile kullanıcı bilgilerini alma
   async getUserInfo(accessToken: string): Promise<any> {
     try {
+      console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn User] Kullanıcı bilgileri alınıyor...');
+      
       // Kullanıcı profil bilgilerini al
       const profileResponse = await axios.get('https://api.linkedin.com/v2/me', {
         headers: {
@@ -74,6 +87,8 @@ class LinkedInAuthService {
           'X-Restli-Protocol-Version': '2.0.0'
         }
       });
+
+      console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn User] Profil bilgileri alındı:', profileResponse.data);
 
       // Kullanıcı email bilgisini al
       const emailResponse = await axios.get('https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))', {
@@ -84,18 +99,23 @@ class LinkedInAuthService {
         }
       });
 
+      console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn User] Email bilgisi alındı:', emailResponse.data);
+
       const profileData = profileResponse.data;
       const emailData = emailResponse.data;
       const email = emailData.elements?.[0]?.['handle~']?.emailAddress || '';
 
-      return {
+      const userData = {
         id: profileData.id,
         firstName: profileData.localizedFirstName,
         lastName: profileData.localizedLastName,
         email
       };
-    } catch (error) {
-      console.error('LinkedIn kullanıcı bilgileri alınamadı:', error);
+
+      console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn User] Birleştirilmiş kullanıcı bilgileri:', userData);
+      return userData;
+    } catch (error: any) {
+      console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn User] HATA:', error.response?.data || error.message);
       logger.error(`LinkedIn kullanıcı bilgileri alınamadı linkedinAuth.Service: ${error}`);
       throw error;
     }
