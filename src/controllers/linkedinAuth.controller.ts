@@ -13,7 +13,8 @@ class LinkedInAuthController {
    */
   async getLinkedInAuthURL(req: Request, res: Response): Promise<void> {
     try {
-      const authURL = linkedinAuthService.getLinkedInAuthURL();
+      const { platform } = req.query;
+      const authURL = linkedinAuthService.getLinkedInAuthURL(platform as string);
       res.status(200).json({ url: authURL });
     } catch (error: any) {
       console.error("LinkedIn auth URL oluşturma hatası:", error);

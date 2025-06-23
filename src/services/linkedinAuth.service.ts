@@ -7,8 +7,16 @@ dotenv.config();
 
 class LinkedInAuthService {
   // LinkedIn ile oturum açma URL'sini oluştur
-  getLinkedInAuthURL(): string {
-    const redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
+  getLinkedInAuthURL(platform?: string): string {
+    let redirectURI;
+    
+    // Platform'a göre redirect URI'yi belirle
+    if (platform === 'mobile') {
+      redirectURI = 'com.aikumobile://auth/linkedin-callback';
+    } else {
+      redirectURI = process.env.LINKEDIN_REDIRECT_URI || 'https://aikuaiplatform.com/auth/social-callback';
+    }
+    
     const linkedInClientId = process.env.LINKEDIN_CLIENT_ID;
     
     if (!linkedInClientId) {
