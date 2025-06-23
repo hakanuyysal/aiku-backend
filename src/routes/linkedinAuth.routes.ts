@@ -7,14 +7,35 @@ import logger from '../config/logger';
 
 const router = express.Router();
 
+// Debug için tüm istekleri logla
+router.use((req, res, next) => {
+  console.log('\x1b[35m%s\x1b[0m', '🔍 [LinkedIn Debug] Gelen İstek:', {
+    method: req.method,
+    url: req.url,
+    headers: req.headers,
+    query: req.query,
+    body: req.body,
+    path: req.path
+  });
+  next();
+});
+
 // LinkedIn URL endpoint'i (mobil uygulama için)
 router.get('/auth/linkedin/url', async (req, res) => {
   const { platform } = req.query;
-  console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Route] Auth URL isteği alındı:', { platform, query: req.query });
+  console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Route] Auth URL isteği alındı:', { 
+    platform, 
+    query: req.query,
+    headers: {
+      'user-agent': req.headers['user-agent'],
+      'content-type': req.headers['content-type'],
+      'origin': req.headers['origin']
+    }
+  });
   
   try {
     const authURL = linkedinAuthController.getLinkedInAuthURL(req, res);
-    console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Route] Auth URL başarıyla oluşturuldu');
+    console.log('\x1b[32m%s\x1b[0m', '🟢 [LinkedIn Route] Auth URL başarıyla oluşturuldu:', authURL);
   } catch (error) {
     console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Route] Auth URL oluşturma hatası:', error);
     res.status(500).json({ error: 'Auth URL oluşturulamadı' });
@@ -55,7 +76,15 @@ router.get('/auth/linkedin', async (req, res) => {
 
 // LinkedIn callback endpoint'i (Supabase üzerinden - web için)
 router.get('/auth/linkedin/callback', async (req, res) => {
-  console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Route] Web callback alındı:', { query: req.query });
+  console.log('\x1b[36m%s\x1b[0m', '🔵 [LinkedIn Route] Web callback alındı:', { 
+    query: req.query,
+    headers: {
+      'user-agent': req.headers['user-agent'],
+      'referer': req.headers['referer'],
+      'origin': req.headers['origin']
+    }
+  });
+  
   const { code } = req.query;
   if (!code) {
     console.log('\x1b[31m%s\x1b[0m', '🔴 [LinkedIn Route] Callback\'de code parametresi yok');
@@ -94,7 +123,8 @@ router.post('/auth/linkedin/callback', async (req, res) => {
     body: req.body,
     headers: {
       'user-agent': req.headers['user-agent'],
-      'content-type': req.headers['content-type']
+      'content-type': req.headers['content-type'],
+      'origin': req.headers['origin']
     }
   });
   
