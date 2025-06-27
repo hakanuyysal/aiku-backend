@@ -26,6 +26,7 @@ export interface ICompany extends Document {
   isIncorporated?: boolean;
   isHighlighted?: boolean;
   user: mongoose.Schema.Types.ObjectId;
+  connectedHub?: mongoose.Schema.Types.ObjectId;
   createdAt: Date;
   slug: string;
   acceptMessages: boolean;
@@ -188,6 +189,11 @@ const companySchema = new Schema<ICompany>(
       type: mongoose.Schema.Types.ObjectId,
       required: [true, 'User ID is required'],
       ref: 'User',
+    },
+     connectedHub: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Hub',
+      default: null,
     },
     createdAt: {
       type: Date,

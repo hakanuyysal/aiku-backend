@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { Company } from '../models/Company';
 import { Product } from '../models/Product';
 import { InvestmentNews } from '../models/InvestmentNews';
+import { Hub } from '../models/Hub';
 import { Blog } from '../models/Blog';
 import { TeamMember } from '../models/TeamMember';
 import { Investment } from '../models/Investment';
@@ -591,5 +592,76 @@ router.delete(
     }
   }
 );
+
+// Hub logosu yükleme/güncelleme
+router.post('/hub-logo/:hubId', protect, upload.single('logo'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please upload a file'
+      });
+    }
+
+    const hub = await Hub.findById(req.params.hubId);
+    if (!hub) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hub not found'
+      });
+    }
+
+    // Eski logoyu sil
+    if (hub.logoUrl) {
+      deleteFile(hub.logoUrl);
+    }
+
+    const fileUrl = `/uploads/images/${req.file.filename}`;
+    hub.logoUrl = fileUrl;
+    await hub.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Hub logo uploaded successfully',
+      data: { url: fileUrl }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'File upload error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Hub logosu silme
+router.delete('/hub-logo/:hubId', protect, async (req: Request, res: Response) => {
+  try {
+    const hub = await Hub.findById(req.params.hubId);
+    if (!hub) {
+      return res.status(404).json({
+        success: false,
+        message: 'Hub not found'
+      });
+    }
+
+    if (hub.logoUrl) {
+      deleteFile(hub.logoUrl);
+      hub.logoUrl = undefined;
+      await hub.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Hub logo deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'File deletion error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
 
 export default router; 

@@ -35,6 +35,7 @@ interface CompanyResponse {
   numberOfInvestments?: number;
   numberOfExits?: number;
   user: string;
+  connectedHub?: string;
   createdAt: Date;
 }
 
@@ -78,6 +79,7 @@ export const getAllCompanies = async (req: Request, res: Response) => {
       numberOfInvestments: company.numberOfInvestments,
       numberOfExits: company.numberOfExits,
       user: company.user.toString(),
+      connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
       createdAt: company.createdAt,
     }));
 
@@ -140,6 +142,7 @@ export const createCompany = async (req: Request, res: Response) => {
       acceptMessages,
       numberOfInvestments,
       numberOfExits,
+      connectedHub,
     } = req.body;
 
     const company = await Company.create({
@@ -170,6 +173,7 @@ export const createCompany = async (req: Request, res: Response) => {
       numberOfInvestments,
       numberOfExits,
       user: userId,
+      connectedHub: connectedHub || null,
     });
 
     const companyResponse: CompanyResponse = {
@@ -201,6 +205,7 @@ export const createCompany = async (req: Request, res: Response) => {
       numberOfInvestments: company.numberOfInvestments,
       numberOfExits: company.numberOfExits,
       user: company.user.toString(),
+      connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
       createdAt: company.createdAt,
     };
 
@@ -252,6 +257,7 @@ export const getCompany = async (req: Request, res: Response) => {
       numberOfInvestments: company.numberOfInvestments,
       numberOfExits: company.numberOfExits,
       user: company.user.toString(),
+      connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
       createdAt: company.createdAt,
     };
 
@@ -311,6 +317,9 @@ export const getCompaniesForUser = async (req: Request, res: Response) => {
       numberOfInvestments: company.numberOfInvestments,
       numberOfExits: company.numberOfExits,
       user: company.user.toString(),
+      connectedHub: company.connectedHub
+        ? company.connectedHub.toString()
+        : null,
       createdAt: company.createdAt,
     }));
 
@@ -379,6 +388,7 @@ export const updateCompany = async (req: Request, res: Response) => {
       acceptMessages,
       numberOfInvestments,
       numberOfExits,
+      connectedHub,
     } = req.body;
 
     if (companyName) company.companyName = companyName;
@@ -408,6 +418,9 @@ export const updateCompany = async (req: Request, res: Response) => {
     if (acceptMessages !== undefined) company.acceptMessages = acceptMessages;
     if (numberOfInvestments !== undefined) company.numberOfInvestments = numberOfInvestments;
     if (numberOfExits !== undefined) company.numberOfExits = numberOfExits;
+    if (connectedHub !== undefined) {
+      company.connectedHub = connectedHub;
+    }
 
     await company.save();
 
@@ -440,6 +453,9 @@ export const updateCompany = async (req: Request, res: Response) => {
       numberOfInvestments: company.numberOfInvestments,
       numberOfExits: company.numberOfExits,
       user: company.user.toString(),
+      connectedHub: company.connectedHub
+        ? company.connectedHub.toString()
+        : null,
       createdAt: company.createdAt,
     };
 

@@ -13,7 +13,7 @@ if (!process.env.GEMINI_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // const toolDefinitions = [
-  
+
 //   {
 //     name: 'fetchProductById',
 //     description: 'Get a product by its MongoDB ObjectId',
@@ -38,7 +38,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 //     }
 //   },
 
- 
+
 //   {
 //     name: 'fetchCompanyById',
 //     description: 'Get a company by its MongoDB ObjectId',
@@ -63,7 +63,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 //     }
 //   },
 
-  
+
 //   {
 //     name: 'fetchArticleList',
 //     description: 'Get a list of all articles sorted by date',
@@ -1487,6 +1487,19 @@ All active subscribers (Startup, Business, Investor) gain:
 5. **Support & Resources**  
    – Blog articles, customer success stories, video tutorials.  
    – Dedicated support team reachable at info@aikuaiplatform.com or +90 850 757 94.  
+
+   === PLATFORM CONTENT PAGES ===
+• **AI Pulse**  
+  – Aggregate AI-related news and share the very latest developments.  
+  – Allow users to submit and publish their own blog posts.  
+  – Provide up-to-date investment updates on AI companies.
+
+• **Hubs**  
+  – Showcase technology hubs such as technoparks.  
+  – Display the companies registered within each hub.
+
+• **AI Strategy Playbooks**  
+  – Host strategy guidebooks for AI startups prepared by leading technology companies. 
 
 === CONTACT & SOCIAL ===
 Website: https://aikuaiplatform.com  
