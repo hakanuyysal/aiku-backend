@@ -77,6 +77,32 @@ class MailgunService {
       throw new Error("E-posta gönderimi başarısız oldu");
     }
   }
+
+  async sendEmailChangeCode(
+    newEmail: string,
+    changeCode: string,
+    expiresInMinutes: number
+  ): Promise<void> {
+    const messageData = {
+      from: `AIKU AI Platform <postmaster@${this.domain}>`,
+      to: newEmail,
+      subject: "Your Verification Code",
+      template: "email-change-verification",
+      "t:variables": JSON.stringify({
+        code: changeCode,
+        expires: expiresInMinutes
+      })
+    };
+
+    try {
+      await this.mailgun.messages.create(this.domain, messageData);
+    } catch (err) {
+      console.error("Failed to send change-code email:", err);
+      throw new Error("Could not send verification code");
+    }
+  }
+
 }
+
 
 export const mailgunService = new MailgunService();

@@ -7,7 +7,9 @@ import {
   getAllCompanies,
   updateCompany,
   deleteCompany,
-  uploadCompanyVideo
+  uploadCompanyVideo,
+  matchCompaniesByDomain,
+  claimCompany
 } from '../controllers/companyController';
 import { protect } from '../middleware/auth';
 import videoUpload from '../middleware/videoUpload';
@@ -20,6 +22,14 @@ router.get('/all', optionalAuth, getAllCompanies);
 
 // Giriş yapmış kullanıcıya ait tüm şirketleri getirme 
 router.get('/current', protect, getCompaniesForUser);
+
+// Kullanıcının e-posta domain’ine uygun, user’a ait olmayan şirketleri getir
+// Örnek: GET /api/company/match-domain?domain=example.com
+router.get('/match-domain', protect, matchCompaniesByDomain);
+
+// Şirketi “claim” etme (sahipliğini devralma)
+// POST /api/company/:id/claim
+router.post('/:id/claim', protect, claimCompany);
 
 // Şirket oluşturma rotası (örn: POST /api/company)
 router.post(

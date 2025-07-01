@@ -5,6 +5,7 @@ import {
   login,
   getCurrentUser,
   updateUser,
+  changePassword,
   getUserById,
   getAllUsers,
   addFavorite,
@@ -19,6 +20,10 @@ import {
   logout,
   verifyEmail,
   resendVerificationEmail,
+  requestEmailChange,
+  confirmEmailChange,
+  deleteCurrentUser,
+  deleteUserById
 } from "../controllers/authController";
 import { protect, optionalSupabaseToken } from "../middleware/auth";
 import { verifySupabaseToken } from "../middleware/supabaseAuth";
@@ -59,14 +64,44 @@ router.get("/currentUser", optionalSupabaseToken, getCurrentUser);
 // Kullanıcı bilgilerini güncelleme rotası
 router.put("/updateUser", optionalSupabaseToken, updateUser);
 
+router.put(
+  "/change-password",
+  protect,
+  [
+    check("currentPassword", "Current password is required").notEmpty(),
+    check("newPassword", "New password must be at least 6 characters").isLength({ min: 6 }),
+    check("confirmPassword", "Passwords do not match")
+      .custom((value, { req }) => value === req.body.newPassword),
+  ],
+  changePassword
+);
+
 // Kullanıcı id'si ile bilgilerini alma rotası
 router.get("/user/:id", optionalSupabaseToken, getUserById);
 
 router.put(
   '/updateUserById/:id',
-  protect,      
+  protect,
   updateUserById
 );
+
+router.post(
+  "/email/change/request",
+  protect,
+  [
+    check("newEmail", "Please enter a valid email").isEmail().normalizeEmail()
+  ],
+  requestEmailChange
+);
+
+router.post(
+  "/email/change/confirm",
+  [
+    check("code", "Verification code is required").isLength({ min: 6, max: 6 })
+  ],
+  confirmEmailChange
+);
+
 
 // **Yeni Eklenti: Tüm kullanıcıları çekme rotası (Sadece admin erişimi)**
 router.get("/users", protect, getAllUsers);
@@ -181,7 +216,7 @@ router.post("/google/login", async (req, res) => {
     });
 
     const { idToken, accessToken } = req.body;
-    
+
     if (!idToken && !accessToken) {
       console.log("Google auth login token bulunamadı:", req.body);
       logger.error("Google auth login Token bulunamadı:", req.body);
@@ -202,7 +237,7 @@ router.post("/google/login", async (req, res) => {
     });
 
     console.log("Google login başarılı:", { userId: authResult.user.id });
-    
+
     res.json({
       token: authResult.token,
       user: authResult.user
@@ -221,6 +256,20 @@ router.post("/google/login", async (req, res) => {
 
 // Oturum kapatma rotası
 router.post("/logout", protect, logout);
+
+// Self-delete
+router.delete(
+  "/delete-account",
+  protect,
+  deleteCurrentUser
+);
+
+// Admin: delete any user
+router.delete(
+  "/users/:id",
+  protect,
+  deleteUserById
+);
 
 // LinkedIn Routes
 router.get("/linkedin", (req, res) => {

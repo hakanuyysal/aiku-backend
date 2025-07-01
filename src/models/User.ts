@@ -25,6 +25,9 @@ export interface IUser extends Document {
   emailVerified: boolean;
   emailVerificationToken: string;
   emailVerificationExpires: Date;
+  newEmail?: string;
+  emailChangeToken?: string;
+  emailChangeExpires?: Date;
   locale?: {
     country: string;
     language: string;
@@ -45,7 +48,7 @@ export interface IUser extends Document {
   subscriptionAmount?: number;
   autoRenewal?: boolean;
   paymentMethod?: 'creditCard' | 'bankTransfer' | 'other';
-  savedCardId?: mongoose.Types.ObjectId; 
+  savedCardId?: mongoose.Types.ObjectId;
   lastPaymentDate?: Date;
   nextPaymentDate?: Date;
   paymentHistory?: Array<{
@@ -69,10 +72,9 @@ export interface IUser extends Document {
   vatNumber?: string;
   isSubscriptionActive?: boolean;
   role?: 'user' | 'admin' | 'editor';
-  
   matchPassword(enteredPassword: string): Promise<boolean>;
   checkAutoRenewal(): Promise<boolean>;
-  processPayment(): Promise<{success: boolean, transactionId?: string, error?: string, cardDetails?: any}>;
+  processPayment(): Promise<{ success: boolean, transactionId?: string, error?: string, cardDetails?: any }>;
 }
 
 interface IUserModel extends Model<IUser> {
@@ -101,7 +103,7 @@ const userSchema = new Schema<IUser>({
   },
   password: {
     type: String,
-    required: function() {
+    required: function () {
       return !this.authProvider;
     },
     minlength: [6, 'Şifre en az 6 karakter olmalıdır'],
@@ -111,11 +113,11 @@ const userSchema = new Schema<IUser>({
     type: String,
     trim: true
   },
-  countryCode: {               
+  countryCode: {
     type: String,
     trim: true,
   },
-  localPhone: {            
+  localPhone: {
     type: String,
     trim: true
   },
@@ -186,6 +188,26 @@ const userSchema = new Schema<IUser>({
     type: Date,
     select: false
   },
+  newEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    select: false,
+    match: [
+      /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/,
+      'Please enter a valid email'
+    ]
+    // unique: true,
+    // sparse: true
+  },
+  emailChangeToken: {
+    type: String,
+    select: false
+  },
+  emailChangeExpires: {
+    type: Date,
+    select: false
+  },
   locale: {
     country: { type: String },
     language: { type: String }
@@ -227,7 +249,7 @@ const userSchema = new Schema<IUser>({
     type: String,
     enum: [null, 'startup', 'business', 'investor'],
     default: null,
-  },   
+  },
   isAngelInvestor: {
     type: Boolean,
     default: false,
@@ -305,12 +327,16 @@ const userSchema = new Schema<IUser>({
     type: String,
     enum: ['user', 'admin', 'editor'],
     default: 'user'
-  }
+  },
+
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
+
+userSchema.index({ emailChangeToken: 1 }, { sparse: true });
+userSchema.index({ emailChangeExpires: 1 }, { expireAfterSeconds: 0 });
 
 userSchema.pre('save', async function (this: IUser, next) {
   if (!this.isModified('password') || !this.password) {
@@ -322,12 +348,12 @@ userSchema.pre('save', async function (this: IUser, next) {
 });
 
 // Abonelik planı startup olarak ayarlandığında 6 aylık deneme süresi tanımlanır
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
   // Abonelik planı değiştiyse ve plan startup ise
   if (this.isModified('subscriptionPlan') && this.subscriptionPlan === 'startup') {
     // İlk abonelik olup olmadığını kontrol et (periyod fark etmeksizin)
     const isFirstSubscription = !this.paymentHistory || this.paymentHistory.length === 0;
-    
+
     // Sadece ilk abonelik ise trial süresi ver (aylık veya yıllık)
     if (isFirstSubscription) {
       this.subscriptionStatus = 'trial';
@@ -346,7 +372,7 @@ userSchema.pre('save', function(next) {
 });
 
 // Abonelik planına göre fiyatı belirleyen fonksiyon
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
   if (this.isModified('subscriptionPlan') || this.isModified('subscriptionPeriod')) {
     // Aylık fiyatlar
     const monthlyPrices = {
@@ -354,14 +380,14 @@ userSchema.pre('save', function(next) {
       business: 75,
       investor: 99
     };
-    
+
     // Yıllık fiyatlar (%10 indirimli)
     const yearlyPrices = {
       startup: 529,
       business: 810,
       investor: 1069
     };
-    
+
     if (this.subscriptionPlan && this.subscriptionPeriod) {
       if (this.subscriptionPeriod === 'monthly') {
         this.subscriptionAmount = monthlyPrices[this.subscriptionPlan];
@@ -374,7 +400,7 @@ userSchema.pre('save', function(next) {
 });
 
 // Abonelik durumunu güncelleyen hook
-userSchema.pre('save', function(next) {
+userSchema.pre('save', function (next) {
   // subscriptionStatus değiştiğinde isSubscriptionActive değerini güncelle
   if (this.isModified('subscriptionStatus')) {
     const status = this.subscriptionStatus ? this.subscriptionStatus.trim() : '';
@@ -385,7 +411,7 @@ userSchema.pre('save', function(next) {
 });
 
 // Deneme süresinin sonunda otomatik ödemeyi kontrol eden metod
-userSchema.methods.checkAutoRenewal = async function() {
+userSchema.methods.checkAutoRenewal = async function () {
   // Deneme süresinin bitişi kontrol edilir
   if (this.subscriptionStatus === 'trial' && this.trialEndsAt && new Date() >= this.trialEndsAt) {
     // Eğer otomatik yenileme açıksa ve kayıtlı bir kart varsa
@@ -393,7 +419,7 @@ userSchema.methods.checkAutoRenewal = async function() {
       try {
         // Ödeme işlemini gerçekleştir
         const paymentResult = await this.processPayment();
-        
+
         if (paymentResult.success) {
           // Ödeme başarılı ise aboneliği aktifleştir
           this.subscriptionStatus = 'active';
@@ -405,7 +431,7 @@ userSchema.methods.checkAutoRenewal = async function() {
             nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
           }
           this.nextPaymentDate = nextBillingDate;
-          
+
           // Ödeme geçmişine ekle
           if (!this.paymentHistory) this.paymentHistory = [];
           this.paymentHistory.push({
@@ -419,7 +445,7 @@ userSchema.methods.checkAutoRenewal = async function() {
             period: this.subscriptionPeriod,
             cardDetails: paymentResult.cardDetails
           });
-          
+
           this.lastPaymentDate = new Date();
           await this.save();
           return true;
@@ -444,23 +470,23 @@ userSchema.methods.checkAutoRenewal = async function() {
 };
 
 // Ödeme işlemini gerçekleştiren metod
-userSchema.methods.processPayment = async function() {
+userSchema.methods.processPayment = async function () {
   try {
     if (!this.savedCardId) {
       throw new Error('Kayıtlı kart bulunamadı');
     }
-    
+
     // Kart bilgisini al
     const savedCard = await mongoose.model('SavedCard').findById(this.savedCardId);
     if (!savedCard) {
       throw new Error('Geçerli kart bilgisi bulunamadı');
     }
-    
+
     // Param POS API ile ödeme işlemi
     // Not: Bu kısım gerçek entegrasyonda doldurulmalıdır
     const ParamPosService = await import('../services/ParamPosService');
     const paymentService = ParamPosService.default;
-    
+
     const paymentResult = await paymentService.payment({
       amount: this.subscriptionAmount || 0,
       cardNumber: savedCard.cardMaskedNumber.replace(/X/g, '0'), // Örnek amaçlı
@@ -472,7 +498,7 @@ userSchema.methods.processPayment = async function() {
       is3D: false,
       userId: this._id.toString()
     });
-    
+
     const cardDetails = {
       cardType: savedCard.cardType,
       cardMaskedNumber: savedCard.cardMaskedNumber,
@@ -480,7 +506,7 @@ userSchema.methods.processPayment = async function() {
       expireMonth: savedCard.cardExpireMonth,
       expireYear: savedCard.cardExpireYear
     };
-    
+
     return {
       success: true,
       transactionId: paymentResult.TURKPOS_RETVAL_Islem_ID || Date.now().toString(),
@@ -504,7 +530,7 @@ userSchema.virtual('isSubscriptionActiveVirtual').get(function (this: IUser) {
   console.log('subscriptionStatus:', this.subscriptionStatus);
   console.log('isEqual active:', this.subscriptionStatus === 'active');
   console.log('isEqual trial:', this.subscriptionStatus === 'trial');
-  
+
   // Abonelik durumu 'active' veya 'trial' ise aktif kabul edilir
   // String değerlerini temizleyerek kontrol et
   const status = this.subscriptionStatus ? this.subscriptionStatus.trim() : '';

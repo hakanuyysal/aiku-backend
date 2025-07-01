@@ -235,6 +235,70 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
   }
 };
 
+export const requestEmailChange = async (req: Request, res: Response) => {
+  try {
+    const user = req.user as IUser;
+    const { newEmail } = req.body;
+    if (!newEmail) {
+      return res.status(400).json({ success: false, message: "newEmail is required." });
+    }
+
+    // 1) yeni email kullanımda mı kontrol
+    const exists = await User.findOne({ email: newEmail });
+    if (exists) {
+      return res.status(400).json({ success: false, message: "Email already in use." });
+    }
+
+    // 2) 6 haneli kod ve expiry oluştur
+    const changeCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresInMinutes = 15;
+    user.newEmail = newEmail;
+    user.emailChangeToken = changeCode;
+    user.emailChangeExpires = new Date(Date.now() + expiresInMinutes * 60_000);
+    await user.save();
+
+    // 3) mail gönder
+    await mailgunService.sendEmailChangeCode(newEmail, changeCode, expiresInMinutes);
+
+    res.json({ success: true, message: "Verification code sent to your new email address." });
+  } catch (err: any) {
+    console.error("Error in requestEmailChange:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+export const confirmEmailChange = async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, message: "code is required." });
+    }
+
+    // token ve expiry kontrolü (select:false alanları da getiriyoruz)
+    const user = await User.findOne({
+      emailChangeToken: code,
+      emailChangeExpires: { $gt: new Date() }
+    }).select("+newEmail +emailChangeExpires");
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid or expired code." });
+    }
+
+    // geçerliyse email’i güncelle
+    user.email = user.newEmail!;
+    user.newEmail = undefined;
+    user.emailChangeToken = undefined;
+    user.emailChangeExpires = undefined;
+    user.emailVerified = true; // isteğe bağlı
+    await user.save();
+
+    res.json({ success: true, message: "Email address updated successfully." });
+  } catch (err: any) {
+    console.error("Error in confirmEmailChange:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
 export const login = async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
@@ -385,6 +449,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         isSubscriptionActive: hasActiveSubscription,
         isAngelInvestor: user.isAngelInvestor,
         role: user.role,
+        authProvider: user.authProvider,
       },
     });
   } catch (err: any) {
@@ -491,6 +556,40 @@ export const updateUser = async (req: Request, res: Response) => {
       message: "An error occurred while updating user information.",
       error: err.message,
     });
+  }
+};
+
+export const changePassword = async (req: Request, res: Response) => {
+  // 1) Validator errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  try {
+    // 2) Load user along with password
+    const userId = (req.user as IUser)._id;
+    const user = await User.findById(userId).select("+password");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+
+    // 3) Verify current password
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: "Current password is incorrect" });
+    }
+
+    // 4) Assign new password and save (pre-save hook will hash it)
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password updated successfully" });
+  } catch (err) {
+    console.error("changePassword error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -904,8 +1003,8 @@ export const fixSubscription = async (req: Request, res: Response) => {
             : "",
           statusCharCodes: refreshedUser?.subscriptionStatus
             ? Array.from(refreshedUser.subscriptionStatus).map((c) =>
-                c.charCodeAt(0)
-              )
+              c.charCodeAt(0)
+            )
             : [],
         },
       },
@@ -1281,6 +1380,57 @@ export const getAllUsers = async (req: Request, res: Response) => {
       message: "Kullanıcılar getirilirken bir hata oluştu",
       error: error.message,
     });
+  }
+};
+
+// controllers/authController.ts
+export const deleteCurrentUser = async (req: Request, res: Response) => {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ success: false, message: "Password is required." });
+  }
+
+  const user = await User.findById((req.user as IUser)._id).select("+password");
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found." });
+  }
+
+  const isMatch = await user.matchPassword(password);
+  if (!isMatch) {
+    return res.status(401).json({ success: false, message: "Incorrect password." });
+  }
+
+  await user.deleteOne();
+  return res.status(200).json({ success: true, message: "Account deleted." });
+};
+
+
+// DELETE /users/:id — admin deletes any user by ID
+export const deleteUserById = async (req: Request, res: Response) => {
+  try {
+    // only admin may delete others
+    if (req.user?.role !== "admin") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Forbidden" });
+    }
+
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    return res
+      .status(200)
+      .json({ success: true, message: "User deleted successfully" });
+  } catch (err) {
+    console.error("deleteUserById error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error" });
   }
 };
 

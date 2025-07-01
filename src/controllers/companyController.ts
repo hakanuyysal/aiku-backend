@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import { Company, ICompany } from "../models/Company";
 import mongoose from "mongoose";
 import videoUpload from "../middleware/videoUpload";
+import { User } from '../models/User';
 
 interface CompanyResponse {
   id: string;
@@ -543,5 +544,101 @@ export const uploadCompanyVideo = async (req: Request, res: Response) => {
       message: "Video yükleme başarısız",
       error: error.message,
     });
+  }
+};
+
+// Kullanıcının e-posta domain’ine göre, hâlihazırda o kullanıcıya ait olmayan şirketleri getir
+export const matchCompaniesByDomain = async (req: Request, res: Response) => {
+  try {
+    // 1) Domain query parametresini al ve doğrula
+    const rawDomain = req.query.domain;
+    if (!rawDomain || typeof rawDomain !== 'string') {
+      return res
+        .status(400)
+        .json({ success: false, message: 'domain query parametresi zorunlu' });
+    }
+    const domain = rawDomain.trim().toLowerCase();
+
+    // 2) Token'dan kullanıcıyı çöz (aynı create/update’de yaptığınız gibi)
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+      return res
+        .status(401)
+        .json({ success: false, message: 'Yetkilendirme başarısız, token yok' });
+    }
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+    const userId = decoded.id;
+
+    // 3) companyEmail alanı “@domain” ile biten, ama user !== userId olanları bul
+    const companies = await Company.find({
+      companyEmail: { $regex: new RegExp(`@${domain}$`, 'i') },
+      user: { $ne: userId }
+    })
+      .select('companyName companyEmail companyLogo user');
+
+    // 4) Döndür
+    res.status(200).json({ success: true, companies });
+  } catch (err: any) {
+    res
+      .status(500)
+      .json({ success: false, message: 'Sunucu hatası', error: err.message });
+  }
+};
+
+export const claimCompany = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // 1) ID geçerli mi?
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: "Invalid company ID" });
+    }
+
+    // 2) Şirketi al
+    const company = await Company.findById(id);
+    if (!company) {
+      return res.status(404).json({ success: false, message: "Company not found" });
+    }
+
+    // 3) Zaten siz misiniz?
+    const token = req.header("Authorization")?.replace("Bearer ", "");
+    if (!token) {
+      return res.status(401).json({ success: false, message: "Token missing" });
+    }
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
+    const userId = decoded.id;
+    if (company.user.toString() === userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "You already own this company" });
+    }
+
+    // 4) Kullanıcıyı çek (sadece email lazım)
+    const user = await User.findById(userId).select("email");
+    if (!user?.email) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // 5) Domain’leri karşılaştır
+    const userDomain = user.email.split("@")[1].toLowerCase();
+    const companyDomain = company.companyEmail.split("@")[1]?.toLowerCase();
+    if (userDomain !== companyDomain) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Email domain does not match" });
+    }
+
+    // 6) Atama ve kaydet
+    company.user = userId;
+    await company.save();
+
+    res
+      .status(200)
+      .json({ success: true, message: "Company successfully claimed", company });
+  } catch (err: any) {
+    console.error("claimCompany error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error", error: err.message });
   }
 };
