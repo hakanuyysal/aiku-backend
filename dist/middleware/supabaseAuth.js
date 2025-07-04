@@ -71,7 +71,7 @@ const verifySupabaseToken = (req, res, next) => __awaiter(void 0, void 0, void 0
             }
             return res.status(401).json({
                 success: false,
-                message: 'Geçersiz veya süresi dolmuş token',
+                message: 'Invalid or expired token',
                 error: error.message,
                 details: {
                     name: error.name,

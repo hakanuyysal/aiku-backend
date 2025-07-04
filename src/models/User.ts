@@ -6,6 +6,7 @@ export interface IUser extends Document {
   lastName: string;
   email: string;
   password?: string;
+  accountStatus: 'active' | 'deleted' | 'deactivated';
   phone?: string;
   countryCode?: string;
   localPhone?: string;
@@ -108,6 +109,12 @@ const userSchema = new Schema<IUser>({
     },
     minlength: [6, 'Şifre en az 6 karakter olmalıdır'],
     select: false
+  },
+  accountStatus: {
+    type: String,
+    enum: ['active', 'deleted', 'deactivated'],
+    default: 'active',
+    required: true
   },
   phone: {
     type: String,

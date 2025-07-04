@@ -59,7 +59,7 @@ const protect = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
         console.error("Token doğrulama hatası:", err);
         return res.status(401).json({
             success: false,
-            message: "Geçersiz veya süresi dolmuş token",
+            message: "Invalid or expired token",
         });
     }
 });
@@ -104,7 +104,7 @@ const optionalSupabaseToken = (req, res, next) => __awaiter(void 0, void 0, void
         if (error || !supabaseUser) {
             return res.status(401).json({
                 success: false,
-                message: 'Geçersiz veya süresi dolmuş token',
+                message: 'Invalid or expired token',
                 error: error === null || error === void 0 ? void 0 : error.message
             });
         }
@@ -124,7 +124,7 @@ const optionalSupabaseToken = (req, res, next) => __awaiter(void 0, void 0, void
         console.error("Token doğrulama hatası:", err);
         return res.status(401).json({
             success: false,
-            message: "Geçersiz veya süresi dolmuş token",
+            message: "Invalid or expired token",
         });
     }
 });

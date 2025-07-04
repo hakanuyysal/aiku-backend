@@ -70,7 +70,7 @@ export const verifySupabaseToken = async (req: Request, res: Response, next: Nex
       
       return res.status(401).json({ 
         success: false,
-        message: 'Geçersiz veya süresi dolmuş token',
+        message: 'Invalid or expired token',
         error: error.message,
         details: {
           name: error.name,

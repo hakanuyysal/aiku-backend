@@ -31,6 +31,7 @@ export const register = async (req: Request, res: Response) => {
       firstName,
       lastName,
       email,
+      accountStatus = "active",
       password,
       phone,
       countryCode,
@@ -62,6 +63,7 @@ export const register = async (req: Request, res: Response) => {
       firstName,
       lastName,
       email,
+      accountStatus,
       password,
       phone,
       countryCode,
@@ -100,6 +102,7 @@ export const register = async (req: Request, res: Response) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      accountStatus: user.accountStatus,
       phone: user.phone,
       countryCode: user.countryCode,
       localPhone: user.localPhone,
@@ -327,6 +330,12 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
+    if (user.accountStatus === 'deleted') {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Account not found.' });
+    }
+
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({
@@ -349,6 +358,7 @@ export const login = async (req: Request, res: Response) => {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      accountStatus: user.accountStatus,
       phone: user.phone,
       countryCode: user.countryCode,
       localPhone: user.localPhone,
@@ -418,6 +428,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        accountStatus: user.accountStatus,
         phone: user.phone,
         countryCode: user.countryCode,
         localPhone: user.localPhone,
@@ -478,6 +489,7 @@ export const updateUser = async (req: Request, res: Response) => {
       firstName,
       lastName,
       email,
+      accountStatus,
       phone,
       countryCode,
       localPhone,
@@ -499,6 +511,7 @@ export const updateUser = async (req: Request, res: Response) => {
     if (firstName) user.firstName = firstName;
     if (lastName) user.lastName = lastName;
     if (email) user.email = email;
+    if (accountStatus) user.accountStatus = accountStatus;
     if (phone) user.phone = phone;
     if (countryCode) user.countryCode = countryCode;
     if (localPhone) user.localPhone = localPhone;
@@ -532,6 +545,7 @@ export const updateUser = async (req: Request, res: Response) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        accountStatus: user.accountStatus,
         phone: user.phone,
         countryCode: user.countryCode,
         localPhone: user.localPhone,
@@ -615,6 +629,7 @@ export const getUserById = async (req: Request, res: Response) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
+        accountStatus: user.accountStatus,
         phone: user.phone,
         countryCode: user.countryCode,
         localPhone: user.localPhone,
@@ -1400,8 +1415,9 @@ export const deleteCurrentUser = async (req: Request, res: Response) => {
     return res.status(401).json({ success: false, message: "Incorrect password." });
   }
 
-  await user.deleteOne();
-  return res.status(200).json({ success: true, message: "Account deleted." });
+  user.accountStatus = "deleted";
+  await user.save();
+  return res.status(200).json({ success: true, message: "Account deletion successful." });
 };
 
 
@@ -1416,16 +1432,13 @@ export const deleteUserById = async (req: Request, res: Response) => {
     }
 
     const { id } = req.params;
-    const user = await User.findByIdAndDelete(id);
+    const user = await User.findById(id);
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found." });
     }
-
-    return res
-      .status(200)
-      .json({ success: true, message: "User deleted successfully" });
+    user.accountStatus = "deleted";
+    await user.save();
+    return res.status(200).json({ success: true, message: "User soft-deleted successfully." });
   } catch (err) {
     console.error("deleteUserById error:", err);
     return res

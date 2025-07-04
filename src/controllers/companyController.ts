@@ -50,8 +50,16 @@ export const getAllCompanies = async (req: Request, res: Response) => {
     // }
     // const decoded: any = jwt.verify(token, process.env.JWT_SECRET!);
 
-    const companies = await Company.find();
-    const companiesResponse: CompanyResponse[] = companies.map((company) => ({
+    const companies = await Company.find()
+      .populate({
+        path: "user",
+        select: "accountStatus",
+        match: { accountStatus: "active" }
+      });
+
+    // populate sonucu user null gelenleri filtrele
+    const activeCompanies = companies.filter(c => c.user);
+    const companiesResponse: CompanyResponse[] = activeCompanies.map(company => ({
       id: company._id,
       companyName: company.companyName,
       companyLogo: company.companyLogo,
@@ -79,7 +87,7 @@ export const getAllCompanies = async (req: Request, res: Response) => {
       acceptMessages: company.acceptMessages,
       numberOfInvestments: company.numberOfInvestments,
       numberOfExits: company.numberOfExits,
-      user: company.user.toString(),
+      user: company.user._id.toString(),
       connectedHub: company.connectedHub ? company.connectedHub.toString() : null,
       createdAt: company.createdAt,
     }));

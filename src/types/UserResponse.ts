@@ -3,6 +3,7 @@ export interface UserResponse {
   firstName: string;
   lastName: string;
   email: string;
+  accountStatus: 'active' | 'deleted' | 'deactivated';
   phone?: string;
   countryCode?: string;
   localPhone?: string;

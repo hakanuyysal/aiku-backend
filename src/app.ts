@@ -40,6 +40,8 @@ import panelUserRoutes from "./routes/panelUserRoutes";
 import blogRoutes from "./routes/blogRoutes";
 import investmentNewsRoutes from './routes/investmentNewsRoutes';
 import hubRoutes from "./routes/hubRoutes";
+import claimRequestRoutes from "./routes/claimRequestRoutes";
+import { ClaimRequest } from "./models/ClaimRequest";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -594,6 +596,7 @@ app.use("/api/blog", blogRoutes);
 app.use("/api/panel-users", panelUserRoutes);
 app.use('/api/investment-news', investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
+app.use("/api/claim-requests", claimRequestRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

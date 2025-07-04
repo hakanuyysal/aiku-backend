@@ -62,7 +62,7 @@ export const protect = async (req: Request, res: Response, next: NextFunction) =
 
   } catch (err) {
     console.error('Token doğrulama hatası:', err);
-    return res.status(401).json({ success: false, message: 'Geçersiz veya süresi dolmuş token' });
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
 
@@ -138,7 +138,7 @@ export const optionalSupabaseToken = async (req: Request, res: Response, next: N
     // 2) Supabase token olarak dene
     const { data: { user: supabaseUser }, error } = await supabase.auth.getUser(token);
     if (error || !supabaseUser) {
-      return res.status(401).json({ success: false, message: 'Geçersiz veya süresi dolmuş token', error: error?.message });
+      return res.status(401).json({ success: false, message: 'Invalid or expired token', error: error?.message });
     }
 
     // Supabase ID ile MongoDB'deki kullanıcıyı bul
@@ -152,7 +152,7 @@ export const optionalSupabaseToken = async (req: Request, res: Response, next: N
 
   } catch (err) {
     console.error("Token doğrulama hatası:", err);
-    return res.status(401).json({ success: false, message: 'Geçersiz veya süresi dolmuş token' });
+    return res.status(401).json({ success: false, message: 'Invalid or expired token' });
   }
 };
 
