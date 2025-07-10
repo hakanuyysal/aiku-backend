@@ -14,8 +14,8 @@ const googleClient = new OAuth2Client({
 // Desteklenen client ID'ler
 const SUPPORTED_CLIENT_IDS = [
   process.env.GOOGLE_CLIENT_ID!, // Web client ID
-  '974504980015-2e15l52tr86h8o42v8puf36lrtaamjqc.apps.googleusercontent.com', // iOS client ID
-  '974504980015-p5e88nccp7v1i40o41t1tkl5rudrqdvf.apps.googleusercontent.com'  // Android client ID
+  '940825068315-erm1cg6j87lqnldrbohmgvfd2ig0cr2f.apps.googleusercontent.com', // iOS client ID
+  '940825068315-11h2cdsluv3a8o3t019pf5hq4dnc4721.apps.googleusercontent.com'  // Android client ID
 ];
 
 /**
