@@ -12,12 +12,85 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteChat = exports.toggleArchiveChat = exports.sendMessage = exports.getChatMessages = exports.createChatSession = exports.getCompanyChatSessions = void 0;
+exports.broadcastToAllCompanies = exports.deleteChat = exports.toggleArchiveChat = exports.sendMessage = exports.getChatMessages = exports.createChatSession = exports.getCompanyChatSessions = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const ChatSession_1 = require("../models/ChatSession");
 const Message_1 = require("../models/Message");
 const Company_1 = require("../models/Company");
 const app_1 = require("../app");
+/** SystemBot ID'si: */
+// const SYSTEM_BOT_ID = new Types.ObjectId(process.env.SYSTEM_BOT_ID!);
+// export const broadcastMessage = async (req: Request, res: Response) => {
+//   try {
+//     const { content, attachment } = req.body;
+//     if (!content) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Mesaj içeriği (content) zorunludur'
+//       });
+//     }
+//     if (!mongoose.Types.ObjectId.isValid(SYSTEM_BOT_ID)) {
+//       return res.status(500).json({
+//         success: false,
+//         message: 'SYSTEM_BOT_ID hatalı yapılandırılmış'
+//       });
+//     }
+//     const companies = await Company.find({}, '_id');
+//     let broadcastCount = 0;
+//     for (const { _id: companyId } of companies) {
+//       let session = await ChatSession.findOne({
+//         $or: [
+//           { initiatorCompany: SYSTEM_BOT_ID, targetCompany: companyId },
+//           { initiatorCompany: companyId, targetCompany: SYSTEM_BOT_ID }
+//         ]
+//       });
+//       if (!session) {
+//         session = await ChatSession.create({
+//           initiatorCompany: SYSTEM_BOT_ID,
+//           targetCompany: companyId,
+//           title: 'System Broadcast'
+//         });
+//       }
+//       const message = await Message.create({
+//         chatSession: session._id,
+//         sender: new mongoose.Types.ObjectId(SYSTEM_BOT_ID),
+//         content,
+//         attachment
+//       });
+//       session.lastMessageText = content;
+//       session.lastMessageSender = new mongoose.Types.ObjectId(SYSTEM_BOT_ID);
+//       session.lastMessageDate = new Date();
+//       if (session.initiatorCompany.toString() === SYSTEM_BOT_ID) {
+//         session.unreadCountTarget += 1;
+//       } else {
+//         session.unreadCountInitiator += 1;
+//       }
+//       await session.save();
+//       io.to(`chat-${session._id}`).emit('new-message', message);
+//       io.to(`company-${companyId.toString()}`).emit('chat-notification', {
+//         type: 'new-message',
+//         chatSessionId: session._id,
+//         message,
+//         unreadCount:
+//           session.initiatorCompany.toString() === SYSTEM_BOT_ID
+//             ? session.unreadCountTarget
+//             : session.unreadCountInitiator
+//       });
+//       broadcastCount++;
+//     }
+//     return res.status(200).json({
+//       success: true,
+//       message: `Broadcast tamamlandı, ${broadcastCount} şirkete mesaj gönderildi`
+//     });
+//   } catch (error) {
+//     console.error('Broadcast hatası:', error);
+//     return res.status(500).json({
+//       success: false,
+//       message: 'Broadcast sırasında hata oluştu',
+//       error: error instanceof Error ? error.message : 'Bilinmeyen hata'
+//     });
+//   }
+// };
 // Bir şirketin tüm sohbet oturumlarını getirme
 const getCompanyChatSessions = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -26,7 +99,7 @@ const getCompanyChatSessions = (req, res) => __awaiter(void 0, void 0, void 0, f
         if (!mongoose_1.default.Types.ObjectId.isValid(companyId)) {
             return res.status(400).json({
                 success: false,
-                message: 'Geçersiz şirket ID',
+                message: "Geçersiz şirket ID",
             });
         }
         // Şirketin başlattığı veya hedef olduğu tüm sohbetleri bul
@@ -36,9 +109,9 @@ const getCompanyChatSessions = (req, res) => __awaiter(void 0, void 0, void 0, f
                 { targetCompany: companyId, deletedByTarget: false },
             ],
         })
-            .populate('initiatorCompany', 'companyName companyLogo')
-            .populate('targetCompany', 'companyName companyLogo')
-            .populate('lastMessageSender', 'companyName')
+            .populate("initiatorCompany", "companyName companyLogo")
+            .populate("targetCompany", "companyName companyLogo")
+            .populate("lastMessageSender", "companyName")
             .sort({ lastMessageDate: -1 }); // En son mesaj alınanlar en üstte
         res.status(200).json({
             success: true,
@@ -47,11 +120,11 @@ const getCompanyChatSessions = (req, res) => __awaiter(void 0, void 0, void 0, f
         });
     }
     catch (error) {
-        console.error('Sohbet oturumları alınırken hata:', error);
+        console.error("Sohbet oturumları alınırken hata:", error);
         res.status(500).json({
             success: false,
-            message: 'Sohbet oturumları alınırken bir hata oluştu',
-            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            message: "Sohbet oturumları alınırken bir hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
         });
     }
 });
@@ -64,14 +137,14 @@ const createChatSession = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (!initiatorCompanyId || !targetCompanyId || !title) {
             return res.status(400).json({
                 success: false,
-                message: 'Başlatıcı şirket ID, hedef şirket ID ve başlık alanları zorunludur',
+                message: "Başlatıcı şirket ID, hedef şirket ID ve başlık alanları zorunludur",
             });
         }
         // Kendisiyle konuşmayı engelle
         if (initiatorCompanyId === targetCompanyId) {
             return res.status(400).json({
                 success: false,
-                message: 'Bir şirket kendisiyle sohbet başlatamaz',
+                message: "Bir şirket kendisiyle sohbet başlatamaz",
             });
         }
         // Her iki şirketin de var olduğunu kontrol et
@@ -80,20 +153,28 @@ const createChatSession = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (!initiatorExists || !targetExists) {
             return res.status(404).json({
                 success: false,
-                message: 'Bir veya her iki şirket bulunamadı',
+                message: "Bir veya her iki şirket bulunamadı",
             });
         }
         // Aynı şirketler arasında zaten var olan bir sohbet var mı kontrol et
         let chatSession = yield ChatSession_1.ChatSession.findOne({
             $or: [
-                { initiatorCompany: initiatorCompanyId, targetCompany: targetCompanyId },
-                { initiatorCompany: targetCompanyId, targetCompany: initiatorCompanyId },
+                {
+                    initiatorCompany: initiatorCompanyId,
+                    targetCompany: targetCompanyId,
+                },
+                {
+                    initiatorCompany: targetCompanyId,
+                    targetCompany: initiatorCompanyId,
+                },
             ],
         });
         if (chatSession) {
             // Eğer sohbet silinmişse, tekrar aktive et
-            if ((chatSession.initiatorCompany.toString() === initiatorCompanyId && chatSession.deletedByInitiator) ||
-                (chatSession.targetCompany.toString() === initiatorCompanyId && chatSession.deletedByTarget)) {
+            if ((chatSession.initiatorCompany.toString() === initiatorCompanyId &&
+                chatSession.deletedByInitiator) ||
+                (chatSession.targetCompany.toString() === initiatorCompanyId &&
+                    chatSession.deletedByTarget)) {
                 if (chatSession.initiatorCompany.toString() === initiatorCompanyId) {
                     chatSession.deletedByInitiator = false;
                 }
@@ -104,7 +185,7 @@ const createChatSession = (req, res) => __awaiter(void 0, void 0, void 0, functi
             }
             return res.status(200).json({
                 success: true,
-                message: 'Var olan sohbet bulundu',
+                message: "Var olan sohbet bulundu",
                 data: chatSession,
             });
         }
@@ -116,16 +197,16 @@ const createChatSession = (req, res) => __awaiter(void 0, void 0, void 0, functi
         });
         res.status(201).json({
             success: true,
-            message: 'Sohbet oturumu başarıyla oluşturuldu',
+            message: "Sohbet oturumu başarıyla oluşturuldu",
             data: chatSession,
         });
     }
     catch (error) {
-        console.error('Sohbet oluşturma hatası:', error);
+        console.error("Sohbet oluşturma hatası:", error);
         res.status(500).json({
             success: false,
-            message: 'Sohbet oturumu oluşturulurken bir hata oluştu',
-            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            message: "Sohbet oturumu oluşturulurken bir hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
         });
     }
 });
@@ -138,7 +219,7 @@ const getChatMessages = (req, res) => __awaiter(void 0, void 0, void 0, function
         if (!chatSessionId || !companyId) {
             return res.status(400).json({
                 success: false,
-                message: 'Sohbet oturumu ID ve şirket ID parametreleri zorunludur',
+                message: "Sohbet oturumu ID ve şirket ID parametreleri zorunludur",
             });
         }
         // Sohbet oturumunu bul
@@ -146,7 +227,7 @@ const getChatMessages = (req, res) => __awaiter(void 0, void 0, void 0, function
         if (!chatSession) {
             return res.status(404).json({
                 success: false,
-                message: 'Sohbet oturumu bulunamadı',
+                message: "Sohbet oturumu bulunamadı",
             });
         }
         // Şirketin bu sohbete erişim izni var mı kontrol et
@@ -154,20 +235,22 @@ const getChatMessages = (req, res) => __awaiter(void 0, void 0, void 0, function
             chatSession.targetCompany.toString() !== companyId) {
             return res.status(403).json({
                 success: false,
-                message: 'Bu sohbete erişim izniniz yok',
+                message: "Bu sohbete erişim izniniz yok",
             });
         }
         // Sohbetteki mesajları getir
         const messages = yield Message_1.Message.find({ chatSession: chatSessionId })
-            .populate('sender', 'companyName companyLogo')
+            .populate("sender", "companyName companyLogo")
             .sort({ createdAt: 1 }); // Mesajları eski->yeni sırayla getir
         // Okunmamış mesajları "okundu" olarak işaretle
         const isInitiator = chatSession.initiatorCompany.toString() === companyId;
         // Şirketin karşı tarafından gelen mesajları okundu olarak işaretle
         yield Message_1.Message.updateMany({
             chatSession: chatSessionId,
-            sender: isInitiator ? chatSession.targetCompany : chatSession.initiatorCompany,
-            isRead: false
+            sender: isInitiator
+                ? chatSession.targetCompany
+                : chatSession.initiatorCompany,
+            isRead: false,
         }, { isRead: true });
         // Okunmamış mesaj sayacını sıfırla
         if (isInitiator) {
@@ -184,11 +267,11 @@ const getChatMessages = (req, res) => __awaiter(void 0, void 0, void 0, function
         });
     }
     catch (error) {
-        console.error('Mesajlar alınırken hata:', error);
+        console.error("Mesajlar alınırken hata:", error);
         res.status(500).json({
             success: false,
-            message: 'Mesajlar alınırken bir hata oluştu',
-            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            message: "Mesajlar alınırken bir hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
         });
     }
 });
@@ -201,7 +284,7 @@ const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!chatSessionId || !senderId || !content) {
             return res.status(400).json({
                 success: false,
-                message: 'Sohbet oturumu ID, gönderen ID ve mesaj içeriği zorunludur',
+                message: "Sohbet oturumu ID, gönderen ID ve mesaj içeriği zorunludur",
             });
         }
         // Sohbet oturumunu bul
@@ -209,7 +292,7 @@ const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!chatSession) {
             return res.status(404).json({
                 success: false,
-                message: 'Sohbet oturumu bulunamadı',
+                message: "Sohbet oturumu bulunamadı",
             });
         }
         // Gönderen şirketin bu sohbete katılımını kontrol et
@@ -217,7 +300,7 @@ const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             chatSession.targetCompany.toString() !== senderId) {
             return res.status(403).json({
                 success: false,
-                message: 'Bu sohbete mesaj gönderme yetkiniz yok',
+                message: "Bu sohbete mesaj gönderme yetkiniz yok",
             });
         }
         // Yeni mesaj oluştur
@@ -248,30 +331,35 @@ const sendMessage = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         }
         yield chatSession.save();
         // Mesajı popüle et ve geri dön
-        const populatedMessage = yield Message_1.Message.findById(message._id).populate('sender', 'companyName companyLogo');
+        const populatedMessage = yield Message_1.Message.findById(message._id).populate("sender", "companyName companyLogo");
+        console.log("Emitting message to room: chat-" + chatSessionId, "Message:", populatedMessage);
         // Socket.io ile gerçek zamanlı bildirim gönder
         // 1. Sohbet odasına mesaj gönder
-        app_1.io.to(`chat-${chatSessionId}`).emit('new-message', populatedMessage);
+        app_1.io.to(`chat-${chatSessionId}`).emit("new-message", populatedMessage);
         // 2. Alıcı şirkete bildirim gönder
-        const recipientCompanyId = isInitiator ? chatSession.targetCompany.toString() : chatSession.initiatorCompany.toString();
-        app_1.io.to(`company-${recipientCompanyId}`).emit('chat-notification', {
-            type: 'new-message',
+        const recipientCompanyId = isInitiator
+            ? chatSession.targetCompany.toString()
+            : chatSession.initiatorCompany.toString();
+        app_1.io.to(`company-${recipientCompanyId}`).emit("chat-notification", {
+            type: "new-message",
             chatSessionId,
             message: populatedMessage,
-            unreadCount: isInitiator ? chatSession.unreadCountTarget : chatSession.unreadCountInitiator,
+            unreadCount: isInitiator
+                ? chatSession.unreadCountTarget
+                : chatSession.unreadCountInitiator,
         });
         res.status(201).json({
             success: true,
-            message: 'Mesaj başarıyla gönderildi',
+            message: "Mesaj başarıyla gönderildi",
             data: populatedMessage,
         });
     }
     catch (error) {
-        console.error('Mesaj gönderilirken hata:', error);
+        console.error("Mesaj gönderilirken hata:", error);
         res.status(500).json({
             success: false,
-            message: 'Mesaj gönderilirken bir hata oluştu',
-            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            message: "Mesaj gönderilirken bir hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
         });
     }
 });
@@ -284,7 +372,7 @@ const toggleArchiveChat = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (!chatSessionId || !companyId || archive === undefined) {
             return res.status(400).json({
                 success: false,
-                message: 'Sohbet oturumu ID, şirket ID ve arşiv durumu zorunludur',
+                message: "Sohbet oturumu ID, şirket ID ve arşiv durumu zorunludur",
             });
         }
         // Sohbet oturumunu bul
@@ -292,7 +380,7 @@ const toggleArchiveChat = (req, res) => __awaiter(void 0, void 0, void 0, functi
         if (!chatSession) {
             return res.status(404).json({
                 success: false,
-                message: 'Sohbet oturumu bulunamadı',
+                message: "Sohbet oturumu bulunamadı",
             });
         }
         // Şirketin bu sohbete erişim izni var mı kontrol et
@@ -300,7 +388,7 @@ const toggleArchiveChat = (req, res) => __awaiter(void 0, void 0, void 0, functi
             chatSession.targetCompany.toString() !== companyId) {
             return res.status(403).json({
                 success: false,
-                message: 'Bu sohbete erişim izniniz yok',
+                message: "Bu sohbete erişim izniniz yok",
             });
         }
         // Arşiv durumunu güncelle
@@ -313,16 +401,16 @@ const toggleArchiveChat = (req, res) => __awaiter(void 0, void 0, void 0, functi
         yield chatSession.save();
         res.status(200).json({
             success: true,
-            message: `Sohbet ${archive ? 'arşivlendi' : 'arşivden çıkarıldı'}`,
+            message: `Sohbet ${archive ? "arşivlendi" : "arşivden çıkarıldı"}`,
             data: chatSession,
         });
     }
     catch (error) {
-        console.error('Sohbet arşivleme hatası:', error);
+        console.error("Sohbet arşivleme hatası:", error);
         res.status(500).json({
             success: false,
-            message: 'Sohbet arşivlenirken bir hata oluştu',
-            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            message: "Sohbet arşivlenirken bir hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
         });
     }
 });
@@ -335,7 +423,7 @@ const deleteChat = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!chatSessionId || !companyId) {
             return res.status(400).json({
                 success: false,
-                message: 'Sohbet oturumu ID ve şirket ID zorunludur',
+                message: "Sohbet oturumu ID ve şirket ID zorunludur",
             });
         }
         // Sohbet oturumunu bul
@@ -343,7 +431,7 @@ const deleteChat = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!chatSession) {
             return res.status(404).json({
                 success: false,
-                message: 'Sohbet oturumu bulunamadı',
+                message: "Sohbet oturumu bulunamadı",
             });
         }
         // Şirketin bu sohbete erişim izni var mı kontrol et
@@ -351,7 +439,7 @@ const deleteChat = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             chatSession.targetCompany.toString() !== companyId) {
             return res.status(403).json({
                 success: false,
-                message: 'Bu sohbete erişim izniniz yok',
+                message: "Bu sohbete erişim izniniz yok",
             });
         }
         // Silme işlemi (soft delete)
@@ -369,16 +457,94 @@ const deleteChat = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         yield chatSession.save();
         res.status(200).json({
             success: true,
-            message: 'Sohbet başarıyla silindi',
+            message: "Sohbet başarıyla silindi",
         });
     }
     catch (error) {
-        console.error('Sohbet silme hatası:', error);
+        console.error("Sohbet silme hatası:", error);
         res.status(500).json({
             success: false,
-            message: 'Sohbet silinirken bir hata oluştu',
-            error: error instanceof Error ? error.message : 'Bilinmeyen hata',
+            message: "Sohbet silinirken bir hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
         });
     }
 });
 exports.deleteChat = deleteChat;
+const broadcastToAllCompanies = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { content, isReplyable, attachment } = req.body;
+        if (!content) {
+            return res.status(400).json({
+                success: false,
+                message: "Mesaj içeriği (content) zorunludur",
+            });
+        }
+        const senderCompanyId = (_a = req.company) === null || _a === void 0 ? void 0 : _a.id;
+        if (!senderCompanyId) {
+            return res.status(401).json({
+                success: false,
+                message: "Yetkisiz erişim",
+            });
+        }
+        const companies = yield Company_1.Company.find({
+            _id: { $ne: new mongoose_1.default.Schema.Types.ObjectId(senderCompanyId) },
+        });
+        let broadcastCount = 0;
+        for (const company of companies) {
+            let session = yield ChatSession_1.ChatSession.findOne({
+                $or: [
+                    { initiatorCompany: senderCompanyId, targetCompany: company._id },
+                    { initiatorCompany: company._id, targetCompany: senderCompanyId },
+                ],
+            }).exec();
+            if (!session) {
+                session = yield ChatSession_1.ChatSession.create({
+                    initiatorCompany: new mongoose_1.default.Schema.Types.ObjectId(senderCompanyId),
+                    targetCompany: company._id,
+                    title: "Toplu Mesaj",
+                });
+            }
+            const message = yield Message_1.Message.create({
+                chatSession: session._id,
+                sender: new mongoose_1.default.Schema.Types.ObjectId(senderCompanyId),
+                content,
+                isReplyable: isReplyable !== undefined ? isReplyable : true,
+                attachment,
+            });
+            session.lastMessageText = content;
+            session.lastMessageSender = new mongoose_1.default.Schema.Types.ObjectId(senderCompanyId);
+            session.lastMessageDate = new Date();
+            if (session.initiatorCompany.toString() === senderCompanyId) {
+                session.unreadCountTarget += 1;
+            }
+            else {
+                session.unreadCountInitiator += 1;
+            }
+            yield session.save();
+            app_1.io.to(`chat-${session._id}`).emit("new-message", message);
+            app_1.io.to(`company-${company._id.toString()}`).emit("chat-notification", {
+                type: "new-message",
+                chatSessionId: session._id,
+                message,
+                unreadCount: session.initiatorCompany.toString() === senderCompanyId
+                    ? session.unreadCountTarget
+                    : session.unreadCountInitiator,
+            });
+            broadcastCount++;
+        }
+        return res.status(200).json({
+            success: true,
+            message: `Toplu mesaj gönderimi tamamlandı, ${broadcastCount} şirkete mesaj gönderildi`,
+        });
+    }
+    catch (error) {
+        console.error("Toplu mesaj gönderimi hatası:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Toplu mesaj gönderimi sırasında hata oluştu",
+            error: error instanceof Error ? error.message : "Bilinmeyen hata",
+        });
+    }
+});
+exports.broadcastToAllCompanies = broadcastToAllCompanies;

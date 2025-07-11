@@ -36,4 +36,9 @@ router.patch('/archive/:chatSessionId', auth_1.protect, chatController_1.toggleA
 // Sohbeti silme
 // DELETE /api/chat/sessions/:chatSessionId
 router.delete('/sessions/:chatSessionId', auth_1.protect, chatController_1.deleteChat);
+// Tüm şirketlere toplu mesaj gönderme
+// POST /api/chat/broadcast
+router.post('/broadcast', auth_1.protect, [
+    (0, express_validator_1.check)('content', 'Mesaj içeriği zorunludur').not().isEmpty(),
+], chatController_1.broadcastToAllCompanies);
 exports.default = router;

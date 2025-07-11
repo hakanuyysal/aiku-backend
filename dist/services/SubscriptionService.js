@@ -89,7 +89,7 @@ class SubscriptionService {
                                 }
                                 else if (user.subscriptionPlan === 'business' || user.subscriptionPlan === 'investor') {
                                     // Business ve Investor planları için extraMonths var
-                                    extraMonths = 3; // Sabit 3 ay olarak belirtilmiş
+                                    extraMonths = 3; // Yıllık ödemede 3 ay fazla (12+3=15 ay)
                                 }
                                 nextBillingDate.setMonth(nextBillingDate.getMonth() + 12 + extraMonths);
                             }
@@ -98,15 +98,21 @@ class SubscriptionService {
                             // Ödeme geçmişine ekle
                             if (!user.paymentHistory)
                                 user.paymentHistory = [];
-                            user.paymentHistory.push({
+                            const paymentHistoryEntry = {
                                 amount: user.subscriptionAmount || 0,
                                 date: new Date(),
                                 status: 'success',
                                 transactionId: paymentResult.transactionId,
                                 description: `Otomatik ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} abonelik ödemesi`,
+                                type: 'subscription',
                                 plan: user.subscriptionPlan || undefined,
                                 period: user.subscriptionPeriod
-                            });
+                            };
+                            // Eğer kart bilgileri varsa ekle
+                            if (paymentResult.cardDetails) {
+                                paymentHistoryEntry.cardDetails = paymentResult.cardDetails;
+                            }
+                            user.paymentHistory.push(paymentHistoryEntry);
                             yield user.save();
                             successCount++;
                         }
@@ -119,6 +125,7 @@ class SubscriptionService {
                                 date: new Date(),
                                 status: 'failed',
                                 description: `Otomatik ${user.subscriptionPeriod === 'monthly' ? 'aylık' : 'yıllık'} abonelik ödemesi başarısız`,
+                                type: 'subscription',
                                 plan: user.subscriptionPlan || undefined,
                                 period: user.subscriptionPeriod
                             });
@@ -154,10 +161,10 @@ class SubscriptionService {
      * @param userId Kullanıcı ID
      * @param plan Abonelik planı (startup, business, investor)
      * @param period Abonelik periyodu (monthly, yearly)
-     * @deprecated Bu metod artık controller'da doğrudan kullanıcıyı güncellemek için kullanılıyor
+     * @param isFirstSubscription İlk abonelik mi
      */
-    changeSubscriptionPlan(userId, plan, period) {
-        return __awaiter(this, void 0, void 0, function* () {
+    changeSubscriptionPlan(userId_1, plan_1, period_1) {
+        return __awaiter(this, arguments, void 0, function* (userId, plan, period, isFirstSubscription = false) {
             try {
                 const user = yield User_1.User.findById(userId);
                 if (!user) {
@@ -166,23 +173,42 @@ class SubscriptionService {
                 // Abonelik planını ve periyodunu güncelle
                 user.subscriptionPlan = plan;
                 user.subscriptionPeriod = period;
-                // Eğer startup planı seçilmişse, her zaman trial durumuna ayarla
-                if (plan === 'startup') {
+                const now = new Date();
+                // Eğer startup planı ve ilk abonelik ise, trial süresini ayarla (periyoda bakılmaksızın)
+                if (plan === 'startup' && isFirstSubscription) {
                     user.subscriptionStatus = 'trial';
-                    const trialEndDate = new Date();
-                    trialEndDate.setMonth(trialEndDate.getMonth() + 3);
+                    const trialEndDate = new Date(now);
+                    trialEndDate.setMonth(trialEndDate.getMonth() + 6); // 6 ay deneme süresi
                     user.trialEndsAt = trialEndDate;
                     user.nextPaymentDate = trialEndDate;
                 }
-                else {
-                    // Startup dışında bir plan seçilmişse
-                    user.subscriptionStatus = 'pending'; // Ödeme yapılana kadar pending
+                else if (period === 'yearly') {
+                    // Yıllık abonelikler için
+                    user.subscriptionStatus = 'active';
                     user.trialEndsAt = undefined; // Trial süresini kaldır
-                    // Bir sonraki ödeme tarihini şimdi olarak ayarla (hemen ödeme alınacak)
-                    user.nextPaymentDate = new Date();
+                    // Bir sonraki ödeme tarihini hesapla (yıllık + ekstra)
+                    const nextPaymentDate = new Date(now);
+                    // Business ve Investor planları için ekstra 3 ay
+                    if (plan === 'business' || plan === 'investor') {
+                        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + 3); // 15 ay (12 + 3 ekstra)
+                    }
+                    else {
+                        // Startup için standart 12 ay
+                        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12);
+                    }
+                    user.nextPaymentDate = nextPaymentDate;
+                }
+                else {
+                    // Aylık abonelikler için (veya startup dışındaki planlar için)
+                    user.subscriptionStatus = 'active';
+                    user.trialEndsAt = undefined; // Trial süresini kaldır
+                    // Bir sonraki ödeme tarihini şimdi+1 ay olarak ayarla
+                    const nextPaymentDate = new Date(now);
+                    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+                    user.nextPaymentDate = nextPaymentDate;
                 }
                 // Abonelik başlangıç tarihini güncelle
-                user.subscriptionStartDate = new Date();
+                user.subscriptionStartDate = now;
                 yield user.save();
                 return {
                     success: true,
@@ -223,14 +249,15 @@ class SubscriptionService {
                 pricing: {
                     monthly: {
                         price: 49,
-                        trialPeriod: 3, // ay
+                        trialPeriod: 6, // ay
                         isFirstTimeOnly: true // Sadece ilk abonelikte geçerli
                     },
                     yearly: {
                         price: 529,
                         discount: '10% off',
-                        trialPeriod: 3, // ay
-                        isFirstTimeOnly: true // Sadece ilk abonelikte geçerli
+                        trialPeriod: 6, // ay
+                        isFirstTimeOnly: true, // Sadece ilk abonelikte geçerli
+                        extraMonths: 0 // Startup planında extra ay yok
                     }
                 }
             },
@@ -244,12 +271,14 @@ class SubscriptionService {
                 ],
                 pricing: {
                     monthly: {
-                        price: 75
+                        price: 75,
+                        trialPeriod: 0 // Deneme süresi yok
                     },
                     yearly: {
                         price: 810,
                         discount: '10% off',
-                        extraMonths: 3 // Yıllık ödemede 3 ay fazla (12+3=15 ay)
+                        extraMonths: 3, // Yıllık ödemede 3 ay fazla (12+3=15 ay)
+                        trialPeriod: 0 // Deneme süresi yok
                     }
                 }
             },
@@ -263,12 +292,14 @@ class SubscriptionService {
                 ],
                 pricing: {
                     monthly: {
-                        price: 99
+                        price: 99,
+                        trialPeriod: 0 // Deneme süresi yok
                     },
                     yearly: {
                         price: 1069,
                         discount: '10% off',
-                        extraMonths: 3 // Yıllık ödemede 3 ay fazla (12+3=15 ay)
+                        extraMonths: 3, // Yıllık ödemede 3 ay fazla (12+3=15 ay)
+                        trialPeriod: 0 // Deneme süresi yok
                     }
                 }
             }

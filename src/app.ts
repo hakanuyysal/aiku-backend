@@ -13,6 +13,7 @@ import helmet from "helmet";
 import cron from "node-cron";
 import { fetchAndStoreNews } from './controllers/newsController';
 import { ipBlocker } from './middleware/ipBlocker';
+import UserStatusService from './services/userStatusService';
 
 // Route'ları import et
 import authRoutes from "./routes/authRoutes";
@@ -41,6 +42,7 @@ import blogRoutes from "./routes/blogRoutes";
 import investmentNewsRoutes from './routes/investmentNewsRoutes';
 import hubRoutes from "./routes/hubRoutes";
 import claimRequestRoutes from "./routes/claimRequestRoutes";
+import userStatusRoutes from "./routes/userStatusRoutes";
 import { ClaimRequest } from "./models/ClaimRequest";
 
 // Env değişkenlerini yükle
@@ -81,10 +83,60 @@ const io = new Server(server, {
   transports: ["websocket", "polling"], // Önce WebSocket, sonra polling dene
 });
 
+// Initialize user status service
+const userStatusService = new UserStatusService(io);
+userStatusService.startCleanupJob();
+
+// Export userStatusService for use in other modules
+export { userStatusService };
+
 // Socket.io bağlantılarını yönet
 io.on("connection", (socket) => {
   console.log("👋 Yeni bir kullanıcı bağlandı:", socket.id);
   logger.debug("Yeni Socket.IO bağlantısı kuruldu", { socketId: socket.id });
+
+  // User authentication and status tracking
+  socket.on("authenticate", async (data: { userId: string, token?: string }) => {
+    try {
+      const { userId, token } = data;
+      
+      // TODO: Add token validation if needed
+      // For now, we'll trust the userId from the client
+      // In production, you should validate the token/session
+      
+      if (userId) {
+        await userStatusService.addUserSocket(userId, socket.id);
+        await userStatusService.sendOnlineUsersToSocket(socket.id);
+        
+        console.log(`🔐 Kullanıcı kimlik doğrulandı: ${userId} (${socket.id})`);
+        logger.info("User authenticated", { userId, socketId: socket.id });
+        
+        socket.emit("authentication-success", { 
+          userId, 
+          onlineCount: userStatusService.getOnlineUsersCount() 
+        });
+      } else {
+        socket.emit("authentication-error", { message: "Kullanıcı ID gerekli" });
+      }
+    } catch (error) {
+      logger.error("Authentication error", { error, socketId: socket.id });
+      socket.emit("authentication-error", { message: "Kimlik doğrulama hatası" });
+    }
+  });
+
+  // Request online users list
+  socket.on("get-online-users", async () => {
+    await userStatusService.sendOnlineUsersToSocket(socket.id);
+  });
+
+  // Typing indicators
+  socket.on("typing-start", (data: { chatSessionId: string, userId: string }) => {
+    userStatusService.sendTypingIndicator(data.userId, data.chatSessionId, true);
+  });
+
+  socket.on("typing-stop", (data: { chatSessionId: string, userId: string }) => {
+    userStatusService.sendTypingIndicator(data.userId, data.chatSessionId, false);
+  });
 
   // Şirket id'sine göre chat odası katılımı
   socket.on("join-company-chat", (companyId) => {
@@ -133,10 +185,18 @@ io.on("connection", (socket) => {
     });
   });
 
+  // User status ping (heartbeat)
+  socket.on("ping", (callback) => {
+    if (callback) callback("pong");
+  });
+
   // Bağlantı kesildiğinde
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     console.log("👋 Bir kullanıcı ayrıldı:", socket.id);
     logger.debug("Socket.IO bağlantısı kesildi", { socketId: socket.id });
+    
+    // Remove user from online status tracking
+    await userStatusService.removeUserSocket(socket.id);
   });
 });
 
@@ -597,6 +657,7 @@ app.use("/api/panel-users", panelUserRoutes);
 app.use('/api/investment-news', investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
+app.use("/api/user-status", userStatusRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

@@ -39,6 +39,10 @@ export interface IUser extends Document {
   favoriteUsers?: mongoose.Types.ObjectId[];
   favoriteCompanies?: mongoose.Types.ObjectId[];
   favoriteProducts?: mongoose.Types.ObjectId[];
+  // Online status tracking
+  isOnline?: boolean;
+  lastSeen?: Date;
+  socketIds?: string[]; // Multiple socket connections for same user
   // Abonelik özellikleri
   subscriptionStatus?: 'active' | 'pending' | 'trial' | 'cancelled' | 'expired';
   subscriptionStartDate?: Date;
@@ -239,6 +243,19 @@ const userSchema = new Schema<IUser>({
   favoriteProducts: [{
     type: Schema.Types.ObjectId,
     ref: 'Product',
+    default: []
+  }],
+  // Online status tracking
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
+  },
+  socketIds: [{
+    type: String,
     default: []
   }],
   // Abonelik özellikleri

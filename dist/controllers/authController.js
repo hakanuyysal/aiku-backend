@@ -12,16 +12,17 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.logout = exports.googleLogin = exports.checkAndRenewTrialSubscriptions = exports.createOrUpdateSubscription = exports.fixSubscription = exports.googleCallback = exports.getFavorites = exports.removeFavorite = exports.addFavorite = exports.getUserById = exports.updateUser = exports.getCurrentUser = exports.login = exports.register = void 0;
+exports.logout = exports.deleteUserById = exports.deleteCurrentUser = exports.getAllUsers = exports.googleLogin = exports.checkAndRenewTrialSubscriptions = exports.createOrUpdateSubscription = exports.fixSubscription = exports.googleCallback = exports.getFavorites = exports.removeFavorite = exports.addFavorite = exports.updateUserById = exports.getUserById = exports.changePassword = exports.updateUser = exports.getCurrentUser = exports.login = exports.confirmEmailChange = exports.requestEmailChange = exports.resendVerificationEmail = exports.verifyEmail = exports.register = void 0;
 const express_validator_1 = require("express-validator");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const User_1 = require("../models/User");
 const googleService_1 = require("../services/googleService");
+const crypto_1 = __importDefault(require("crypto"));
+const mailgunService_1 = require("../services/mailgunService");
 const createToken = (id) => {
-    // @ts-expect-error - JWT sign işlemi için expiresIn tipi uyumsuzluğunu görmezden geliyoruz
     return jsonwebtoken_1.default.sign({ id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE,
+        expiresIn: "90d", // Token süresini 90 güne çıkarıyoruz
     });
 };
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -33,7 +34,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 errors: errors.array(),
             });
         }
-        const { firstName, lastName, email, password, phone, title, location, profileInfo, profilePhoto, linkedin, instagram, facebook, twitter, } = req.body;
+        const { firstName, lastName, email, accountStatus = "active", password, phone, countryCode, localPhone, title, location, profileInfo, profilePhoto, linkedin, instagram, facebook, twitter, role, } = req.body;
         let user = yield User_1.User.findOne({ email });
         if (user) {
             return res.status(400).json({
@@ -41,12 +42,18 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 message: "Bu email adresi zaten kayıtlı",
             });
         }
+        // E-posta doğrulama tokeni oluştur
+        const verificationToken = crypto_1.default.randomBytes(32).toString("hex");
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
         user = yield User_1.User.create({
             firstName,
             lastName,
             email,
+            accountStatus,
             password,
             phone,
+            countryCode,
+            localPhone,
             title,
             location,
             profileInfo,
@@ -55,8 +62,20 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             instagram,
             facebook,
             twitter,
+            role,
             authProvider: "email",
+            emailVerificationToken: verificationToken,
+            emailVerificationExpires: verificationExpires,
+            isAngelInvestor: false,
         });
+        // Doğrulama e-postası gönder
+        try {
+            yield mailgunService_1.mailgunService.sendVerificationEmail(email, verificationToken);
+        }
+        catch (error) {
+            console.error("Doğrulama e-postası gönderilemedi:", error);
+            // E-posta gönderilemese bile kullanıcı kaydını tamamla
+        }
         const token = createToken(user._id);
         const hasActiveSubscription = user.subscriptionStatus === "active" ||
             user.subscriptionStatus === "trial";
@@ -65,7 +84,10 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,
+            accountStatus: user.accountStatus,
             phone: user.phone,
+            countryCode: user.countryCode,
+            localPhone: user.localPhone,
             title: user.title,
             location: user.location,
             profileInfo: user.profileInfo,
@@ -81,8 +103,7 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             subscriptionStatus: user.subscriptionStatus,
             subscriptionStartDate: user.subscriptionStartDate,
             trialEndsAt: user.trialEndsAt,
-            // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
-            subscriptionPlan: user.subscriptionPlan,
+            subscriptionPlan: user.subscriptionPlan || undefined,
             subscriptionPeriod: user.subscriptionPeriod,
             subscriptionAmount: user.subscriptionAmount,
             autoRenewal: user.autoRenewal,
@@ -93,6 +114,8 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             billingAddress: user.billingAddress,
             vatNumber: user.vatNumber,
             isSubscriptionActive: hasActiveSubscription,
+            isAngelInvestor: user.isAngelInvestor,
+            role: user.role,
         };
         res.status(201).json({
             success: true,
@@ -103,11 +126,151 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     catch (err) {
         res.status(500).json({
             success: false,
-            message: "Sunucu hatası",
+            message: "Server error",
         });
     }
 });
 exports.register = register;
+const verifyEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { token } = req.params;
+        const user = yield User_1.User.findOne({
+            emailVerificationToken: token,
+            emailVerificationExpires: { $gt: Date.now() },
+        });
+        if (!user) {
+            return res.status(400).json({
+                success: false,
+                message: "Geçersiz veya süresi dolmuş doğrulama bağlantısı",
+            });
+        }
+        user.emailVerified = true;
+        // @ts-ignore
+        user.emailVerificationToken = undefined;
+        // @ts-ignore
+        user.emailVerificationExpires = undefined;
+        yield user.save();
+        // Frontend'e yönlendir
+        if (process.env.FRONTEND_URL) {
+            return res.redirect(`${process.env.FRONTEND_URL}/api/auth/verify-email/${token}`);
+        }
+        // Eğer FRONTEND_URL tanımlı değilse JSON yanıtı döndür
+        res.json({
+            success: true,
+            message: "E-posta adresiniz başarıyla doğrulandı",
+        });
+    }
+    catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+        });
+    }
+});
+exports.verifyEmail = verifyEmail;
+const resendVerificationEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { email } = req.body;
+        const user = yield User_1.User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı",
+            });
+        }
+        if (user.emailVerified) {
+            return res.status(400).json({
+                success: false,
+                message: "Bu e-posta adresi zaten doğrulanmış",
+            });
+        }
+        // Yeni doğrulama tokeni oluştur
+        const verificationToken = crypto_1.default.randomBytes(32).toString("hex");
+        const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 saat
+        user.emailVerificationToken = verificationToken;
+        user.emailVerificationExpires = verificationExpires;
+        yield user.save();
+        // Yeni doğrulama e-postası gönder
+        try {
+            yield mailgunService_1.mailgunService.sendVerificationEmail(email, verificationToken);
+            res.json({
+                success: true,
+                message: "Doğrulama e-postası tekrar gönderildi",
+            });
+        }
+        catch (error) {
+            res.status(500).json({
+                success: false,
+                message: "Doğrulama e-postası gönderilemedi",
+            });
+        }
+    }
+    catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+        });
+    }
+});
+exports.resendVerificationEmail = resendVerificationEmail;
+const requestEmailChange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const user = req.user;
+        const { newEmail } = req.body;
+        if (!newEmail) {
+            return res.status(400).json({ success: false, message: "newEmail is required." });
+        }
+        // 1) yeni email kullanımda mı kontrol
+        const exists = yield User_1.User.findOne({ email: newEmail });
+        if (exists) {
+            return res.status(400).json({ success: false, message: "Email already in use." });
+        }
+        // 2) 6 haneli kod ve expiry oluştur
+        const changeCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresInMinutes = 15;
+        user.newEmail = newEmail;
+        user.emailChangeToken = changeCode;
+        user.emailChangeExpires = new Date(Date.now() + expiresInMinutes * 60000);
+        yield user.save();
+        // 3) mail gönder
+        yield mailgunService_1.mailgunService.sendEmailChangeCode(newEmail, changeCode, expiresInMinutes);
+        res.json({ success: true, message: "Verification code sent to your new email address." });
+    }
+    catch (err) {
+        console.error("Error in requestEmailChange:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+exports.requestEmailChange = requestEmailChange;
+const confirmEmailChange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { code } = req.body;
+        if (!code) {
+            return res.status(400).json({ success: false, message: "code is required." });
+        }
+        // token ve expiry kontrolü (select:false alanları da getiriyoruz)
+        const user = yield User_1.User.findOne({
+            emailChangeToken: code,
+            emailChangeExpires: { $gt: new Date() }
+        }).select("+newEmail +emailChangeExpires");
+        if (!user) {
+            return res.status(400).json({ success: false, message: "Invalid or expired code." });
+        }
+        // geçerliyse email’i güncelle
+        user.email = user.newEmail;
+        user.newEmail = undefined;
+        user.emailChangeToken = undefined;
+        user.emailChangeExpires = undefined;
+        user.emailVerified = true; // isteğe bağlı
+        yield user.save();
+        res.json({ success: true, message: "Email address updated successfully." });
+    }
+    catch (err) {
+        console.error("Error in confirmEmailChange:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+exports.confirmEmailChange = confirmEmailChange;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const errors = (0, express_validator_1.validationResult)(req);
@@ -122,14 +285,26 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: "Geçersiz email veya şifre",
+                message: "Invalid email or password.",
             });
+        }
+        // Email doğrulaması kontrolü
+        if (!user.emailVerified) {
+            return res.status(401).json({
+                success: false,
+                message: "This email is not verified. Please verify your email before login.",
+            });
+        }
+        if (user.accountStatus === 'deleted') {
+            return res
+                .status(404)
+                .json({ success: false, message: 'Account not found.' });
         }
         const isMatch = yield user.matchPassword(password);
         if (!isMatch) {
             return res.status(401).json({
                 success: false,
-                message: "Geçersiz email veya şifre",
+                message: "Invalid email or password.",
             });
         }
         user.authProvider = "email";
@@ -142,7 +317,10 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,
+            accountStatus: user.accountStatus,
             phone: user.phone,
+            countryCode: user.countryCode,
+            localPhone: user.localPhone,
             title: user.title,
             location: user.location,
             profileInfo: user.profileInfo,
@@ -158,8 +336,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             subscriptionStatus: user.subscriptionStatus,
             subscriptionStartDate: user.subscriptionStartDate,
             trialEndsAt: user.trialEndsAt,
-            // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
-            subscriptionPlan: user.subscriptionPlan,
+            subscriptionPlan: user.subscriptionPlan || undefined,
             subscriptionPeriod: user.subscriptionPeriod,
             subscriptionAmount: user.subscriptionAmount,
             autoRenewal: user.autoRenewal,
@@ -170,6 +347,8 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             billingAddress: user.billingAddress,
             vatNumber: user.vatNumber,
             isSubscriptionActive: hasActiveSubscription,
+            isAngelInvestor: user.isAngelInvestor,
+            role: user.role,
         };
         res.status(200).json({
             success: true,
@@ -180,7 +359,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     catch (err) {
         res.status(500).json({
             success: false,
-            message: "Sunucu hatası",
+            message: "Server error",
         });
     }
 });
@@ -191,7 +370,7 @@ const getCurrentUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: "Oturum açmanız gerekiyor",
+                message: "You need to sign in",
             });
         }
         // Kullanıcı aktif bir aboneliğe sahip mi?
@@ -204,7 +383,10 @@ const getCurrentUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                accountStatus: user.accountStatus,
                 phone: user.phone,
+                countryCode: user.countryCode,
+                localPhone: user.localPhone,
                 title: user.title,
                 location: user.location,
                 profileInfo: user.profileInfo,
@@ -220,8 +402,7 @@ const getCurrentUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 subscriptionStatus: user.subscriptionStatus,
                 subscriptionStartDate: user.subscriptionStartDate,
                 trialEndsAt: user.trialEndsAt,
-                // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
-                subscriptionPlan: user.subscriptionPlan,
+                subscriptionPlan: user.subscriptionPlan || undefined,
                 subscriptionPeriod: user.subscriptionPeriod,
                 subscriptionAmount: user.subscriptionAmount,
                 autoRenewal: user.autoRenewal,
@@ -232,14 +413,17 @@ const getCurrentUser = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 billingAddress: user.billingAddress,
                 vatNumber: user.vatNumber,
                 isSubscriptionActive: hasActiveSubscription,
+                isAngelInvestor: user.isAngelInvestor,
+                role: user.role,
+                authProvider: user.authProvider,
             },
         });
     }
     catch (err) {
-        console.error("Kullanıcı bilgileri alınırken hata:", err);
+        console.error("Error while getting user information:", err);
         res.status(500).json({
             success: false,
-            message: "Kullanıcı bilgileri alınırken bir hata oluştu",
+            message: "An error occurred while retrieving user information.",
             error: err.message,
         });
     }
@@ -251,11 +435,11 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: "Oturum açmanız gerekiyor",
+                message: "You need to sign in.",
             });
         }
         // Güncellenmek istenen alanları al
-        const { firstName, lastName, email, phone, title, location, profileInfo, profilePhoto, linkedin, instagram, facebook, twitter, password, locale, } = req.body;
+        const { firstName, lastName, email, accountStatus, phone, countryCode, localPhone, title, location, profileInfo, profilePhoto, linkedin, instagram, facebook, twitter, password, locale, isAngelInvestor, role } = req.body;
         // Gerekli alanları güncelle
         if (firstName)
             user.firstName = firstName;
@@ -263,8 +447,14 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             user.lastName = lastName;
         if (email)
             user.email = email;
+        if (accountStatus)
+            user.accountStatus = accountStatus;
         if (phone)
             user.phone = phone;
+        if (countryCode)
+            user.countryCode = countryCode;
+        if (localPhone)
+            user.localPhone = localPhone;
         if (title)
             user.title = title;
         if (location)
@@ -283,6 +473,9 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             user.twitter = twitter;
         if (locale)
             user.locale = locale;
+        if (typeof isAngelInvestor !== 'undefined') {
+            user.isAngelInvestor = isAngelInvestor;
+        }
         // Şifre güncelleniyorsa hashle
         if (password && password.length >= 6) {
             const salt = yield bcryptjs_1.default.genSalt(10);
@@ -292,13 +485,16 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
         yield user.save();
         res.status(200).json({
             success: true,
-            message: "Kullanıcı bilgileri başarıyla güncellendi",
+            message: "User information updated successfully!",
             user: {
                 id: user._id,
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                accountStatus: user.accountStatus,
                 phone: user.phone,
+                countryCode: user.countryCode,
+                localPhone: user.localPhone,
                 title: user.title,
                 location: user.location,
                 profileInfo: user.profileInfo,
@@ -309,19 +505,51 @@ const updateUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
                 twitter: user.twitter,
                 emailVerified: user.emailVerified,
                 locale: user.locale,
+                isAngelInvestor: user.isAngelInvestor,
+                role: user.role,
             },
         });
     }
     catch (err) {
-        console.error("Kullanıcı güncelleme hatası:", err);
+        console.error("User update error:", err);
         res.status(500).json({
             success: false,
-            message: "Kullanıcı bilgileri güncellenirken bir hata oluştu",
+            message: "An error occurred while updating user information.",
             error: err.message,
         });
     }
 });
 exports.updateUser = updateUser;
+const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    // 1) Validator errors
+    const errors = (0, express_validator_1.validationResult)(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, errors: errors.array() });
+    }
+    try {
+        // 2) Load user along with password
+        const userId = req.user._id;
+        const user = yield User_1.User.findById(userId).select("+password");
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+        const { currentPassword, newPassword } = req.body;
+        // 3) Verify current password
+        const isMatch = yield user.matchPassword(currentPassword);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Current password is incorrect" });
+        }
+        // 4) Assign new password and save (pre-save hook will hash it)
+        user.password = newPassword;
+        yield user.save();
+        res.status(200).json({ success: true, message: "Password updated successfully" });
+    }
+    catch (err) {
+        console.error("changePassword error:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+});
+exports.changePassword = changePassword;
 const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const userId = req.params.id;
@@ -329,7 +557,7 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return res
                 .status(404)
-                .json({ success: false, message: "Kullanıcı bulunamadı" });
+                .json({ success: false, message: "User not found" });
         }
         const hasActiveSubscription = user.subscriptionStatus === "active" ||
             user.subscriptionStatus === "trial";
@@ -340,7 +568,10 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                accountStatus: user.accountStatus,
                 phone: user.phone,
+                countryCode: user.countryCode,
+                localPhone: user.localPhone,
                 title: user.title,
                 location: user.location,
                 profileInfo: user.profileInfo,
@@ -356,7 +587,6 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 subscriptionStatus: user.subscriptionStatus,
                 subscriptionStartDate: user.subscriptionStartDate,
                 trialEndsAt: user.trialEndsAt,
-                // @ts-expect-error - subscriptionPlan tip uyumsuzluğunu görmezden geliyoruz
                 subscriptionPlan: user.subscriptionPlan,
                 subscriptionPeriod: user.subscriptionPeriod,
                 subscriptionAmount: user.subscriptionAmount,
@@ -368,16 +598,61 @@ const getUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 billingAddress: user.billingAddress,
                 vatNumber: user.vatNumber,
                 isSubscriptionActive: hasActiveSubscription,
+                isAngelInvestor: user.isAngelInvestor,
+                role: user.role,
             },
         });
     }
     catch (err) {
         res
             .status(500)
-            .json({ success: false, message: "Sunucu hatası", error: err.message });
+            .json({ success: false, message: "Server error", error: err.message });
     }
 });
 exports.getUserById = getUserById;
+const updateUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    // Sadece admin rolündekilere izin ver
+    if (((_a = req.user) === null || _a === void 0 ? void 0 : _a.role) !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Yetkiniz yok.' });
+    }
+    const { id } = req.params;
+    const user = yield User_1.User.findById(id);
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+    }
+    // Güncellenmesine izin verdiğiniz alanları listeleyin
+    const updatable = [
+        'firstName',
+        'lastName',
+        'email',
+        'role',
+        'subscriptionStatus',
+        'subscriptionPlan',
+        // ihtiyaca göre diğer alanlar...
+    ];
+    updatable.forEach((field) => {
+        if (req.body[field] !== undefined) {
+            user[field] = req.body[field];
+        }
+    });
+    yield user.save();
+    res.json({
+        success: true,
+        user: {
+            id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+            subscriptionStatus: user.subscriptionStatus,
+            subscriptionPlan: user.subscriptionPlan,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        }
+    });
+});
+exports.updateUserById = updateUserById;
 const addFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -385,7 +660,7 @@ const addFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!token) {
             return res.status(401).json({
                 success: false,
-                message: "Yetkilendirme başarısız, token bulunamadı",
+                message: "Authorization failed, token not found.",
             });
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
@@ -393,7 +668,7 @@ const addFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         if (!user) {
             return res
                 .status(404)
-                .json({ success: false, message: "Kullanıcı bulunamadı" });
+                .json({ success: false, message: "User not found" });
         }
         const { type, itemId } = req.body;
         if (!type || !itemId) {
@@ -440,7 +715,7 @@ const addFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     catch (err) {
         res
             .status(500)
-            .json({ success: false, message: "Sunucu hatası", error: err.message });
+            .json({ success: false, message: "Server error", error: err.message });
     }
 });
 exports.addFavorite = addFavorite;
@@ -451,7 +726,7 @@ const removeFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!token) {
             return res.status(401).json({
                 success: false,
-                message: "Yetkilendirme başarısız, token bulunamadı",
+                message: "Authorization failed, token not found.",
             });
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
@@ -459,7 +734,7 @@ const removeFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function*
         if (!user) {
             return res
                 .status(404)
-                .json({ success: false, message: "Kullanıcı bulunamadı" });
+                .json({ success: false, message: "User not found" });
         }
         const { type, itemId } = req.body;
         if (!type || !itemId) {
@@ -491,7 +766,7 @@ const removeFavorite = (req, res) => __awaiter(void 0, void 0, void 0, function*
     catch (err) {
         res
             .status(500)
-            .json({ success: false, message: "Sunucu hatası", error: err.message });
+            .json({ success: false, message: "Server error", error: err.message });
     }
 });
 exports.removeFavorite = removeFavorite;
@@ -502,7 +777,7 @@ const getFavorites = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (!token) {
             return res.status(401).json({
                 success: false,
-                message: "Yetkilendirme başarısız, token bulunamadı",
+                message: "Authorization failed, token not found.",
             });
         }
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
@@ -514,7 +789,7 @@ const getFavorites = (req, res) => __awaiter(void 0, void 0, void 0, function* (
         if (!user) {
             return res
                 .status(404)
-                .json({ success: false, message: "Kullanıcı bulunamadı" });
+                .json({ success: false, message: "User not found" });
         }
         user.favoriteUsers = (user.favoriteUsers || []).filter((fav) => fav);
         res.status(200).json({
@@ -529,7 +804,7 @@ const getFavorites = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     catch (err) {
         res
             .status(500)
-            .json({ success: false, message: "Sunucu hatası", error: err.message });
+            .json({ success: false, message: "Server error", error: err.message });
     }
 });
 exports.getFavorites = getFavorites;
@@ -537,7 +812,7 @@ const googleCallback = (req, res) => __awaiter(void 0, void 0, void 0, function*
     try {
         console.log("[GoogleCallback] Callback başladı");
         if (!req.user) {
-            console.error("[GoogleCallback] Kullanıcı bulunamadı");
+            console.error("[GoogleCallback] User not found");
             return res.redirect(`${process.env.CLIENT_URL}/auth/login?error=google-user-not-found`);
         }
         console.log("[GoogleCallback] Kullanıcı bilgileri alındı:", {
@@ -574,19 +849,18 @@ exports.googleCallback = googleCallback;
 const fixSubscription = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     try {
-        // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
-                message: "Oturum açmanız gerekiyor",
+                message: "You need to sign in",
             });
         }
         const user = yield User_1.User.findById(userId);
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: "Kullanıcı bulunamadı",
+                message: "User not found",
             });
         }
         // Abonelik durumunu kontrol et
@@ -609,7 +883,7 @@ const fixSubscription = (req, res) => __awaiter(void 0, void 0, void 0, function
             // Güncellemeler varsa kaydet
             if (updated) {
                 yield user.save();
-                console.log("Kullanıcı abonelik durumu güncellendi:", {
+                console.log("User subscription status updated:", {
                     userId: user._id,
                     status: user.subscriptionStatus,
                     isActive: user.isSubscriptionActive,
@@ -651,7 +925,7 @@ const fixSubscription = (req, res) => __awaiter(void 0, void 0, void 0, function
     catch (error) {
         res.status(500).json({
             success: false,
-            message: "Abonelik durumu kontrol edilirken bir hata oluştu",
+            message: "An error occurred while checking subscription status",
             error: error.message,
         });
     }
@@ -660,47 +934,47 @@ exports.fixSubscription = fixSubscription;
 const createOrUpdateSubscription = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
+        // @ts-ignore - req.user tipini IUser olarak kabul ediyoruz
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         if (!userId) {
             return res.status(401).json({
                 success: false,
-                message: "Oturum açmanız gerekiyor",
+                message: "You need to sign in",
             });
         }
         const user = yield User_1.User.findById(userId);
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: "Kullanıcı bulunamadı",
+                message: "User not found",
             });
         }
         const { plan, period, paymentMethod, cardId } = req.body;
         if (!plan || !period || !paymentMethod) {
             return res.status(400).json({
                 success: false,
-                message: "Plan, dönem ve ödeme yöntemi gereklidir",
+                message: "Plan, term and payment method required.",
             });
         }
         // Ödeme yöntemi kredi kartı ise ve kart id yoksa hata ver
         if (paymentMethod === "creditCard" && !cardId) {
             return res.status(400).json({
                 success: false,
-                message: "Kredi kartı ödemesi için kart bilgisi gereklidir",
+                message: "Card information is required for credit card payment.",
             });
         }
         // Plan tipini kontrol et
         if (!["startup", "business", "investor"].includes(plan)) {
             return res.status(400).json({
                 success: false,
-                message: "Geçersiz plan türü",
+                message: "Invalid plan type",
             });
         }
         // Dönem tipini kontrol et
         if (!["monthly", "yearly"].includes(period)) {
             return res.status(400).json({
                 success: false,
-                message: "Geçersiz dönem türü",
+                message: "Invalid period type",
             });
         }
         // İlk abonelik mi kontrol et
@@ -709,7 +983,7 @@ const createOrUpdateSubscription = (req, res) => __awaiter(void 0, void 0, void 
             user.subscriptionStatus === "cancelled";
         const now = new Date();
         let nextPaymentDate;
-        // Startup planı ve ilk abonelik ise 3 aylık deneme süresi ver
+        // Startup planı ve ilk abonelik ise (aylık veya yıllık) 3 aylık deneme süresi ver
         if (isFirstSubscription && plan === "startup") {
             // 3 aylık trial süresi
             const trialEndDate = new Date(now);
@@ -732,9 +1006,16 @@ const createOrUpdateSubscription = (req, res) => __awaiter(void 0, void 0, void 
                 nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
             }
             else {
-                // yearly
+                // Yıllık abonelik
                 nextPaymentDate = new Date(now);
-                nextPaymentDate.setFullYear(nextPaymentDate.getFullYear() + 1);
+                // Business ve Investor planları için yıllık abonelikte 3 ay bonus (12+3=15 ay)
+                if (plan === "business" || plan === "investor") {
+                    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12 + 3);
+                }
+                else {
+                    // Startup planı için standart 12 ay
+                    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 12);
+                }
             }
             user.nextPaymentDate = nextPaymentDate;
             user.lastPaymentDate = now;
@@ -796,7 +1077,7 @@ const createOrUpdateSubscription = (req, res) => __awaiter(void 0, void 0, void 
     catch (err) {
         res.status(500).json({
             success: false,
-            message: "Abonelik işlemi sırasında bir hata oluştu",
+            message: "An error occurred during the subscription process",
             error: err.message,
         });
     }
@@ -808,7 +1089,7 @@ const checkAndRenewTrialSubscriptions = (req, res) => __awaiter(void 0, void 0, 
     var _a;
     try {
         // Sadece admin kullanıcısına izin ver
-        // @ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
+        // ts-expect-error - req.user tipini IUser olarak kabul ediyoruz
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const user = yield User_1.User.findById(userId);
         if (!user || user.role !== "admin") {
@@ -949,12 +1230,79 @@ const googleLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         res.status(500).json({
             success: false,
             error: error.message,
-            details: "Sunucu hatası",
+            details: "Server error",
             errorCode: 500,
         });
     }
 });
 exports.googleLogin = googleLogin;
+const getAllUsers = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // İstek yapan kullanıcının admin olup olmadığı kontrolü kaldırıldı.
+        // Sadece giriş yapılmış olması yeterli (protect middleware tarafından sağlanıyor).
+        // Tüm kullanıcıları parola alanı hariç getirme
+        const users = yield User_1.User.find({}).select("-password");
+        res.status(200).json({
+            success: true,
+            users,
+        });
+    }
+    catch (error) {
+        console.error("Error retrieving users:", error);
+        res.status(500).json({
+            success: false,
+            message: "Kullanıcılar getirilirken bir hata oluştu",
+            error: error.message,
+        });
+    }
+});
+exports.getAllUsers = getAllUsers;
+// controllers/authController.ts
+const deleteCurrentUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { password } = req.body;
+    if (!password) {
+        return res.status(400).json({ success: false, message: "Password is required." });
+    }
+    const user = yield User_1.User.findById(req.user._id).select("+password");
+    if (!user) {
+        return res.status(404).json({ success: false, message: "User not found." });
+    }
+    const isMatch = yield user.matchPassword(password);
+    if (!isMatch) {
+        return res.status(401).json({ success: false, message: "Incorrect password." });
+    }
+    user.accountStatus = "deleted";
+    yield user.save();
+    return res.status(200).json({ success: true, message: "Account deletion successful." });
+});
+exports.deleteCurrentUser = deleteCurrentUser;
+// DELETE /users/:id — admin deletes any user by ID
+const deleteUserById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        // only admin may delete others
+        if (((_a = req.user) === null || _a === void 0 ? void 0 : _a.role) !== "admin") {
+            return res
+                .status(403)
+                .json({ success: false, message: "Forbidden" });
+        }
+        const { id } = req.params;
+        const user = yield User_1.User.findById(id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found." });
+        }
+        user.accountStatus = "deleted";
+        yield user.save();
+        return res.status(200).json({ success: true, message: "User soft-deleted successfully." });
+    }
+    catch (err) {
+        console.error("deleteUserById error:", err);
+        return res
+            .status(500)
+            .json({ success: false, message: "Server error" });
+    }
+});
+exports.deleteUserById = deleteUserById;
 /**
  * Kullanıcı oturumunu kapatır
  * @param req Express request
