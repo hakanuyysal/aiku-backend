@@ -1,15 +1,120 @@
-import React, { useState, useEffect, useContext, createContext } from 'react';
-import { io } from 'socket.io-client';
+import React, { useState, useEffect, useContext, createContext, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
+
+// TypeScript interfaces
+interface User {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  profilePhoto?: string;
+  isOnline: boolean;
+  lastSeen?: Date;
+}
+
+interface Message {
+  _id: string;
+  content: string;
+  createdAt: string;
+  chatSession: string;
+  sender: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    companyName?: string;
+    profilePhoto?: string;
+  };
+}
+
+interface AuthenticationData {
+  userId: string;
+  token?: string;
+}
+
+interface AuthenticationSuccessData {
+  userId: string;
+  onlineCount: number;
+}
+
+interface UserStatusChangeData {
+  userId: string;
+  isOnline: boolean;
+  timestamp: Date;
+}
+
+interface OnlineUsersListData {
+  users: User[];
+  count: number;
+}
+
+interface TypingData {
+  chatSessionId: string;
+  userId: string;
+  isTyping: boolean;
+  timestamp: Date;
+}
+
+interface SocketContextType {
+  socket: Socket | null;
+  isConnected: boolean;
+  onlineUsers: User[];
+  currentUser: { id: string } | null;
+  authenticate: (userId: string, token?: string) => void;
+  getOnlineUsers: () => void;
+  joinChatSession: (chatSessionId: string) => void;
+  leaveChatSession: (chatSessionId: string) => void;
+  startTyping: (chatSessionId: string, userId: string) => void;
+  stopTyping: (chatSessionId: string, userId: string) => void;
+}
+
+interface SocketProviderProps {
+  children: React.ReactNode;
+  apiUrl?: string;
+}
+
+interface UserStatusIndicatorProps {
+  userId: string;
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+  showText?: boolean;
+}
+
+interface OnlineUsersListProps {
+  className?: string;
+}
+
+interface ChatMessageProps {
+  message: Message;
+}
+
+interface TypingIndicatorProps {
+  chatSessionId: string;
+}
+
+interface ChatInputProps {
+  chatSessionId: string;
+  userId: string;
+  onSendMessage: (message: string) => void;
+  placeholder?: string;
+}
+
+interface ChatRoomProps {
+  chatSessionId: string;
+  currentUserId: string;
+  messages: Message[];
+  onSendMessage: (message: string) => void;
+}
 
 // Socket Context for managing socket connection
-const SocketContext = createContext();
+const SocketContext = createContext<SocketContextType | undefined>(undefined);
 
 // Socket Provider Component
-export const SocketProvider = ({ children, apiUrl = 'http://localhost:4000' }) => {
-  const [socket, setSocket] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
+export const SocketProvider: React.FC<SocketProviderProps> = ({ 
+  children, 
+  apiUrl = 'http://localhost:4000' 
+}) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<{ id: string } | null>(null);
 
   useEffect(() => {
     const newSocket = io(apiUrl, {
@@ -24,34 +129,39 @@ export const SocketProvider = ({ children, apiUrl = 'http://localhost:4000' }) =
       setIsConnected(true);
     });
 
-    newSocket.on('disconnect', (reason) => {
+    newSocket.on('disconnect', (reason: string) => {
       console.log('❌ Disconnected from server:', reason);
       setIsConnected(false);
     });
 
     // Authentication events
-    newSocket.on('authentication-success', (data) => {
+    newSocket.on('authentication-success', (data: AuthenticationSuccessData) => {
       console.log('🔐 Authentication successful:', data);
     });
 
-    newSocket.on('authentication-error', (error) => {
+    newSocket.on('authentication-error', (error: { message: string }) => {
       console.error('❌ Authentication failed:', error);
     });
 
     // User status events
-    newSocket.on('user-status-change', (data) => {
+    newSocket.on('user-status-change', (data: UserStatusChangeData) => {
       console.log('👤 User status changed:', data);
       setOnlineUsers(prev => {
         const updated = prev.filter(user => user._id !== data.userId);
         if (data.isOnline) {
           // Add user to online list (you might need to fetch user details)
-          return [...updated, { _id: data.userId, isOnline: true }];
+          return [...updated, { 
+            _id: data.userId, 
+            firstName: '', 
+            lastName: '', 
+            isOnline: true 
+          } as User];
         }
         return updated;
       });
     });
 
-    newSocket.on('online-users-list', (data) => {
+    newSocket.on('online-users-list', (data: OnlineUsersListData) => {
       console.log('📋 Online users list received:', data);
       setOnlineUsers(data.users || []);
     });
@@ -63,44 +173,44 @@ export const SocketProvider = ({ children, apiUrl = 'http://localhost:4000' }) =
     };
   }, [apiUrl]);
 
-  const authenticate = (userId, token = null) => {
+  const authenticate = useCallback((userId: string, token?: string) => {
     if (socket) {
       setCurrentUser({ id: userId });
-      socket.emit('authenticate', { userId, token });
+      socket.emit('authenticate', { userId, token } as AuthenticationData);
     }
-  };
+  }, [socket]);
 
-  const getOnlineUsers = () => {
+  const getOnlineUsers = useCallback(() => {
     if (socket) {
       socket.emit('get-online-users');
     }
-  };
+  }, [socket]);
 
-  const joinChatSession = (chatSessionId) => {
+  const joinChatSession = useCallback((chatSessionId: string) => {
     if (socket) {
       socket.emit('join-chat-session', chatSessionId);
     }
-  };
+  }, [socket]);
 
-  const leaveChatSession = (chatSessionId) => {
+  const leaveChatSession = useCallback((chatSessionId: string) => {
     if (socket) {
       socket.emit('leave-chat-session', chatSessionId);
     }
-  };
+  }, [socket]);
 
-  const startTyping = (chatSessionId, userId) => {
+  const startTyping = useCallback((chatSessionId: string, userId: string) => {
     if (socket) {
       socket.emit('typing-start', { chatSessionId, userId });
     }
-  };
+  }, [socket]);
 
-  const stopTyping = (chatSessionId, userId) => {
+  const stopTyping = useCallback((chatSessionId: string, userId: string) => {
     if (socket) {
       socket.emit('typing-stop', { chatSessionId, userId });
     }
-  };
+  }, [socket]);
 
-  const value = {
+  const value: SocketContextType = {
     socket,
     isConnected,
     onlineUsers,
@@ -121,7 +231,7 @@ export const SocketProvider = ({ children, apiUrl = 'http://localhost:4000' }) =
 };
 
 // Hook to use socket context
-export const useSocket = () => {
+export const useSocket = (): SocketContextType => {
   const context = useContext(SocketContext);
   if (!context) {
     throw new Error('useSocket must be used within a SocketProvider');
@@ -130,28 +240,35 @@ export const useSocket = () => {
 };
 
 // User Status Indicator Component
-export const UserStatusIndicator = ({ userId, size = 'sm', showText = false }) => {
+export const UserStatusIndicator: React.FC<UserStatusIndicatorProps> = ({ 
+  userId, 
+  size = 'sm', 
+  showText = false 
+}) => {
   const { onlineUsers } = useSocket();
-  const [userStatus, setUserStatus] = useState({ isOnline: false, lastSeen: null });
+  const [userStatus, setUserStatus] = useState<{ isOnline: boolean; lastSeen: Date | null }>({ 
+    isOnline: false, 
+    lastSeen: null 
+  });
 
   useEffect(() => {
     const user = onlineUsers.find(u => u._id === userId);
     if (user) {
-      setUserStatus({ isOnline: user.isOnline, lastSeen: user.lastSeen });
+      setUserStatus({ isOnline: user.isOnline, lastSeen: user.lastSeen || null });
     } else {
       // Fetch user status from API if not in online users list
       fetchUserStatus();
     }
   }, [userId, onlineUsers]);
 
-  const fetchUserStatus = async () => {
+  const fetchUserStatus = async (): Promise<void> => {
     try {
       const response = await fetch(`/api/user-status/${userId}`);
       const data = await response.json();
       if (data.success) {
         setUserStatus({
           isOnline: data.data.isOnline,
-          lastSeen: data.data.lastSeen
+          lastSeen: data.data.lastSeen ? new Date(data.data.lastSeen) : null
         });
       }
     } catch (error) {
@@ -166,11 +283,11 @@ export const UserStatusIndicator = ({ userId, size = 'sm', showText = false }) =
     lg: 'w-5 h-5'
   };
 
-  const formatLastSeen = (lastSeen) => {
+  const formatLastSeen = (lastSeen: Date | null): string => {
     if (!lastSeen) return 'Never seen';
     const date = new Date(lastSeen);
     const now = new Date();
-    const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
     
     if (diffInMinutes < 1) return 'Just now';
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
@@ -203,12 +320,12 @@ export const UserStatusIndicator = ({ userId, size = 'sm', showText = false }) =
 };
 
 // Online Users List Component
-export const OnlineUsersList = ({ className = '' }) => {
+export const OnlineUsersList: React.FC<OnlineUsersListProps> = ({ className = '' }) => {
   const { onlineUsers, getOnlineUsers } = useSocket();
 
   useEffect(() => {
     getOnlineUsers();
-  }, []);
+  }, [getOnlineUsers]);
 
   return (
     <div className={`bg-white rounded-lg shadow-md p-4 ${className}`}>
@@ -254,7 +371,7 @@ export const OnlineUsersList = ({ className = '' }) => {
 };
 
 // Chat with typing indicators
-export const ChatMessage = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   return (
     <div className="flex space-x-3 p-3">
       <img
@@ -279,14 +396,14 @@ export const ChatMessage = ({ message }) => {
 };
 
 // Typing Indicator Component
-export const TypingIndicator = ({ chatSessionId }) => {
+export const TypingIndicator: React.FC<TypingIndicatorProps> = ({ chatSessionId }) => {
   const { socket } = useSocket();
-  const [typingUsers, setTypingUsers] = useState([]);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   useEffect(() => {
     if (!socket) return;
 
-    const handleUserTyping = (data) => {
+    const handleUserTyping = (data: TypingData) => {
       if (data.chatSessionId === chatSessionId) {
         setTypingUsers(prev => {
           const filtered = prev.filter(userId => userId !== data.userId);
@@ -319,14 +436,19 @@ export const TypingIndicator = ({ chatSessionId }) => {
 };
 
 // Chat Input with typing detection
-export const ChatInput = ({ chatSessionId, userId, onSendMessage, placeholder = "Type a message..." }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ 
+  chatSessionId, 
+  userId, 
+  onSendMessage, 
+  placeholder = "Type a message..." 
+}) => {
   const { startTyping, stopTyping } = useSocket();
-  const [message, setMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+  const [message, setMessage] = useState<string>('');
+  const [isTyping, setIsTyping] = useState<boolean>(false);
   
-  let typingTimeout;
+  let typingTimeout: NodeJS.Timeout;
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
     
     if (!isTyping) {
@@ -341,7 +463,7 @@ export const ChatInput = ({ chatSessionId, userId, onSendMessage, placeholder = 
     }, 1000);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (message.trim()) {
       onSendMessage(message.trim());
@@ -373,7 +495,12 @@ export const ChatInput = ({ chatSessionId, userId, onSendMessage, placeholder = 
 };
 
 // Main Chat Component
-export const ChatRoom = ({ chatSessionId, currentUserId, messages = [], onSendMessage }) => {
+export const ChatRoom: React.FC<ChatRoomProps> = ({ 
+  chatSessionId, 
+  currentUserId, 
+  messages = [], 
+  onSendMessage 
+}) => {
   const { joinChatSession, leaveChatSession } = useSocket();
 
   useEffect(() => {
@@ -381,7 +508,7 @@ export const ChatRoom = ({ chatSessionId, currentUserId, messages = [], onSendMe
       joinChatSession(chatSessionId);
       return () => leaveChatSession(chatSessionId);
     }
-  }, [chatSessionId]);
+  }, [chatSessionId, joinChatSession, leaveChatSession]);
 
   return (
     <div className="flex flex-col h-full bg-white rounded-lg shadow-md">
@@ -404,11 +531,14 @@ export const ChatRoom = ({ chatSessionId, currentUserId, messages = [], onSendMe
 };
 
 // Usage Example Component
-export const ChatApp = () => {
-  const [currentUser] = useState({ id: '12345', name: 'John Doe' }); // Get from your auth context
-  const [messages, setMessages] = useState([]);
+export const ChatApp: React.FC = () => {
+  const [currentUser] = useState<{ id: string; name: string }>({ 
+    id: '12345', 
+    name: 'John Doe' 
+  }); // Get from your auth context
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (content: string): Promise<void> => {
     try {
       // Send message to your API
       const response = await fetch('/api/chat/send', {
