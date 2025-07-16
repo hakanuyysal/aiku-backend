@@ -37,5 +37,8 @@ export interface UserResponse {
   vatNumber?: string;
   isSubscriptionActive?: boolean;
   isAngelInvestor?: boolean;
+  isOnline?: boolean;
+  lastSeen?: Date;
+  acceptChatNotification?: boolean;
   role?: 'admin' | 'user' | 'editor';
 } 

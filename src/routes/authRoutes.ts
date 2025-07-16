@@ -301,7 +301,7 @@ router.post("/linkedin", async (req, res) => {
 // E-posta doğrulama rotaları
 router.get("/verify-email/:token", verifyEmail);
 router.post("/resend-verification", [
-  check("email", "Lütfen geçerli bir email adresi giriniz").isEmail(),
+  check("email", "Please enter a valid email address.").isEmail(),
 ], resendVerificationEmail);
 
 export default router;

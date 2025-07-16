@@ -73,6 +73,9 @@ export interface IUser extends Document {
   vatNumber?: string;
   isSubscriptionActive?: boolean;
   role?: 'user' | 'admin' | 'editor';
+  isOnline?: boolean;
+  lastSeen?: Date;
+  acceptChatNotification: boolean;
   matchPassword(enteredPassword: string): Promise<boolean>;
   checkAutoRenewal(): Promise<boolean>;
   processPayment(): Promise<{ success: boolean, transactionId?: string, error?: string, cardDetails?: any }>;
@@ -329,6 +332,18 @@ const userSchema = new Schema<IUser>({
   isSubscriptionActive: {
     type: Boolean,
     default: false
+  },
+  isOnline: {
+    type: Boolean,
+    default: false
+  },
+  lastSeen: {
+    type: Date,
+    default: Date.now
+  },
+  acceptChatNotification: {
+    type: Boolean,
+    default: true  // kullanıcı varsayılan olarak chat mail bildirimlerini kabul etsin
   },
   role: {
     type: String,

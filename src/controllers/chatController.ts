@@ -4,6 +4,7 @@ import { ChatSession, IChatSession } from "../models/ChatSession";
 import { Message } from "../models/Message";
 import { Company } from "../models/Company";
 import { io } from "../app";
+import { mailgunService } from '../services/mailgunService';
 
 interface CustomRequest extends Request {
   company?: {
@@ -114,10 +115,18 @@ export const getCompanyChatSessions = async (req: Request, res: Response) => {
         { targetCompany: companyId, deletedByTarget: false },
       ],
     })
-      .populate("initiatorCompany", "companyName companyLogo")
-      .populate("targetCompany", "companyName companyLogo")
+      .populate({
+        path: 'initiatorCompany',
+        select: 'companyName companyLogo user',          // company.user alanını da alın
+        populate: { path: 'user', select: 'isOnline' }   // ve o kullanıcıdan sadece isOnline
+      })
+      .populate({
+        path: 'targetCompany',
+        select: 'companyName companyLogo user',
+        populate: { path: 'user', select: 'isOnline' }
+      })
       .populate("lastMessageSender", "companyName")
-      .sort({ lastMessageDate: -1 }); // En son mesaj alınanlar en üstte
+      .sort({ lastMessageDate: -1 });
 
     res.status(200).json({
       success: true,
@@ -131,6 +140,71 @@ export const getCompanyChatSessions = async (req: Request, res: Response) => {
       message: "Sohbet oturumları alınırken bir hata oluştu",
       error: error instanceof Error ? error.message : "Bilinmeyen hata",
     });
+  }
+};
+
+// YENİ: Sadece online/offline durumlarını dönen metod
+export const getCompanyChatStatuses = async (req: Request, res: Response) => {
+  try {
+    const { companyId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ success: false, message: "Geçersiz şirket ID" });
+    }
+
+    // Sadece ID ve user.isOnline gerekli
+    const sessions = await ChatSession.find({
+      $or: [
+        { initiatorCompany: companyId },
+        { targetCompany: companyId }
+      ]
+    })
+      .select("_id initiatorCompany targetCompany")
+      .populate({
+        path: "initiatorCompany",
+        select: "user",
+        populate: { path: "user", select: "isOnline" }
+      })
+      .populate({
+        path: "targetCompany",
+        select: "user",
+        populate: { path: "user", select: "isOnline" }
+      });
+
+    const statuses = sessions.map(session => {
+      // 1) chatSession ID
+      const sessionId = session._id.toString();
+
+      // 2) initiatorCompany referansını normalize et
+      const initiatorRaw = session.initiatorCompany as any;
+      const initiatorId = initiatorRaw._id
+        ? initiatorRaw._id.toString()
+        : initiatorRaw.toString();
+
+      // 3) targetCompany referansını normalize et
+      const targetRaw = session.targetCompany as any;
+      const targetId = targetRaw._id
+        ? targetRaw._id.toString()
+        : targetRaw.toString();
+
+      // 4) karar ver: bu companyId hangi rolde?
+      const isInitiator = (initiatorId === companyId);
+
+      // 5) diğer kullanıcı objesini al
+      const otherUser = isInitiator
+        ? (targetRaw.user as any)
+        : (initiatorRaw.user as any);
+
+      // 6) gerçek boolean olarak dön
+      return {
+        sessionId,
+        isOnline: Boolean(otherUser?.isOnline)
+      };
+    });
+
+    return res.status(200).json(statuses);
+  } catch (err) {
+    console.error("getCompanyChatStatuses error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
@@ -367,6 +441,31 @@ export const sendMessage = async (req: Request, res: Response) => {
 
     await chatSession.save();
 
+    // 4️⃣ KARŞI TARAFIN companyId’si
+    const recipientId = isInitiator
+      ? chatSession.targetCompany.toString()
+      : chatSession.initiatorCompany.toString();
+
+    // 5️⃣ Recipient company ve user bilgisini al
+    const recipientCompany = await Company.findById(recipientId)
+      .populate('user', 'email isOnline acceptChatNotification')
+      .orFail();
+
+    // 6️⃣ populated user objesi üzerinden isOnline kontrolü
+    const recipientUser = (recipientCompany.user as any) as { email: string; isOnline: boolean, acceptChatNotification: boolean };
+    if (recipientUser.isOnline === false && recipientUser.acceptChatNotification) {
+      // Gönderen şirket adını al
+      const senderCompany = await Company.findById(senderId).select('companyName');
+      const recipientEmail = recipientUser.email as string;
+      const chatUrl = `${process.env.FRONTEND_URL}/chats/${chatSessionId}`;
+
+      await mailgunService.sendChatNotification(recipientEmail, {
+        companyName: senderCompany?.companyName || 'Biri',
+        content,
+        chatUrl
+      });
+    }
+
     // Mesajı popüle et ve geri dön
     const populatedMessage = await Message.findById(message._id).populate(
       "sender",
@@ -384,10 +483,8 @@ export const sendMessage = async (req: Request, res: Response) => {
     io.to(`chat-${chatSessionId}`).emit("new-message", populatedMessage);
 
     // 2. Alıcı şirkete bildirim gönder
-    const recipientCompanyId = isInitiator
-      ? chatSession.targetCompany.toString()
-      : chatSession.initiatorCompany.toString();
-    io.to(`company-${recipientCompanyId}`).emit("chat-notification", {
+    // 2. Alıcı şirkete bildirim gönder (recipientId zaten var)
+    io.to(`company-${recipientId}`).emit("chat-notification", {
       type: "new-message",
       chatSessionId,
       message: populatedMessage,

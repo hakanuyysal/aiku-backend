@@ -41,7 +41,10 @@ import blogRoutes from "./routes/blogRoutes";
 import investmentNewsRoutes from './routes/investmentNewsRoutes';
 import hubRoutes from "./routes/hubRoutes";
 import claimRequestRoutes from "./routes/claimRequestRoutes";
+import heartbeatRouter from './routes/heartbeat';
 import { ClaimRequest } from "./models/ClaimRequest";
+import { startOfflineUpdater } from './updateOnlineStatus';
+import { User } from './models/User'
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -68,6 +71,26 @@ const whitelist = [
   "https://bevakpqfycmxnpzrkecv.supabase.co",
   "https://posws.param.com.tr",
 ];
+
+// 30 saniyelik eşik
+const OFFLINE_AFTER_MS = 30_000
+
+// Her 30 saniyede bir, sonSeen < (NOW - 30s) olanları kapat
+cron.schedule('*/30 * * * * *', async () => {
+  try {
+    const cutoff = new Date(Date.now() - OFFLINE_AFTER_MS)
+    const result = await User.updateMany(
+      { isOnline: true, lastSeen: { $lt: cutoff } },
+      { $set: { isOnline: false } }
+    )
+    // Mongoose 6’da UpdateResult.modifiedCount kullanılır
+    if (result.modifiedCount && result.modifiedCount > 0) {
+      console.log(`⏱️ ${result.modifiedCount} kullanıcı offline olarak işaretlendi`)
+    }
+  } catch (err) {
+    console.error('Offline cron error:', err)
+  }
+})
 
 // Socket.io sunucusunu oluştur
 const io = new Server(server, {
@@ -564,6 +587,7 @@ mongoose
   .then(() => {
     console.log("✅ MongoDB bağlantısı başarılı");
     logger.info("MongoDB bağlantısı başarılı");
+    startOfflineUpdater();
   })
   .catch((err) => {
     console.log("❌ MongoDB bağlantı hatası:", err);
@@ -597,6 +621,7 @@ app.use("/api/panel-users", panelUserRoutes);
 app.use('/api/investment-news', investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
+app.use('/api/heartbeat', heartbeatRouter);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {

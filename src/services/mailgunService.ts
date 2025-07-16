@@ -102,6 +102,25 @@ class MailgunService {
     }
   }
 
+  async sendChatNotification(
+    to: string,
+    variables: {
+      companyName: string;
+      content: string;
+      chatUrl: string;
+    }
+  ): Promise<void> {
+    const messageData = {
+      from: `AIKU AI Platform <postmaster@${this.domain}>`,
+      to,
+      subject: "AIKU · You have a new chat message",
+      template: "chat-notification",
+      "t:variables": JSON.stringify(variables)
+    };
+
+    await this.mailgun.messages.create(this.domain, messageData);
+  }
+
 }
 
 

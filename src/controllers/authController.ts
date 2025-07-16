@@ -10,6 +10,7 @@ import { authService } from "../services/authService";
 import { GoogleService } from "../services/googleService";
 import crypto from "crypto";
 import { mailgunService } from "../services/mailgunService";
+import { is } from "cheerio/dist/commonjs/api/traversing";
 
 const createToken = (id: string): string => {
   return jwt.sign({ id }, process.env.JWT_SECRET!, {
@@ -45,13 +46,14 @@ export const register = async (req: Request, res: Response) => {
       facebook,
       twitter,
       role,
+      acceptChatNotification,
     } = req.body;
 
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({
         success: false,
-        message: "Bu email adresi zaten kayıtlı",
+        message: "This email address is already registered.",
       });
     }
 
@@ -81,13 +83,14 @@ export const register = async (req: Request, res: Response) => {
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
       isAngelInvestor: false,
+      acceptChatNotification,
     });
 
     // Doğrulama e-postası gönder
     try {
       await mailgunService.sendVerificationEmail(email, verificationToken);
     } catch (error) {
-      console.error("Doğrulama e-postası gönderilemedi:", error);
+      console.error("Verification email was not sent:", error);
       // E-posta gönderilemese bile kullanıcı kaydını tamamla
     }
 
@@ -134,6 +137,7 @@ export const register = async (req: Request, res: Response) => {
       isSubscriptionActive: hasActiveSubscription,
       isAngelInvestor: user.isAngelInvestor,
       role: user.role,
+      acceptChatNotification: user.acceptChatNotification,
     };
 
     res.status(201).json({
@@ -161,7 +165,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Geçersiz veya süresi dolmuş doğrulama bağlantısı",
+        message: "Invalid or expired verification link.",
       });
     }
 
@@ -180,7 +184,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     // Eğer FRONTEND_URL tanımlı değilse JSON yanıtı döndür
     res.json({
       success: true,
-      message: "E-posta adresiniz başarıyla doğrulandı",
+      message: "Your email address has been verified successfully.",
     });
   } catch (err) {
     res.status(500).json({
@@ -198,14 +202,14 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı",
+        message: "No users registered with this email address found.",
       });
     }
 
     if (user.emailVerified) {
       return res.status(400).json({
         success: false,
-        message: "Bu e-posta adresi zaten doğrulanmış",
+        message: "This email address has already been verified.",
       });
     }
 
@@ -222,12 +226,12 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       await mailgunService.sendVerificationEmail(email, verificationToken);
       res.json({
         success: true,
-        message: "Doğrulama e-postası tekrar gönderildi",
+        message: "Verification email resent.",
       });
     } catch (error) {
       res.status(500).json({
         success: false,
-        message: "Doğrulama e-postası gönderilemedi",
+        message: "Verification email was not sent. Please try again later.",
       });
     }
   } catch (err) {
@@ -344,6 +348,9 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
+    user.lastSeen = new Date();
+    user.lastLogin = new Date();
+    user.isOnline = true;
     user.authProvider = "email";
     await user.save();
 
@@ -390,6 +397,9 @@ export const login = async (req: Request, res: Response) => {
       isSubscriptionActive: hasActiveSubscription,
       isAngelInvestor: user.isAngelInvestor,
       role: user.role,
+      isOnline: user.isOnline,
+      lastSeen: user.lastSeen,
+      acceptChatNotification: user.acceptChatNotification,
     };
 
     res.status(200).json({
@@ -461,6 +471,9 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         isAngelInvestor: user.isAngelInvestor,
         role: user.role,
         authProvider: user.authProvider,
+        isOnline: user.isOnline,
+        lastSeen: user.lastSeen,
+        acceptChatNotification: user.acceptChatNotification,
       },
     });
   } catch (err: any) {
@@ -504,7 +517,8 @@ export const updateUser = async (req: Request, res: Response) => {
       password,
       locale,
       isAngelInvestor,
-      role
+      role,
+      acceptChatNotification,
     } = req.body;
 
     // Gerekli alanları güncelle
@@ -526,6 +540,9 @@ export const updateUser = async (req: Request, res: Response) => {
     if (locale) user.locale = locale;
     if (typeof isAngelInvestor !== 'undefined') {
       user.isAngelInvestor = isAngelInvestor;
+    }
+    if (typeof acceptChatNotification !== 'undefined') {
+      user.acceptChatNotification = acceptChatNotification;
     }
 
     // Şifre güncelleniyorsa hashle
@@ -561,6 +578,7 @@ export const updateUser = async (req: Request, res: Response) => {
         locale: user.locale,
         isAngelInvestor: user.isAngelInvestor,
         role: user.role,
+        acceptChatNotification: user.acceptChatNotification,
       },
     });
   } catch (err: any) {
@@ -661,6 +679,9 @@ export const getUserById = async (req: Request, res: Response) => {
         isSubscriptionActive: hasActiveSubscription,
         isAngelInvestor: user.isAngelInvestor,
         role: user.role,
+        isOnline: user.isOnline,
+        lastSeen: user.lastSeen,
+        acceptChatNotification: user.acceptChatNotification,
       },
     });
   } catch (err: any) {
@@ -690,6 +711,7 @@ export const updateUserById = async (req: Request, res: Response) => {
     'role',
     'subscriptionStatus',
     'subscriptionPlan',
+    'acceptChatNotification',
     // ihtiyaca göre diğer alanlar...
   ];
 
@@ -901,6 +923,11 @@ export const googleCallback = async (req: Request, res: Response) => {
     const hasActiveSubscription =
       user.subscriptionStatus === "active" ||
       user.subscriptionStatus === "trial";
+
+    user.lastSeen = new Date();
+    await user.save();
+
+    user.acceptChatNotification = user.acceptChatNotification ?? true;
 
     const redirectUrl = encodeURIComponent(
       JSON.stringify({
@@ -1357,11 +1384,24 @@ export const googleLogin = async (req: Request, res: Response) => {
         access_token: accessToken,
       },
     });
+    const userId = authResult.user.id;
+
+    await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          lastSeen: new Date(),
+          isOnline: true    // opsiyonel
+        }
+      },
+      { new: true }
+    );
 
     console.log("Google login başarılı:", { userId: authResult.user.id });
 
     // Frontend'in beklediği formatta yanıt döndür
     res.json({
+      success: true,
       token: authResult.token,
       user: authResult.user,
     });
@@ -1398,37 +1438,44 @@ export const getAllUsers = async (req: Request, res: Response) => {
   }
 };
 
-// controllers/authController.ts
 export const deleteCurrentUser = async (req: Request, res: Response) => {
   const { password } = req.body;
   if (!password) {
     return res.status(400).json({ success: false, message: "Password is required." });
   }
 
+  // Kullanıcıyı getir (şifre dahil)
   const user = await User.findById((req.user as IUser)._id).select("+password");
   if (!user) {
     return res.status(404).json({ success: false, message: "User not found." });
   }
 
+  // Şifre kontrolü
   const isMatch = await user.matchPassword(password);
   if (!isMatch) {
     return res.status(401).json({ success: false, message: "Incorrect password." });
   }
 
-  user.accountStatus = "deleted";
-  await user.save();
-  return res.status(200).json({ success: true, message: "Account deletion successful." });
+  // Kullanıcı dokümanını tamamen sil
+  await user.deleteOne();
+  // Alternatif: await User.findByIdAndDelete(user._id);
+
+  // (Opsiyonel) ilgili diğer verileri temizle:
+  // await Comment.deleteMany({ author: user._id });
+  // await Order.deleteMany({ user: user._id });
+  // ...
+
+  return res.status(200).json({ success: true, message: "Account successfully deleted." });
 };
+
 
 
 // DELETE /users/:id — admin deletes any user by ID
 export const deleteUserById = async (req: Request, res: Response) => {
   try {
-    // only admin may delete others
+    // Sadece admin
     if (req.user?.role !== "admin") {
-      return res
-        .status(403)
-        .json({ success: false, message: "Forbidden" });
+      return res.status(403).json({ success: false, message: "Forbidden" });
     }
 
     const { id } = req.params;
@@ -1436,16 +1483,23 @@ export const deleteUserById = async (req: Request, res: Response) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found." });
     }
-    user.accountStatus = "deleted";
-    await user.save();
-    return res.status(200).json({ success: true, message: "User soft-deleted successfully." });
+
+    // Kullanıcıyı tamamen sil
+    await User.findByIdAndDelete(id);
+    // veya: await user.deleteOne();
+
+    // (Opsiyonel) bağlı verileri de sil
+    // await Favorite.deleteMany({ user: id });
+    // await Post.deleteMany({ author: id });
+    // ...
+
+    return res.status(200).json({ success: true, message: "User deleted successfully." });
   } catch (err) {
     console.error("deleteUserById error:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error" });
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
+
 
 
 /**
@@ -1455,16 +1509,25 @@ export const deleteUserById = async (req: Request, res: Response) => {
  */
 export const logout = async (req: Request, res: Response) => {
   try {
-    // Burada kendi session/token yönetiminize göre oturum kapatma işlemi yapabilirsiniz
+    const user = req.user as IUser;
+    if (user) {
+      await User.findByIdAndUpdate(user._id, {
+        $set: {
+          isOnline: false,
+          lastSeen: new Date()
+        }
+      });
+    }
+
     res.status(200).json({
       success: true,
-      message: "Oturum başarıyla kapatıldı",
+      message: "Oturum başarıyla kapatıldı"
     });
   } catch (error) {
-    console.error("Oturum kapatılırken hata oluştu:", error);
+    console.error("logout error:", error);
     res.status(500).json({
       success: false,
-      message: "Oturum kapatılırken bir hata oluştu",
+      message: "Oturum kapatılırken hata oluştu"
     });
   }
 };

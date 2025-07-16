@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getCompanyChatSessions,
   createChatSession,
+  getCompanyChatStatuses,
   getChatMessages,
   sendMessage,
   toggleArchiveChat,
@@ -66,6 +67,22 @@ router.post(
     check('content', 'Mesaj içeriği zorunludur').not().isEmpty(),
   ],
   broadcastToAllCompanies
+);
+
+// ————— Mevcut sohbet oturumlarını çek —————
+// GET /api/chat/sessions/:companyId
+router.get(
+  '/sessions/:companyId',
+  protect,
+  getCompanyChatSessions
+);
+
+// ————— Yeni: sadece online durumlarını çek —————
+// GET /api/chat/sessions/:companyId/statuses
+router.get(
+  '/sessions/:companyId/statuses',
+  protect,
+  getCompanyChatStatuses
 );
 
 export default router; 
