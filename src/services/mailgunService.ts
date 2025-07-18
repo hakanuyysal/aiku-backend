@@ -44,7 +44,7 @@ class MailgunService {
     console.log("Verification URL:", verificationUrl);
 
     const messageData = {
-      from: `AIKU AI Platform <postmaster@${this.domain}>`,
+      from: `AIKU AI Platform <info@${this.domain}>`,
       to: email,
       subject: "Email Verification",
       template: "email-verification",
@@ -84,7 +84,7 @@ class MailgunService {
     expiresInMinutes: number
   ): Promise<void> {
     const messageData = {
-      from: `AIKU AI Platform <postmaster@${this.domain}>`,
+      from: `AIKU AI Platform <info@${this.domain}>`,
       to: newEmail,
       subject: "Your Verification Code",
       template: "email-change-verification",
@@ -111,7 +111,7 @@ class MailgunService {
     }
   ): Promise<void> {
     const messageData = {
-      from: `AIKU AI Platform <postmaster@${this.domain}>`,
+      from: `AIKU AI Platform <info@${this.domain}>`,
       to,
       subject: "AIKU · You have a new chat message",
       template: "chat-notification",
