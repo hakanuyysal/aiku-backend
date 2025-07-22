@@ -45,6 +45,7 @@ import heartbeatRouter from './routes/heartbeat';
 import { ClaimRequest } from "./models/ClaimRequest";
 import { startOfflineUpdater } from './updateOnlineStatus';
 import { User } from './models/User'
+import academicAiRoutes from "./routes/academicAiRoutes";
 
 // Env değişkenlerini yükle
 dotenv.config();
@@ -601,6 +602,7 @@ app.use("/api/product", productRoutes);
 app.use("/api/team-members", teamMemberRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/academic-ai", academicAiRoutes);
 app.use("/api", linkedInRoutes);
 app.use("/api/cards", cardRoutes);
 app.use("/api/payments", paymentRoutes);
