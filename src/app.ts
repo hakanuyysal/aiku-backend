@@ -71,6 +71,8 @@ const whitelist = [
   "http://127.0.0.1:5500",
   "https://bevakpqfycmxnpzrkecv.supabase.co",
   "https://posws.param.com.tr",
+  "https://www.alohadijital.com",
+  "https://alohadijital.com"
 ];
 
 // 30 saniyelik eşik

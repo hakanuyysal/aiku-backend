@@ -3,12 +3,13 @@ import mongoose, { Document, Model, Schema } from "mongoose";
 export interface IAcademicMessage extends Document {
   chatSession: mongoose.Schema.Types.ObjectId;
   sender?: mongoose.Schema.Types.ObjectId;
+  role: "user" | "assistant";
   content: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-interface IAcademicMessageModel extends Model<IAcademicMessage> {}
+interface IAcademicMessageModel extends Model<IAcademicMessage> { }
 
 const academicMessageSchema = new Schema<IAcademicMessage>(
   {
@@ -22,6 +23,11 @@ const academicMessageSchema = new Schema<IAcademicMessage>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: false,
+    },
+    role: {
+      type: String,
+      enum: ["user", "assistant"],
+      required: true
     },
     content: {
       type: String,
