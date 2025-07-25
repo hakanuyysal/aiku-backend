@@ -65,14 +65,14 @@ const whitelist = [
   "https://aikuaiplatform.com",
   "https://www.aikuaiplatform.com",
   "https://api.aikuaiplatform.com",
+  "https://www.alohadijital.com",
+  "https://alohadijital.com",
   "http://localhost:3000",
   "http://localhost:3001",
   "http://localhost:3004",
   "http://127.0.0.1:5500",
   "https://bevakpqfycmxnpzrkecv.supabase.co",
-  "https://posws.param.com.tr",
-  "https://www.alohadijital.com",
-  "https://alohadijital.com"
+  "https://posws.param.com.tr"
 ];
 
 // 30 saniyelik eşik
