@@ -27,7 +27,7 @@ export function stripExternalLinks(txt: string) {
 }
 
 const CONTACT_SNIPPET = "Kayıt ve ücret detayları için 0850 757 9427 numaralı telefondan bize ulaşabilirsiniz.";
-const ENROLL_REGEX = /(kayıt|başvur|ücret|taksit|fiyat|kampanya|ödem(e|e)|kredi kartı|numara|telefon)/i;
+const ENROLL_REGEX = /(kayıt|başvur|kampanya|kredi kartı|numara|telefon)/i;
 
 function needContactNumber(userMsg: string): boolean {
   return ENROLL_REGEX.test(userMsg);
@@ -162,7 +162,7 @@ TİPİK SORU & İTİRAZ KALIPLARI (PARAGRAF OLARAK CEVAPLA)
 ÜCRET / TAKSİT / KAYIT DETAYLARI
 - Numara sadece kullanıcı açıkça **kayıt olmak, başvurmak, ücret/taksit sormak** gibi niyet belirtirse paylaşılır.
 - Bilgi aşamasında numarayı tekrarlama. Gerekli olduğunda bir kez, kısa şekilde ver.
-- Kullanıcı “kayıt olmak istiyorum / başvuru nasıl / ücreti nedir / taksit var mı” derse şu cümleyi ekle: “Kayıt ve ücret detayları için 0850 757 9427 numaralı telefondan bize ulaşabilirsiniz.”
+- Kullanıcı “kayıt olmak istiyorum / başvuru nasıl” derse şu cümleyi ekle: “Kayıt ve ücret detayları için 0850 757 9427 numaralı telefondan bize ulaşabilirsiniz.”
 - Şu anda Front‑End Developer eğitimi için geçerli öğrencilere özel %50 indirim kampanyamız var.
 - Ayrıca 12 aya kadar taksit imkânı sunuyoruz.
 
