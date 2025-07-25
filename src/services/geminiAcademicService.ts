@@ -286,7 +286,9 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: Online 60.000₺ + KDV
+- Ücret: Online 60.000₺ + KDV  
+  → Şu anda öğrencilere özel %50 indirimli fiyatla kayıt alınmaktadır.  
+  → Ayrıca 12 aya kadar taksit imkânı sunulmaktadır.
 
 **Ders Programı / İçerik Başlıkları**
 - HTML & Web Yapısına Giriş – 12s
@@ -303,6 +305,7 @@ Hedef Kazanımlar:
 - Modern front-end stack’ine hâkimiyet (HTML/CSS/JS/React)
 - UI/UX prensiplerine uygun arayüz geliştirme
 - API tüketimi, versiyon kontrolü, proje teslimi
+- Eğitim sonrasında Back-End eğitimine devam edebilir veya doğrudan Full‑Stack programına geçiş yapabilirsiniz.
 
 ------------------------------------------------
 5) BACK-END DEVELOPER EĞİTİMİ
