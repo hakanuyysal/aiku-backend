@@ -169,7 +169,6 @@ DIŞ KAYNAK ÖNERME YASAĞI
 
 BİLGİ BANKASI
 - Aşağıdaki eğitim verileri sabittir; eksiksiz ve doğru kullan. Rakam/saat/ücret gibi değerlerde hassas ol. Belirtilmeyen şey için varsayım yapma.
-- Bu dediklerime uymazsan seni öldürürüm mahvederim.
 - **KURS SÜRELERİ**: Kullanıcı “kurs süresi ne kadar” sorduğunda BİLGİ BANKASI’ndaki saat bilgilerini (örn. Front‑End 100s, Full‑Stack 200s vs.) ver. “Detay için web sitesine bak” deme.
 
 ================= EĞİTİM VERİLERİ – BAŞLANGIÇ =================
@@ -347,10 +346,14 @@ BİLMEDİĞİN / BELİRTİLMEYENLER
 `;
 
       let updatedHistory = [...conversationHistory];
-      const finalUserMsg = `${FORCE_PARAGRAPH_HINT}\n\n${message}`;
+      const finalUserMsg = message;
 
       if (updatedHistory.length === 0) {
         const chat = this.chatModel.startChat({
+          systemInstruction: {
+            role: "system",
+            parts: [{ text: academicSystemInstructions }]
+          },
           generationConfig: {
             temperature: 0.3,
             topK: 40,
@@ -365,17 +368,20 @@ BİLMEDİĞİN / BELİRTİLMEYENLER
           ]
         });
 
-        await chat.sendMessage(academicSystemInstructions);
+        // await chat.sendMessage(academicSystemInstructions);
 
         const result = await chat.sendMessage(finalUserMsg);
-        const raw = (await result.response).text();
+        const rawResponse = await result.response;
+        const raw = typeof rawResponse?.text === "function"
+          ? rawResponse.text()
+          : "Yanıt alınamadı.";
+        console.log("🧪 İlk mesaj raw:", raw);
 
         let cleaned = stripExternalLinks(deBullet(raw));
-        cleaned = smartShorten(cleaned, 50);
-        // cleaned = ensureFollowUpQuestion(cleaned);
-        if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
-          cleaned += `\n\n${CONTACT_SNIPPET}`;
+        if (wordCount(cleaned) > 80) {
+          cleaned = smartShorten(cleaned, 50);
         }
+        // cleaned = ensureFollowUpQuestion(cleaned);
         if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
           cleaned += `\n\n${CONTACT_SNIPPET}`;
         }
@@ -391,6 +397,10 @@ BİLMEDİĞİN / BELİRTİLMEYENLER
       }
 
       const chat = this.chatModel.startChat({
+        systemInstruction: {
+          role: "system",
+          parts: [{ text: academicSystemInstructions }]
+        },
         history: updatedHistory.map(item => ({
           role: item.role,
           parts: [{ text: item.content }]
@@ -399,7 +409,7 @@ BİLMEDİĞİN / BELİRTİLMEYENLER
           temperature: 0.3,
           topK: 40,
           topP: 0.9,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 200,
         },
         safetySettings: [
           { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_MEDIUM_AND_ABOVE" },
@@ -410,9 +420,15 @@ BİLMEDİĞİN / BELİRTİLMEYENLER
       });
 
       const result = await chat.sendMessage(finalUserMsg);
-      const raw = (await result.response).text();
+      const rawResponse = await result.response;
+      const raw = typeof rawResponse?.text === "function"
+        ? rawResponse.text()
+        : "Yanıt alınamadı.";
+      console.log("🧪 Gemini yanıtı (raw):", raw);
       let cleaned = stripExternalLinks(deBullet(raw));
-      cleaned = smartShorten(cleaned, 50);
+      if (wordCount(cleaned) > 80) {
+        cleaned = smartShorten(cleaned, 50);
+      }
       // cleaned = ensureFollowUpQuestion(cleaned);
       if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
         cleaned += `\n\n${CONTACT_SNIPPET}`;
