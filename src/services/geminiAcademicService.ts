@@ -209,6 +209,7 @@ ORTAK AVANTAJLAR (Tüm eğitimler için geçerli)
 - Başarılı öğrenciler iş fırsatları için değerlendirilir.
 - Eğitmenlere ve ekibe sorular için doğrudan ulaşabilme imkânı vardır.
 - Tüm eğitimlerin sonunda, başarıyla tamamlayan katılımcılara e-Devlet onaylı dijital sertifika verilir.
+- Dersler hem haftaiçi hem haftasonu yapılır. Haftaiçi ve haftasonu olarak iki ayrı sınıf bulunmuyor.
 
 ------------------------------------------------
 1) YAPAY ZEKA DEVELOPER EĞİTİMİ
