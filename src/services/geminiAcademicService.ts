@@ -9,6 +9,10 @@ const FORCE_PARAGRAPH_HINT =
   "Cevabını 2–3 kısa cümleyle, maksimum 25–30 kelime olacak şekilde yaz; madde işareti/numara/tablo/başlık kullanma. " +
   "Dış kaynak önermeden yalnızca Aloha Dijital Akademi eğitimlerine yönlendir.";
 
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export function deBullet(txt: string) {
   return txt
     // satır başındaki madde & numaraları sil
@@ -414,6 +418,10 @@ KURALLAR
           cleaned += `\n\n${CONTACT_SNIPPET}`;
         }
 
+        const kelimeSayisi = wordCount(cleaned);
+        const gecikmeMs = Math.min(5000, kelimeSayisi * 70);
+        await delay(gecikmeMs);
+
         updatedHistory = [
           { role: "user", content: academicSystemInstructions },
           { role: "model", content: "(context set)" },
@@ -461,9 +469,12 @@ KURALLAR
       if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
         cleaned += `\n\n${CONTACT_SNIPPET}`;
       }
-      if (needContactNumber(message) && !cleaned.includes("0850 757 9427")) {
-        cleaned += `\n\n${CONTACT_SNIPPET}`;
-      }
+      
+
+      const kelimeSayisi = wordCount(cleaned);
+      const gecikmeMs = Math.min(5000, kelimeSayisi * 70);
+      await delay(gecikmeMs);
+
 
       updatedHistory.push({ role: "user", content: finalUserMsg });
       updatedHistory.push({ role: "model", content: cleaned });
