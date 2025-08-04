@@ -4,7 +4,8 @@ import { ChatSession, IChatSession } from "../models/ChatSession";
 import { Message } from "../models/Message";
 import { Company } from "../models/Company";
 import { io } from "../app";
-import { mailgunService } from '../services/mailgunService';
+// import { mailgunService } from '../services/mailgunService';
+import { brevoService } from '../services/brevoService';
 
 interface CustomRequest extends Request {
   company?: {
@@ -459,7 +460,7 @@ export const sendMessage = async (req: Request, res: Response) => {
       const recipientEmail = recipientUser.email as string;
       const chatUrl = `${process.env.FRONTEND_URL}/chats/${chatSessionId}`;
 
-      await mailgunService.sendChatNotification(recipientEmail, {
+      await brevoService.sendChatNotification(recipientEmail, {
         companyName: senderCompany?.companyName || 'Biri',
         content,
         chatUrl

@@ -9,7 +9,8 @@ import { UserResponse } from "../types/UserResponse";
 import { authService } from "../services/authService";
 import { GoogleService } from "../services/googleService";
 import crypto from "crypto";
-import { mailgunService } from "../services/mailgunService";
+// import { mailgunService } from "../services/mailgunService";
+import { brevoService } from "../services/brevoService";
 import { is } from "cheerio/dist/commonjs/api/traversing";
 
 const createToken = (id: string): string => {
@@ -88,7 +89,7 @@ export const register = async (req: Request, res: Response) => {
 
     // Doğrulama e-postası gönder
     try {
-      await mailgunService.sendVerificationEmail(email, verificationToken);
+      await brevoService.sendVerificationEmail(email, verificationToken);
     } catch (error) {
       console.error("Verification email was not sent:", error);
       // E-posta gönderilemese bile kullanıcı kaydını tamamla
@@ -223,7 +224,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
 
     // Yeni doğrulama e-postası gönder
     try {
-      await mailgunService.sendVerificationEmail(email, verificationToken);
+      await brevoService.sendVerificationEmail(email, verificationToken);
       res.json({
         success: true,
         message: "Verification email resent.",
@@ -265,7 +266,7 @@ export const requestEmailChange = async (req: Request, res: Response) => {
     await user.save();
 
     // 3) mail gönder
-    await mailgunService.sendEmailChangeCode(newEmail, changeCode, expiresInMinutes);
+    await brevoService.sendEmailChangeCode(newEmail, changeCode, expiresInMinutes);
 
     res.json({ success: true, message: "Verification code sent to your new email address." });
   } catch (err: any) {
