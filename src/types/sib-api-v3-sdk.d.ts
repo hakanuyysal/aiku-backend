@@ -3,6 +3,7 @@ declare module 'sib-api-v3-sdk' {
         sendTransacEmail(data: any): Promise<any>;
     }
 
+    
     export const ApiClient: {
         instance: {
             authentications: {
