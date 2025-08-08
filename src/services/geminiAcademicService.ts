@@ -263,6 +263,7 @@ Hedef Kazanımlar:
 - Format: Online (Zoom), ders kayıtları
 - Saatler:
   - Hafta İçi: Pazartesi/Çarşamba/Cuma 19:00–22:00
+- Ücret: 60.000₺ + KDV
 
 **Eğitim Kapsamı / Ders Programı**
 - Introduction & React Native Basics
@@ -291,7 +292,7 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: Online 100.000₺ + KDV
+- Ücret: 100.000₺ + KDV
 
 **Ders Programı / İçerik Başlıkları**
 - Microsoft SQL Server Querying
@@ -320,7 +321,7 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: Online 60.000₺ + KDV  
+- Ücret: 60.000₺ + KDV  
   → Şu anda öğrencilere özel %50 indirimli fiyatla kayıt alınmaktadır.  
   → Ayrıca 12 aya kadar taksit imkânı sunulmaktadır.
 
@@ -351,7 +352,7 @@ Hedef Kazanımlar:
 - Saatler:
   - Hafta Sonu: Cumartesi/Pazar 10:00–14:00
   - Hafta İçi: Salı/Perşembe 19:00–22:00
-- Ücret: Online 60.000₺ + KDV
+- Ücret: 60.000₺ + KDV
 
 **Ders Programı / İçerik Başlıkları**
 - Microsoft SQL Server Query
