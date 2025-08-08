@@ -42,6 +42,7 @@ import investmentNewsRoutes from './routes/investmentNewsRoutes';
 import hubRoutes from "./routes/hubRoutes";
 import claimRequestRoutes from "./routes/claimRequestRoutes";
 import heartbeatRouter from './routes/heartbeat';
+import metaConversionsRoutes from "./routes/metaConversionsRoutes";
 import { ClaimRequest } from "./models/ClaimRequest";
 import { startOfflineUpdater } from './updateOnlineStatus';
 import { User } from './models/User'
@@ -626,6 +627,7 @@ app.use('/api/investment-news', investmentNewsRoutes);
 app.use("/api/hub", hubRoutes);
 app.use("/api/claim-requests", claimRequestRoutes);
 app.use('/api/heartbeat', heartbeatRouter);
+app.use("/api/meta", metaConversionsRoutes);
 
 // Ana route
 app.get("/", (_req: Request, res: Response) => {
